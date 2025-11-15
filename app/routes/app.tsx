@@ -5,6 +5,9 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 
+import '../styles/_variables.scss'
+import {useEffect} from "react";
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
@@ -14,6 +17,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
+  //设置主题
+  const setTheme = ()=>{
+    const theme = localStorage.getItem('YCChat_application_theme') || 'light'
+    document.getElementsByTagName('html')[0].setAttribute('data-theme',theme)
+  }
+
+  useEffect(() => {
+    setTheme()
+  },[])
 
   return (
     <AppProvider embedded apiKey={apiKey}>
