@@ -1,0 +1,13 @@
+@import "base";
+:root{
+  --yc-primary_background_color: #fff;
+  --yc-text_color: #000;
+  --yc-primary_border_radius: 1rem;
+  --yc-gray_color: #f1f1f1;
+  --yc-primary_padding: 1rem;
+  --yc_badge_color: #dd1515;
+}
+[data-theme = 'dark']{
+  --yc-primary_background_color: #000;
+  --yc-text_color: #fff;
+}
