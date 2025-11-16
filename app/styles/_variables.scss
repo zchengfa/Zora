@@ -1,13 +1,27 @@
 @import "base";
 :root{
-  --yc-primary_background_color: #fff;
-  --yc-text_color: #000;
-  --yc-primary_border_radius: 1rem;
-  --yc-gray_color: #f1f1f1;
-  --yc-primary_padding: 1rem;
-  --yc_badge_color: #dd1515;
+  --z-primary_background_color: #fff;
+  --z-text_color: #000;
+  --z-primary_border_radius: 1rem;
+  --z-gray_color: #f1f1f1;
+  --z-primary_padding: 1rem;
+  --z-badge_color: #dd1515;
+  --z-online_tip: #3cbf37;
+  --z-white: #fff;
+  --z-deep_gray_color: #666;
+  --z-secondary_background_color: #e0e0e0;
+  --z-active-color: #a1ecda;
+  --z-secondary_text_color:var(--z-deep_gray_color)
 }
 [data-theme = 'dark']{
-  --yc-primary_background_color: #000;
-  --yc-text_color: #fff;
+  --z-primary_background_color: #000;
+  --z-text_color: #fff;
+  --z-gray_color: #2a2a2a;
+  --z-primary_padding: 1rem;
+  --z-badge_color: #ff4444;
+  --z-online_tip: #4cd137;
+  --z-white: #fff;
+  --z-deep_gray_color: #a0a0a0;
+  --z-secondary_background_color: #1a1a1a;
+  --z-secondary_text_color:var(--z-text_color)
 }

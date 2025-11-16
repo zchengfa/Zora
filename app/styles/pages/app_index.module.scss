@@ -11,33 +11,36 @@
   height: 100%;
   .content{
     @include flexLayout(column,space-between);
-    padding: var(--yc-primary_padding);
+    padding: var(--z-primary_padding);
     position: relative;
     top: 50%;
     left: 50%;
     width: 97%;
     height: 96%;
-    background-color: var(--yc-primary_background_color);
-    border-radius: var(--yc-primary_border_radius);
+    background-color: var(--z-primary_background_color);
+    border-radius: var(--z-primary_border_radius);
     transform: translate(-50%, -50%);
     .statusBox{
       @include flexLayout(row,right,center);
       width: 100%;
       text-align: right;
       .tipSpan,.status{
-        color: var(--yc-gray_color);
+        color: var(--z-text_color);
       }
     }
     .chatContent{
       @include flexLayout;
       width: 100%;
       flex: 1;
-      background: var(--yc-gray_color);
-      border-radius: var(--yc-primary_border_radius);
+      border-radius: var(--z-primary_border_radius);
       .chatTitle{
         width: 100%;
         margin: 1rem 0;
+        text-indent: .8rem;
+        font-size: 1.2rem;
+        font-weight: bold;
         text-transform: capitalize;
+        color: var(--z-text_color);
       }
       .chatBox{
         flex: 1;
@@ -49,15 +52,13 @@
         .chatLeft{
           @include flexLayout;
           flex: 1;
-          background: yellow;
+          min-width: 250px;
         }
         .chatRight{
           flex: 1;
-          background: red;
         }
         .chatMiddle{
           flex: 2.5;
-          background: blue;
         }
       }
     }

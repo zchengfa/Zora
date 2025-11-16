@@ -7,7 +7,7 @@
     position: relative;
     top: 50%;
     width: 90%;
-    height: 1.5rem;
+    height: 2rem;
     border-radius: 2rem;
     text-indent: 1rem;
     transform: translateY(-50%);
@@ -17,7 +17,7 @@
     position: relative;
     top: 50%;
     width: 100%;
-    height: 1.5rem;
+    height: 2rem;
     border-radius: 2rem;
     text-indent: 1rem;
     transform: translateY(-50%);
@@ -25,15 +25,17 @@
   }
   .searchIcon{
     width: fit-content;
-    position: relative;
-    right: -80%;
+    position: absolute;
+    right: 10%;
+    top: 50%;
     transform: translateY(-50%);
     transition: all 300ms ease-out;
   }
   .searchIconActive{
     width: fit-content;
-    position: relative;
-    right: -88%;
+    position: absolute;
+    right: 5%;
+    top: 50%;
     transform: translateY(-50%);
     transition: all 300ms ease-out;
   }
@@ -48,10 +50,11 @@
     height: fit-content;
     min-height: 300%;
     max-height: 74dvh;
-    background: pink;
+    background: var(--z-secondary_background_color);
     overflow-y: scroll;
+    z-index: 9;
     .emptyBox{
-      color: var(--yc-gray_color);
+      color: var(--z-gray_color);
     }
   }
 }
