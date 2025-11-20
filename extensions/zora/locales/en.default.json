@@ -1,0 +1,8 @@
+{
+    "zora":{
+        "title": "chat with zora agent",
+        "description": "👋 Hi, message us with any questions. We're happy to help!",
+        "placeholder": "write your message",
+        "chat_btn": "chat now"
+    }
+}

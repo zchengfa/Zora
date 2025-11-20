@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "zora": {
+      "settings": {
+        "zora_bg_color":{
+          "label":"zora bg color",
+          "info": "change Zora bg color"
+        },
+        "zora_size_position_x": {
+          "label": "Zora left position",
+          "info": "change zora left position"
+        },
+        "zora_size_position_y": {
+          "label": "Zora bottom position",
+          "info": "change zora bottom position"
+        }
+      }
+    }
+  }
+}

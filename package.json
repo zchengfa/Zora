@@ -17,7 +17,8 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
-    "typecheck": "react-router typegen && tsc --noEmit"
+    "typecheck": "react-router typegen && tsc --noEmit",
+    "socket-server": "node socketServer/socketServer.ts"
   },
   "type": "module",
   "engines": {
@@ -38,7 +39,8 @@
     "react-dom": "^18.3.1",
     "react-router": "^7.9.3",
     "sass": "^1.94.0",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@shopify/api-codegen-preset": "^1.2.0",

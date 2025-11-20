@@ -1,0 +1,6 @@
+name = "Zora"
+type = "theme_app_extension"
+uid = "bd4a2aff-76e3-49e2-bc67-78738f89117939816718"
+
+[capabilities]
+app_embed = true

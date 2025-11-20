@@ -59,6 +59,8 @@
         }
         .chatMiddle{
           flex: 2.5;
+          background-color: var(--z-white);
+          border-radius: var(--z-primary_border_radius);
         }
       }
     }

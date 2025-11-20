@@ -7,6 +7,23 @@
 /** @type {import('eslint').Linter.Config} */
 module.exports = {
   root: true,
+  settings:{
+    'import/resolver': {
+      typescript: {
+        project: './tsconfig.json',
+      },
+      alias:{
+        map: [
+          ['@', './app'],
+          ['@styles', './app/styles'],
+          ['@components', './app/components'],
+          ['@hooks', './app/hooks'],
+          ['@Utils', './app/utils']
+        ],
+        extensions: ['.ts', '.tsx', '.js', '.jsx', '.scss']
+      }
+    }
+  },
   parserOptions: {
     ecmaVersion: "latest",
     sourceType: "module",
