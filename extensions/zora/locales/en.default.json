@@ -3,6 +3,21 @@
         "title": "chat with zora agent",
         "description": "👋 Hi, message us with any questions. We're happy to help!",
         "placeholder": "write your message",
-        "chat_btn": "chat now"
+        "chat_btn": "chat now",
+        "auth_title": "before we get started",
+        "auth_description": "Please provide your information so we can reply to you if you leave the chat.",
+        "firstName": "first Name",
+        "lastName": "last Name",
+        "password": "password",
+        "email": "email",
+        "market_email": "Receive marketing emails",
+        "market_SMS": "Receive SMS marketing messages",
+        "policy": "Zora reminds you that if this is your first time filling in the above information, Zora will automatically add you to this Shopify store, making it convenient for you to check orders and perform other operations.",
+        "missing_info": "⚠️content: missing information",
+        "invalid_password": "⚠️password: 8 to 20 uppercase and lowercase characters and contain at least any special symbol in !@#$%^&*",
+        "invalid_email": "⚠️email: invalid email",
+        "verify_code": "verify code",
+        "send": "send",
+        "verify": "verify",
     }
 }

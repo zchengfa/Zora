@@ -2,7 +2,7 @@
   .zora-container{
     display: none;
   }
-  .zora-container-active{
+  .zora-container-active,.zora-auth-container{
     position: absolute;
     display: flex;
     flex-direction: column;
@@ -130,10 +130,125 @@
     background: {{ block.settings.zora_bg_color }};
     border-radius: .5rem;
   }
+  .zora-auth-container{
+    width: fit-content;
+    height: fit-content;
+  }
+  .zora-form-email-box{
+    position: relative;
+    width: 100%;
+  }
+  .zora-form-input{
+    margin-top: 1rem;
+    color: #000;
+    background: #fff;
+  }
+  .zora-verify-box{
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    mix-blend-mode: difference;
+    background:{{ block.settings.zora_bg_color }};
+    border-top-right-radius: .5rem;
+    border-bottom-right-radius: .5rem;
+  }
+  .zora-code-send,.zora-ex,.zora-code-verify{
+    display: flex;
+    min-width: 3rem;
+    justify-content: center;
+    align-items: center;
+    height: 2.2rem;
+    color: #000;
+  }
+  .zora-form-input::placeholder{
+    color: #aaa3a3ff;
+    text-transform: capitalize;
+  }
+  #zora-verify-code{
+    margin-top: 0;
+    max-width: 5rem;
+    text-indent: 0;
+    text-align: center;
+    border-radius: 0;
+    border-left: 1px solid #d5cccc;
+    border-right: 1px solid #d5cccc;
+    background: transparent;
+  }
+  #zora-verify-code:focus-visible{
+    box-shadow: none;
+  }
+  #zora-verify-code::placeholder{
+    color: #000;
+  }
+  .zora-check-item{
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-top: .5rem;
+    font-size: .8rem;
+  }
+
+  .zora-auth-btn,.zora-disabled-btn{
+    margin: 1rem auto;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 2.2rem;
+    border-radius: .5rem;
+    font-size: 1.2rem;
+  }
+  #zora-market-email, #zora-market-sms{
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .zora-policy-box{
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: .5rem;
+    font-size: .8rem;
+    line-height: 1.5;
+    background: rgba(0,0,0,.1);
+  }
+  .zora-disabled-btn{
+    color: #fff;
+    background: rgba(0,0,0,.1);
+    cursor: not-allowed;
+  }
+  .zora-auth-btn{
+    color: {{ block.settings.zora_bg_color }};
+    background: #fff;
+    cursor: pointer;
+  }
+  .zora-err-box{
+    width: 100%;
+    max-height: 10dvh;
+    margin-top: 1rem;
+    background: #fff;
+    border-radius: .5rem;
+    text-align: left;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+  }
+  .zora-err-item{
+    display: block;
+    padding: .5rem 1rem;
+    color: #e89f29ff;
+    font-size: .8rem;
+    line-height: 1.5;
+  }
+  .zora-err-item:last-child{
+    padding-bottom: .5rem;
+  }
+  .zora-disabled{
+    cursor: not-allowed;
+  }
   .hidden{
     display: none;
   }
-  
+
 {% endstyle %}
 
 <div class="zora-container">
@@ -164,7 +279,7 @@
       <zora-input-component class="zora-input-component" data-target="normal-send" data-target-active="active-send">
         <input id="zora-input" placeholder={{ 'zora.placeholder' | t }} class="zora-input" />
       </zora-input-component>
-      <zora-send-component class="zora-send-component">
+      <zora-send-component class="zora-send-component" data-input="zora-input" >
         <div class="zora_icon_box normal-send">
           <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"  width="1em" height="1em"><path d="M1024 10.24l-251.619556 271.928889a8.021333 8.021333 0 0 0-1.991111 7.082667 49.208889 49.208889 0 0 1-83.655111 44.145777l-200.533333 200.476445 19.768889 264.96L731.136 1024 1024 10.24z" fill="#cdcdcd"></path><path d="M1021.240889 17.066667l-248.917333 269.084444a8.021333 8.021333 0 0 0-1.991112 7.111111 48.526222 48.526222 0 0 1-82.773333 43.576889l-197.12 197.12a3.982222 3.982222 0 0 0-1.137778 3.043556l19.456 260.209777L1010.744889 39.936l10.780444-22.755556-0.284444-0.085333z" fill="#cdcdcd" p-id="19679"></path><path d="M1013.816889 0.056889l-271.928889 251.591111a8.049778 8.049778 0 0 1-7.139556 2.048 49.208889 49.208889 0 0 0-44.088888 83.626667l-200.533334 200.533333-264.846222-19.911111L0 292.835556 1013.816889 0.056889z" fill="#cdcdcd"></path><path d="M1006.961778 3.072L737.848889 252.017778a8.021333 8.021333 0 0 1-6.997333 1.991111 48.497778 48.497778 0 0 0-43.605334 82.773333l-197.148444 197.12a3.953778 3.953778 0 0 1-3.128889 1.109334l-260.209778-19.456L984.064 13.568l22.755556-10.752 0.142222 0.256z" fill="#cdcdcd"></path></svg>
         </div>
@@ -173,8 +288,59 @@
         </div>
       </zora-send-component>
     </div>
-    <zora-chat-btn-component class="zora-chat-btn-component" data-header="zora-header" data-header-active="zora-header-active-box" data-input="zora-input-box" data-target-msg="zora-message-box" data-target-msg-active="zora-message-box-active">
+    <zora-chat-btn-component class="zora-chat-btn-component" data-container="zora-container-active" data-auth-container="zora-auth-container" data-header="zora-header" data-header-active="zora-header-active-box" data-input="zora-input-box" data-target-msg="zora-message-box" data-target-msg-active="zora-message-box-active">
       <button class="zora-chat-btn">{{ 'zora.chat_btn' | t }}</button>
     </zora-chat-btn-component>
   </div>
+</div>
+<div class="zora-auth-container hidden">
+  <div class="zora-header">
+    <h3 class="zora-title">{{ 'zora.auth_title' | t }}</h3>
+    <p class="zora-description">{{ 'zora.auth_description' | t }}</p>
+  </div>
+  <zora-auth-form-component
+    data-first-name="zora-firstName"
+    data-last-name="zora-lastName"
+    data-pwd="zora-password"
+    data-email="zora-email"
+    data-market-email="zora-market-email"
+    data-market-Sms="zora-market-sms"
+    data-submit="zora-submit"
+  >
+    <form action="#" id="zora-auth-form">
+      <input id="zora-firstName" type="text" class="zora-input zora-form-input" placeholder="{{ 'zora.firstName' | t }}" />
+      <input id="zora-lastName" type="text" class="zora-input zora-form-input" placeholder="{{ 'zora.lastName' | t }}" />
+      <input id="zora-password" type="password" class="zora-input zora-form-input" placeholder="{{ 'zora.password' | t }}" />
+      <div class="zora-form-email-box">
+        <input id="zora-email" type="email" class="zora-input zora-form-input" placeholder="{{ 'zora.email' | t }}" />
+        <div class="zora-verify-box hidden">
+          <input id="zora-verify-code" type="text" class="zora-input zora-form-input" placeholder="{{ 'zora.verify_code' | t }}" />
+          <div class="zora-send-verify">
+            <button class="zora-code-send">{{ 'zora.send' | t }}</button>
+            <span class="zora-ex hidden">0s</span>
+            <button class="zora-code-verify  zora-disabled hidden"  disabled>{{ 'zora.verify' | t }}</button>
+          </div>
+        </div>
+      </div>
+      <div class="zora-check-box">
+        <div class="zora-check-item">
+          <input type="checkbox" id="zora-market-email" />
+          <label for="zora-market-email">{{ 'zora.market_email' | t }}</label>
+        </div>
+        <div class="zora-check-item">
+          <input type="checkbox" id="zora-market-sms" />
+          <label for="zora-market-sms">{{ 'zora.market_SMS' | t }}</label>
+        </div>
+      </div>
+      <div class="zora-policy-box">
+        <p class="zora-policy-text">{{ 'zora.policy' | t }}</p>
+      </div>
+      <div class="zora-err-box hidden-scroller">
+        <span class="zora-err-item err-info hidden">{{ 'zora.missing_info' | t}}</span>
+        <span class="zora-err-item err-pwd hidden">{{ 'zora.invalid_password' | t }}</span>
+        <span class="zora-err-item err-email hidden">{{ 'zora.invalid_email' | t }}</span>
+      </div>
+      <button id="zora-submit" class="zora-btn zora-disabled-btn" disabled type="submit">{{ 'zora.chat_btn' | t }}</button>
+    </form>
+  </zora-auth-form-component>
 </div>

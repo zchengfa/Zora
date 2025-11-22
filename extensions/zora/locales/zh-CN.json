@@ -3,6 +3,21 @@
         "title": "联系zora代理",
         "description": "👋您好，如有任何疑问，请给我们发送消息。我们很乐意为您提供帮助！",
         "placeholder": "输入您的消息",
-        "chat_btn": "立即联系"
+        "chat_btn": "立即联系",
+        "auth_title": "开始之前",
+        "auth_description": "请提供您的联系信息，以便我们可在您离开聊天时向您发送回复消息。",
+        "firstName": "姓氏",
+        "lastName": "名字",
+        "password": "密码",
+        "email": "邮箱",
+        "market_email": "接收营销电子邮件",
+        "market_SMS": "接收SMS营销短信",
+        "policy": "zora提醒您，若您是首次填写以上信息，zora将会自动将您加入到本shopify商店中，方便您查询订单等操作",
+        "missing_info": "⚠️内容：缺少信息",
+        "invalid_password": "⚠️密码：8~20位大小写字符，且包含任意!@#$%^&*特殊字符",
+        "invalid_email": "⚠️邮箱：邮箱不合规",
+        "verify_code": "验证码",
+        "send": "发送",
+        "verify": "验证",
     }
 }

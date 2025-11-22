@@ -1,4 +1,10 @@
 {% style %}
+  div,input,button{
+    box-sizing: border-box;
+  }
+.hidden-scroller::-webkit-scrollbar {
+  display: none;
+}
   .zora-main{
     position: fixed;
     width: fit-content;
@@ -58,6 +64,8 @@
     </div>
   </zora-button>
   {% render 'zora' %}
+  <script defer src="{{ 'utils.js' | asset_url }}"></script>
+  <script defer src="{{ 'websocket.js' | asset_url }}"></script>
   <script defer src="{{ 'zora.js' | asset_url }}"></script>
 </div>
 
