@@ -2,6 +2,7 @@
   "include": ["env.d.ts", "**/*.ts", "**/*.tsx", ".react-router/types/**/*"],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "allowImportingTsExtensions": true,
     "strict": true,
     "skipLibCheck": true,
     "isolatedModules": true,
@@ -23,7 +24,8 @@
       "@styles/*": ["./app/styles/*"],
       "@components/*": ["./app/components/*"],
       "@hooks/*": ["./app/hooks/*"],
-      "@Utils/*": ["./app/utils/*"]
+      "@Utils/*": ["./app/utils/*"],
+      "@plugins/*": ["./plugins/*"]
     }
   }
 }
