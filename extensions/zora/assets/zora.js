@@ -1,4 +1,5 @@
 
+
 const FETCH_BASE_URL = "http://localhost:8080";
 const ZORA_TOKEN = "zora_auth_token"
 
@@ -243,26 +244,13 @@ if(!customElements.get('zora-auth-form-component')){
         })
 
       }
-      debounceCheckInputValue = debounce(() => {
-        //防抖检查所有输入框都是否有值
+      checkAllFilled() {
+        //检查所有输入框都是否有值
         const targets = ['email', 'firstName', 'lastName','password']
-        const isAllFilled = targets.every(target => this.formData[target])
-        if (isAllFilled && this.checkPasswordStrength(this.formData.password) && this.validateEmail(this.formData.email)) {
-           //再加一层判断，判断邮箱是否验证通过，不需要验证的直接显示验证通过
-          if(this.validateStatus){
-            this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-auth-btn"
-            this.querySelector('#'+ this.dataset.submit).disabled = false
-          }
-        }
-        else if(isAllFilled){
-            this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info hidden"
-        }
-        else{
-            this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-disabled-btn"
-            this.querySelector('#'+ this.dataset.submit).disabled = true
-            this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info"
-        }
-
+        return targets.every(target => this.formData[target])
+      }
+      debounceCheckInputValue = debounce(() => {
+        const isAllFilled = this.checkAllFilled()
         // 检查密码强度
         if(!this.checkPasswordStrength(this.formData.password)){
           this.querySelector('.zora-err-item.err-pwd').className = "zora-err-item err-pwd"
@@ -282,6 +270,24 @@ if(!customElements.get('zora-auth-form-component')){
           this.changeEmailValidateBox()
         }
 
+        if(isAllFilled){
+            this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info hidden"
+            console.log(isAllFilled,'hidden')
+        }
+
+        if (isAllFilled && this.checkPasswordStrength(this.formData.password) && this.validateEmail(this.formData.email)) {
+           //再加一层判断，判断邮箱是否验证通过，不需要验证的直接显示验证通过
+          if(this.validateStatus){
+            this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-auth-btn"
+            this.querySelector('#'+ this.dataset.submit).disabled = false
+          }
+        }
+        else{
+            this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-disabled-btn"
+            this.querySelector('#'+ this.dataset.submit).disabled = true
+            this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info"
+            console.log(isAllFilled,'show')
+        }
       })
       changeEmailValidateBox = ()=>{
         /*
@@ -312,7 +318,7 @@ if(!customElements.get('zora-auth-form-component')){
             }
           })
         }
-        
+
       }
       validateEmail = (email)=> {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -339,16 +345,19 @@ if(!customElements.get('zora-auth-form-component')){
           })
         }).then(response => response.json()).then(res => {
           //收到验证码发送成功的响应
-          if(res.email_send_success){
+          if(res.success){
+            //清除之前的定时器
+            if(this.zoraTimer){
+              clearInterval(this.zoraTimer)
+            }
+            this.querySelector('.zora-code-send').classList.add('hidden')
+            this.querySelector('.zora-ex').classList.remove('hidden')
+            this.endTime = new Date().getTime() + res.code_expired * 1000
+            this.countDown()
             //隐藏发送按钮，显示计时元素
              this.zoraTimer = setInterval(()=>{
               this.countDown()
             },1000)
-            this.querySelector('.zora-code-send').className = 'zora-code-send hidden'
-            this.querySelector('.zora-ex').className = 'zora-ex'
-            this.endTime = new Date().getTime() + res.code_expired * 1000
-            this.querySelector('.zora-ex').innerHTML = `${res.code_expired -1}s`
-           
           }
         })
       }
@@ -356,39 +365,75 @@ if(!customElements.get('zora-auth-form-component')){
         const now = new Date().getTime()
         const leftTime = this.endTime - now
         if(leftTime <= 0){
+          //倒计时结束，清除定时器，元素恢复到初始状态
           clearInterval(this.zoraTimer)
+          this.zoraTimer = null
+          this.verifyCodeElementsDefaultStatus()
         }
         this.querySelector('.zora-ex').innerHTML = `${Math.floor(leftTime/1000)}s`
       }
-      verifyCodeInput = debounce((e)=>{
-        //对验证码长度做出限制,大于6就不再赋值了
-        if(e.target.value.trim().length <=6){
-          this.verifyCode = e.target.value.trim()
-        }
-        else{
-           this.querySelector('#zora-verify-code').value = this.verifyCode
-        }
-        if(this.verifyCode.length >= 6){
-          this.querySelector('.zora-code-verify').className = "zora-code-verify"
-          this.querySelector('.zora-code-verify').disabled = false
-        }
-        else{
-          this.querySelector('.zora-code-verify').className = "zora-code-verify zora-disabled"
-          this.querySelector('.zora-code-verify').disabled = true
-          this.querySelector('.zora-ex').className = "zora-ex hidden"
-          //隐藏计时元素的同时也要清除定时器
-          clearInterval(this.zoraTimer)
-        }
-      },50)
+      verifyCodeInput = (e)=>{
+          if(this.zoraTimer){
+            this.querySelector('.zora-ex').className = "zora-ex hidden"
+            this.querySelector('.zora-code-send').className = 'zora-code-send hidden'
+            this.querySelector('.zora-code-verify').classList.remove('hidden')
+            const value = e.target.value.trim()
+            this.verifyCode = value.substr(0,6)
+            this.querySelector('#zora-verify-code').value = this.verifyCode
+             if(this.verifyCode.length < 6){
+              this.querySelector('.zora-code-verify').disabled = true
+              this.querySelector('.zora-code-verify').classList.add('zora-disabled')
+            }
+            else{
+              this.querySelector('.zora-code-verify').disabled = false
+              this.querySelector('.zora-code-verify').classList.remove('zora-disabled')
+            }
+          }
+      }
       verifyCodeBtn = ()=>{
         /**
          * 点击验证按钮
-         * 1.隐藏验证按钮，显示发送按钮
-         * 2.根据验证响应进行操作
-         *    2.1 验证成功，提交按钮变为可点击状态,并且修改验证状态
+         * 1.发送验证请求
+         * 2.根据验证响应进行操作,清空之前的验证码
+         *    2.1 验证成功，修改验证状态，特定输出框值都验证通过提交按钮变为可点击状态,清除定时器,元素恢复到初始状态
          *    2.2 验证失败，提示错误信息，并且修改验证状态
          */
-        
+        fetch(`${FETCH_BASE_URL}/verifyCode`,{
+          method: 'POST',
+          headers: setHeaders(),
+          body: JSON.stringify({code:this.verifyCode,email: this.formData.email})
+        }).then(response => response.json()).then(res=>{
+
+          if(res.result){
+            this.validateStatus = true
+            this.verifyCodeElementsDefaultStatus()
+            clearInterval(this.zoraTimer)
+            if(this.checkAllFilled()){
+              this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-auth-btn"
+              this.querySelector('#'+ this.dataset.submit).disabled = false
+            }
+          }
+          else{
+            this.validateStatus = false
+            //没有验证次数了或者验证码过期，清除定时器，元素恢复到初始状态
+            if(!res.left_attempt){
+              this.verifyCodeElementsDefaultStatus()
+              clearInterval(this.zoraTimer)
+            }
+            this.verifyCode = ''
+            this.querySelector('#zora-verify-code').value = ''
+          }
+          console.log(res)
+        }).catch(err=>{
+          console.log(err)
+        })
+
+      }
+      verifyCodeElementsDefaultStatus = ()=>{
+        this.querySelector('.zora-code-verify').className = "zora-code-verify zora-disabled hidden"
+        this.querySelector('.zora-code-verify').disabled = true
+        this.querySelector('.zora-code-send').className = 'zora-code-send'
+        this.querySelector('.zora-ex').className = "zora-ex hidden"
       }
       //使用 Web Crypto API 进行 SHA-256 哈希
       hashPassword = async (password) =>{
