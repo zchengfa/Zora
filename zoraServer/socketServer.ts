@@ -7,6 +7,5 @@ export function startSocketServer(server:Server) {
     const clients = new Set()
     wss.on('connection', (socket) => {
         clients.add(socket)
-        console.log('Client connected')
     })
 }

@@ -6,9 +6,7 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "@/shopify.server";
 
 import '@styles/_variables.scss'
-import {useEffect} from "react";
 
-import '../styles/_variables.scss'
 import {useEffect} from "react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
