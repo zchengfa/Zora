@@ -292,8 +292,6 @@ if(!customElements.get('zora-auth-form-component')){
         }
         else{
           this.querySelector('.zora-err-item.err-email').classList.add('hidden')
-          //显示验证元素
-          this.querySelector('.zora-verify-box').classList.remove('hidden')
           this.changeEmailValidateBox()
         }
       })
@@ -318,11 +316,12 @@ if(!customElements.get('zora-auth-form-component')){
             if(res.result){
               //直接将验证状态变为true
               this.validateStatus = true
-              this.querySelector('.zora-verify-box').className = "zora-verify-box hidden"
+              this.querySelector('.zora-verify-box').classList.add('hidden')
             }
             //如果邮箱未注册，则显示验证元素
             else{
-              this.querySelector('.zora-verify-box').className = "zora-verify-box"
+              //显示验证元素
+              this.querySelector('.zora-verify-box').classList.remove('hidden')
             }
           })
         }
@@ -382,8 +381,8 @@ if(!customElements.get('zora-auth-form-component')){
       }
       verifyCodeInput = (e)=>{
           if(this.zoraTimer){
-            this.querySelector('.zora-ex').className = "zora-ex hidden"
-            this.querySelector('.zora-code-send').className = 'zora-code-send hidden'
+            this.querySelector('.zora-ex').classList.add('hidden')
+            this.querySelector('.zora-code-send').classList.add('hidden')
             this.querySelector('.zora-code-verify').classList.remove('hidden')
             const value = e.target.value.trim()
             this.verifyCode = value.substr(0,6)
@@ -438,10 +437,10 @@ if(!customElements.get('zora-auth-form-component')){
 
       }
       verifyCodeElementsDefaultStatus = ()=>{
-        this.querySelector('.zora-code-verify').className = "zora-code-verify zora-disabled hidden"
+        this.querySelector('.zora-code-verify').classList.add('hidden')
         this.querySelector('.zora-code-verify').disabled = true
-        this.querySelector('.zora-code-send').className = 'zora-code-send'
-        this.querySelector('.zora-ex').className = "zora-ex hidden"
+        this.querySelector('.zora-code-send').classList.remove('hidden')
+        this.querySelector('.zora-ex').classList.add('hidden')
       }
       //使用 Web Crypto API 进行 SHA-256 哈希
       hashPassword = async (password) =>{
