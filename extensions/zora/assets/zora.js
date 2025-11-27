@@ -257,7 +257,7 @@ if(!customElements.get('zora-auth-form-component')){
       debounceCheckAllInputValue = debounce(() => {
         const isAllFilled = this.checkAllFilled()
         if(isAllFilled){
-          this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info hidden"
+          this.querySelector('.zora-err-item.err-info').classList.add('hidden')
         }
 
         if (isAllFilled && this.checkPasswordStrength(this.formData.password) && this.validateEmail(this.formData.email)) {
@@ -270,7 +270,7 @@ if(!customElements.get('zora-auth-form-component')){
         else{
           this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-disabled-btn"
           this.querySelector('#'+ this.dataset.submit).disabled = true
-          this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info"
+          this.querySelector('.zora-err-item.err-info').classList.remove('hidden')
         }
       })
       debouncePwdInputValue = debounce(() => {
@@ -303,28 +303,25 @@ if(!customElements.get('zora-auth-form-component')){
           *   2.1 已注册则不显示邮箱验证，可登录按钮显示
           *   2.2 未注册则显示邮箱验证，可登录按钮等验证通过后再显示
           */
-        //发起请求前先判断当前的验证元素是否为隐藏状态，如果是则不发起请求
-        if( window.getComputedStyle(this.querySelector('.zora-verify-box')).display !== 'none'){
             fetch(`${FETCH_BASE_URL}/checkEmail`,{
               method: 'POST',
               headers: setHeaders(),
               body: JSON.stringify({
               email: this.formData.email
-            })
-         }).then(res=>res.json()).then(res=>{
-            //如果邮箱已注册，则不显示验证元素
-            if(res.result){
-              //直接将验证状态变为true
-              this.validateStatus = true
-              this.querySelector('.zora-verify-box').classList.add('hidden')
-            }
-            //如果邮箱未注册，则显示验证元素
-            else{
-              //显示验证元素
-              this.querySelector('.zora-verify-box').classList.remove('hidden')
-            }
-          })
-        }
+              })
+             }).then(res=>res.json()).then(res=>{
+                //如果邮箱已注册，则不显示验证元素
+                if(res.result){
+                  //直接将验证状态变为true
+                  this.validateStatus = true
+                  this.querySelector('.zora-verify-box').classList.add('hidden')
+                }
+                //如果邮箱未注册，则显示验证元素
+                else{
+                  //显示验证元素
+                  this.querySelector('.zora-verify-box').classList.remove('hidden')
+                }
+              })
 
       }
       validateEmail = (email)=> {
