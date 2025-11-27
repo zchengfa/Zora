@@ -1,5 +1,4 @@
 
-
 const FETCH_BASE_URL = "http://localhost:8080";
 const ZORA_TOKEN = "zora_auth_token"
 
@@ -206,11 +205,15 @@ if(!customElements.get('zora-auth-form-component')){
 
       btnSubmit = async () => {
         const hashPwd = await this.hashPassword(this.formData.password)
-        this.formData.password = hashPwd
-        fetch(FETCH_BASE_URL + '/auth', {
+        const submitData = {
+          ...this.formData,
+          password: hashPwd,
+        }
+
+        fetch(FETCH_BASE_URL + '/authenticator', {
             method: 'POST',
             headers: setHeaders(),
-            body: JSON.stringify(this.formData)
+            body: JSON.stringify(submitData)
         })
       }
       listenInput = () => {
@@ -220,6 +223,7 @@ if(!customElements.get('zora-auth-form-component')){
             switch (target) {
               case this.dataset.email:
                 this.formData.email = e.target.value.trim()
+                this.debounceEmailInputValue()
                 break;
               case this.dataset.firstName:
                 this.formData.firstName = e.target.value.trim()
@@ -229,6 +233,7 @@ if(!customElements.get('zora-auth-form-component')){
                 break;
               case this.dataset.pwd:
                 this.formData.password = e.target.value.trim()
+                this.debouncePwdInputValue()
                 break;
               case this.dataset.marketEmail:
                 this.formData.marketEmail = e.target.checked
@@ -239,7 +244,7 @@ if(!customElements.get('zora-auth-form-component')){
               default:
                 break;
             }
-            this.debounceCheckInputValue()
+            this.debounceCheckAllInputValue()
           })
         })
 
@@ -249,44 +254,47 @@ if(!customElements.get('zora-auth-form-component')){
         const targets = ['email', 'firstName', 'lastName','password']
         return targets.every(target => this.formData[target])
       }
-      debounceCheckInputValue = debounce(() => {
+      debounceCheckAllInputValue = debounce(() => {
         const isAllFilled = this.checkAllFilled()
-        // 检查密码强度
-        if(!this.checkPasswordStrength(this.formData.password)){
-          this.querySelector('.zora-err-item.err-pwd').className = "zora-err-item err-pwd"
-        }
-        else{
-          this.querySelector('.zora-err-item.err-pwd').className = "zora-err-item err-pwd hidden"
-        }
-
-        // 检查邮箱格式
-        if(!this.validateEmail(this.formData.email)){
-         this.querySelector('.zora-err-item.err-email').className = "zora-err-item err-email"
-         //隐藏验证元素
-         this.querySelector('.zora-verify-box').className = "zora-verify-box hidden"
-        }
-        else{
-          this.querySelector('.zora-err-item.err-email').className = "zora-err-item err-email hidden"
-          this.changeEmailValidateBox()
-        }
-
         if(isAllFilled){
-            this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info hidden"
-            console.log(isAllFilled,'hidden')
+          this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info hidden"
         }
 
         if (isAllFilled && this.checkPasswordStrength(this.formData.password) && this.validateEmail(this.formData.email)) {
-           //再加一层判断，判断邮箱是否验证通过，不需要验证的直接显示验证通过
+          //再加一层判断，判断邮箱是否验证通过，不需要验证的直接显示验证通过
           if(this.validateStatus){
             this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-auth-btn"
             this.querySelector('#'+ this.dataset.submit).disabled = false
           }
         }
         else{
-            this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-disabled-btn"
-            this.querySelector('#'+ this.dataset.submit).disabled = true
-            this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info"
-            console.log(isAllFilled,'show')
+          this.querySelector('#'+ this.dataset.submit).className = "zora-btn zora-disabled-btn"
+          this.querySelector('#'+ this.dataset.submit).disabled = true
+          this.querySelector('.zora-err-item.err-info').className = "zora-err-item err-info"
+        }
+      })
+      debouncePwdInputValue = debounce(() => {
+
+        // 检查密码强度
+        if(!this.checkPasswordStrength(this.formData.password)){
+          this.querySelector('.zora-err-item.err-pwd').classList.remove('hidden')
+        }
+        else{
+          this.querySelector('.zora-err-item.err-pwd').classList.add('hidden')
+        }
+      })
+      debounceEmailInputValue = debounce(() => {
+        // 检查邮箱格式
+        if(!this.validateEmail(this.formData.email)){
+         this.querySelector('.zora-err-item.err-email').classList.remove('hidden')
+         //隐藏验证元素
+         this.querySelector('.zora-verify-box').classList.add('hidden')
+        }
+        else{
+          this.querySelector('.zora-err-item.err-email').classList.add('hidden')
+          //显示验证元素
+          this.querySelector('.zora-verify-box').classList.remove('hidden')
+          this.changeEmailValidateBox()
         }
       })
       changeEmailValidateBox = ()=>{
@@ -298,7 +306,7 @@ if(!customElements.get('zora-auth-form-component')){
           *   2.2 未注册则显示邮箱验证，可登录按钮等验证通过后再显示
           */
         //发起请求前先判断当前的验证元素是否为隐藏状态，如果是则不发起请求
-        if( window.getComputedStyle(this.querySelector('.zora-verify-box')).display === 'none'){
+        if( window.getComputedStyle(this.querySelector('.zora-verify-box')).display !== 'none'){
             fetch(`${FETCH_BASE_URL}/checkEmail`,{
               method: 'POST',
               headers: setHeaders(),
@@ -307,7 +315,7 @@ if(!customElements.get('zora-auth-form-component')){
             })
          }).then(res=>res.json()).then(res=>{
             //如果邮箱已注册，则不显示验证元素
-            if(res.isExist){
+            if(res.result){
               //直接将验证状态变为true
               this.validateStatus = true
               this.querySelector('.zora-verify-box').className = "zora-verify-box hidden"
