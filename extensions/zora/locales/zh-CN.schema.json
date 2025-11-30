@@ -6,6 +6,22 @@
           "label":"zora背景色",
           "info": "设置zora的背景色"
         },
+        "zora_success_color":{
+          "label":"zora弹框成功色",
+          "info": "设置zora弹框成功色"
+        },
+        "zora_info_color":{
+          "label":"zora弹框信息色",
+          "info": "设置zora弹框信息色"
+        },
+        "zora_warning_color":{
+          "label":"zora弹框警告色",
+          "info": "设置zora弹框警告色"
+        },
+        "zora_error_color":{
+          "label":"zora弹框错误色",
+          "info": "设置zora弹框错误色"
+        },
         "zora_size_position_x": {
           "label": "Zora左定位",
           "info": "设置zora距离页面左侧定位"
