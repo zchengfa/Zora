@@ -2,21 +2,26 @@ import dotenv from 'dotenv'
 import express from "express"
 import cors from 'cors'
 import bodyParser from "body-parser"
-import {PrismaClient} from "@prisma/client"
+import prisma from '../app/db.server.ts'
 import Redis from 'ioredis'
 import {startSocketServer} from "./socketServer.ts"
 import {zoraApi} from "./zoraApi.ts";
 import {syncRedis} from "../plugins/sync.ts";
+import interceptors from "../plugins/interceptors.ts";
 
 dotenv.config({ path: '.env' })
 
-const prisma:PrismaClient = new PrismaClient()
 const redis = new Redis()
 
 const app = express()
-app.use(cors())
+app.use(cors({
+  origin: 'https://raylin-flower.myshopify.com'
+}))
+
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
+
+app.use((req,res,next)=> interceptors({res,req,next}))
 
 const server = app.listen(8080,()=>{
   console.log("zora服务启动成功，端口：8080")

@@ -42,6 +42,7 @@
     "express-rate-limit": "^8.2.1",
     "ioredis": "^5.8.2",
     "isbot": "^5.1.31",
+    "jsonwebtoken": "^9.0.2",
     "nodemailer": "^7.0.10",
     "or": "^0.2.0",
     "prisma": "^6.16.3",
@@ -57,8 +58,10 @@
   "devDependencies": {
     "@shopify/api-codegen-preset": "^1.2.0",
     "@shopify/polaris-types": "^1.0.1",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/eslint": "^9.6.1",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.19.1",
     "@types/nodemailer": "^7.0.4",
     "@types/react": "^18.3.25",

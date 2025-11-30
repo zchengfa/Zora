@@ -6,6 +6,7 @@ import type {PrismaClient} from "@prisma/client";
 import bcrypt from 'bcrypt';
 import {handlePrismaError} from "../plugins/handleZoraError.ts";
 import { v4 as uuidv4 } from "uuid";
+import {createToken} from "../plugins/token.ts";
 
 interface ZoraApiType {
   app:Express,
@@ -52,8 +53,15 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
     if(result){
       const session_id = uuidv4()
       const expired = new Date(new Date().getTime() + SESSION_EXPIRED_DURATION)
-      const sessionPrismaWrite = await prisma.session.create({
-        data:{
+      const sessionPrismaUpsert = await prisma.session.upsert({
+        where:{
+          email:paramsObj.email
+        },
+        update:{
+          sessionId:session_id,
+          expires:expired
+        },
+        create:{
           sessionId: session_id,
           userId: paramsObj.id,
           firstName: paramsObj.firstName,
@@ -63,16 +71,18 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
         }
       })
 
-      await redis.hset(`session:${paramsObj.id}`,{...sessionPrismaWrite})
+      await redis.hset(`session:${paramsObj.id}`,{...sessionPrismaUpsert})
       await redis.expire(`session:${paramsObj.id}`, SESSION_EXPIRED_DURATION / 1000)
 
-      res.status(200).send({result:true,message:'login successfully',session_id})
+      const token = createToken({session_id},'1d')
+      res.status(200).send({result:true,message:'login successfully',token})
     }
     else{
       res.status(200).send({result:false,message:'login failed with invalid credentials'})
     }
   }
   catch (e) {
+    handlePrismaError(e)
     res.status(500).send({result:false,message:"Server Error"})
   }
 }
@@ -105,7 +115,6 @@ const loginFunction = async ({redis,prisma,paramsObj,res}:{redis:Redis,prisma:Pr
 export function zoraApi({app,redis,prisma}:ZoraApiType) {
   app.post('/authenticator', RATE_LIMITS.STRICT,async (req, res) => {
     const paramsObj = req.body
-    console.log('密码：'+paramsObj.password)
     //先判断之前是否已经注册过了
     try{
       const redisQuery = await redis.hget(`customer:${paramsObj.email}`,'userId')
@@ -131,14 +140,13 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
         }
         else{
           //都未命中，执行注册后再执行登录
-          paramsObj.password = await bcrypt.hash(paramsObj.password, 10)
           const newCustomer = await prisma.customers.create({
             data:{
               shopify_customer_id:new Date().getTime().toString(),
               email: paramsObj.email,
               first_name: paramsObj.firstName,
               last_name: paramsObj.lastName,
-              password: paramsObj.password,
+              password: await bcrypt.hash(paramsObj.password, 10),
               market_email: paramsObj.marketEmail,
               market_sms: paramsObj.marketSMS,
             }

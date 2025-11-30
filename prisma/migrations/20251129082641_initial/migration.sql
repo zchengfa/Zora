@@ -87,5 +87,7 @@ CREATE TABLE `session` (
     `collaborator` BOOLEAN NULL DEFAULT false,
     `emailVerified` BOOLEAN NULL DEFAULT false,
 
+    UNIQUE INDEX `session_userId_key`(`userId`),
+    UNIQUE INDEX `session_email_key`(`email`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

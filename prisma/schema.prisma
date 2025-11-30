@@ -73,10 +73,10 @@ model session {
   scope         String?
   expires       DateTime?
   accessToken   String?
-  userId        BigInt?
+  userId        BigInt?   @unique
   firstName     String?
   lastName      String?
-  email         String?
+  email         String?   @unique
   accountOwner  Boolean   @default(false)
   locale        String?
   collaborator  Boolean?  @default(false)
