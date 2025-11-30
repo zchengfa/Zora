@@ -6,6 +6,22 @@
           "label":"zora bg color",
           "info": "change Zora bg color"
         },
+        "zora_success_color":{
+          "label":"zora toast success color",
+          "info": "change Zora toast success color"
+        },
+        "zora_info_color":{
+          "label":"zora toast info color",
+          "info": "change Zora toast info color"
+        },
+        "zora_warning_color":{
+          "label":"zora toast warning color",
+          "info": "change Zora toast warning color"
+        },
+        "zora_error_color":{
+          "label":"zora toast error color",
+          "info": "change Zora toast error  color"
+        },
         "zora_size_position_x": {
           "label": "Zora left position",
           "info": "change zora left position"
