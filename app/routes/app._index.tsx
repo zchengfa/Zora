@@ -1,12 +1,14 @@
 import type {LoaderFunctionArgs} from "react-router";
 import {useLoaderData} from "react-router";
-import {authenticate} from "../shopify.server";
+import {authenticate} from "@/shopify.server";
 
-import indexStyle from '../styles/pages/app_index.module.scss'
-import ZoraSearch from '../components/ZoraSearch'
-import ZoraCustomerList from '../components/ZoraCustomerList'
+import indexStyle from '@styles/pages/app_index.module.scss'
+import ZoraSearch from '@components/ZoraSearch'
+import ZoraCustomerList from '@components/ZoraCustomerList'
 import {useState} from "react";
-import type {CustomerDataType} from "../type";
+import type {CustomerDataType,MessageBoxType} from "@/type";
+
+import ZoraMessageItems from "@components/ZoraMessageItems";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
@@ -44,20 +46,33 @@ export default function Index(){
       hadRead:false,
       isActive:false,
       unreadMessageCount:1
-    },
-    {
-      id: (new Date().getTime()).toString(),
-      firstName:'z',
-      lastName:'Alin',
-      avatar:null,
-      isOnline:false,
-      lastMessage:'em',
-      lastTimestamp:'1677777777777',
-      hadRead:false,
-      isActive:false,
-      unreadMessageCount:101
     }
   ])
+
+  const messageData: MessageBoxType[] = [
+    {
+      id: '23423432432',
+      conversation_id:'fefsfse',
+      owner: "customer_msg",
+      msg_status:{
+        read:false,
+        sent:false,
+        delivered: false
+      },
+      sender:{
+        id: 'sfsfsefs',
+        type: 'customer'
+      },
+      recipient: {
+        id: '342432',
+        type: 'agent'
+      },
+      content:{
+        type: 'text',
+        body: 'this is test message'
+      }
+    }
+  ]
 
   const customerItemClick = (index:number)=>{
     //点击对应的客户项，修改成已读并使其变为激活状态,未读信息数也要清零
@@ -87,11 +102,15 @@ export default function Index(){
       <div className={indexStyle.chatContent}>
         <h3 className={indexStyle.chatTitle}>chat</h3>
         <div className={indexStyle.chatBox}>
+          {/*客户列表*/}
           <div className={indexStyle.chatLeft}>
             <ZoraSearch placeholder={'Search'}></ZoraSearch>
             <ZoraCustomerList customerData={userData} ItemClick={customerItemClick}></ZoraCustomerList>
           </div>
-          <div className={indexStyle.chatMiddle}></div>
+          {/*聊天部分*/}
+          <div className={indexStyle.chatMiddle}>
+            <ZoraMessageItems messageData={messageData}></ZoraMessageItems>
+          </div>
           <div className={indexStyle.chatRight}></div>
         </div>
       </div>

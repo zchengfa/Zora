@@ -1,30 +1,82 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "mysql"
+  url      = env("MYSQL_BASE_URL")
 }
 
-model Session {
-  id            String    @id
-  shop          String
-  state         String
+model customer_addresses {
+  id           BigInt   @id @default(autoincrement())
+  customer_id  BigInt
+  address_type String   @default("shipping")
+  address1     String?
+  address2     String?
+  city         String?
+  province     String?
+  country      String?
+  postal_code  String?
+  phone        String?
+  is_default   Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+
+  @@index([customer_id], map: "customer_addresses_customer_id_fkey")
+}
+
+model customer_tag_relations {
+  id          BigInt   @id @default(autoincrement())
+  customer_id BigInt
+  tag_id      Int
+  created_at  DateTime @default(now())
+
+  @@unique([customer_id, tag_id])
+  @@index([tag_id], map: "customer_tag_relations_tag_id_fkey")
+}
+
+model customer_tags {
+  id         Int      @id @default(autoincrement())
+  tag_name   String   @unique
+  created_at DateTime @default(now())
+}
+
+model customers {
+  id                  BigInt    @id @default(autoincrement())
+  shopify_customer_id String    @unique
+  email               String    @unique
+  password            String
+  first_name          String?
+  last_name           String?
+  phone               String?
+  number_of_orders    Int       @default(0)
+  total_amount_spent  Float     @default(0)
+  currency_code       String    @default("USD")
+  verified_email      Boolean   @default(false)
+  valid_email_address Boolean   @default(true)
+  lifetime_duration   String?
+  note                String?
+  can_delete          Boolean   @default(true)
+  image_url           String?
+  created_at          DateTime? @default(now())
+  updated_at          DateTime?
+  market_email        Boolean   @default(false)
+  market_sms          Boolean   @default(false)
+}
+
+model session {
+  id            String    @id @default(uuid())
+  sessionId     String?   @map("session_id")
+  shop          String?
+  state         String?
   isOnline      Boolean   @default(false)
   scope         String?
   expires       DateTime?
-  accessToken   String
-  userId        BigInt?
+  accessToken   String?
+  userId        BigInt?   @unique
   firstName     String?
   lastName      String?
-  email         String?
+  email         String?   @unique
   accountOwner  Boolean   @default(false)
   locale        String?
   collaborator  Boolean?  @default(false)

@@ -1,8 +1,8 @@
-import ZoraCustomerListStyle from '../styles/componentStyles/ZoraCustomerList.module.scss'
-import type {CustomerDataType} from '../type'
-import Badge from "./common/Badge";
+import ZoraCustomerListStyle from '@styles/componentStyles/ZoraCustomerList.module.scss'
+import type {CustomerDataType} from '@/type'
+import Badge from "@components/common/Badge";
 import React, {useState} from "react";
-import ZoraTimestamp from "./common/ZoraTimestamp";
+import ZoraTimestamp from "@components/common/ZoraTimestamp";
 
 interface ZoraCustomerListProps {
   customerData: CustomerDataType[],

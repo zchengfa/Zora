@@ -1,4 +1,4 @@
-import {usePersistStorage} from '../hooks/usePersistStorage'
+import {usePersistStorage} from '@hooks/usePersistStorage'
 export default function AppSettings (){
   const LOCALSTORAGE_KEY = 'YCChat_application_theme'
   const [theme,setPersistTheme] = usePersistStorage(LOCALSTORAGE_KEY,'light')

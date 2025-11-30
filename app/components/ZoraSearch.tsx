@@ -1,4 +1,4 @@
-import ZoraSearchStyle from '../styles/componentStyles/ZoraSearch.module.scss'
+import ZoraSearchStyle from '@styles/componentStyles/ZoraSearch.module.scss'
 import {useState} from "react";
 
 export default function ZoraSearch(props:any){

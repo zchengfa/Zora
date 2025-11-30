@@ -19,6 +19,30 @@ const shopify = shopifyApp({
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
+  hooks:{
+    //应用安装完成，同步店铺数据
+    afterAuth: async ({ session }) => {
+      const { shop } = session;
+
+      console.log(`🎯 应用安装完成，开始为店铺 ${shop} 同步客户数据功能待开发`);
+
+      // try{
+      //   const utils = new ShopifyUtils(session)
+      //   utils.syncShopifyData().then(res=>{
+      //     console.log(res)
+      //   })
+      // }
+      // catch (e){
+      //   console.error(e);
+      // }
+
+      // 异步执行同步，不阻塞OAuth流程的重定向
+      // syncShopifyCustomers(shop, accessToken).catch(error => {
+      //   console.error(`❌ ${shop} 初始同步失败:`, error);
+      //   // 生产环境中应集成错误上报系统
+      // });
+    },
+  }
 });
 
 export default shopify;
