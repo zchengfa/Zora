@@ -25,3 +25,4 @@ scopes = "write_products,read_products,read_customers,write_customers,read_order
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
+

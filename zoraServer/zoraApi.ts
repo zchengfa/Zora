@@ -6,7 +6,7 @@ import type {PrismaClient} from "@prisma/client";
 import bcrypt from 'bcrypt';
 import {handlePrismaError} from "../plugins/handleZoraError.ts";
 import { v4 as uuidv4 } from "uuid";
-import {createToken} from "../plugins/token.ts";
+import {createToken, verifyTokenAsync} from "../plugins/token.ts";
 
 interface ZoraApiType {
   app:Express,
@@ -75,7 +75,7 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
       await redis.expire(`session:${paramsObj.id}`, SESSION_EXPIRED_DURATION / 1000)
 
       const token = createToken({session_id},'1d')
-      res.status(200).send({result:true,message:'login successfully',token})
+      res.status(200).send({result:true,message:'login successfully',token,userInfo:{userId:paramsObj.id?.toString()}})
     }
     else{
       res.status(200).send({result:false,message:'login failed with invalid credentials'})
@@ -167,7 +167,19 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
       res.status(500).send({result:false,message:"Server Error"})
     }
   })
-
+  app.post('/validateToken',async (req, res)=>{
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) {
+      return res.status(401).send({result:false,message: 'Authentication token missing'})
+    }
+    try{
+      await verifyTokenAsync(token)
+      res.status(200).send({result:true,message:'logged in'})
+    }
+    catch (err){
+      return res.status(401).send({result:false,message: 'Token expired or invalid'})
+    }
+  })
   app.post('/checkEmail',RATE_LIMITS.NORMAL,async (req,res)=>{
     const {email} = req.body
     //检查数据库是否有该邮箱

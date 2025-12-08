@@ -32,6 +32,7 @@ function setHeaders(headers) {
   return headers || {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    "ngrok-skip-browser-warning": true, //绕过ngrok验证
     authorization: `Bearer ${sessionStorage.getItem(ZORA_TOKEN)}`
   }
 }

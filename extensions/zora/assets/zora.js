@@ -1,3 +1,4 @@
+
 const zoraResponse = new ZoraResponse(document.querySelector('.zora-main').dataset.locale)
 const zoraToast = new ZoraToast()
 
@@ -181,8 +182,9 @@ if(!customElements.get('zora-auth-form-component')){
         this.endTime = undefined
         this.zoraTimer = null
         this.validateStatus = false
+        this.form = this.querySelector('#zora-auth-form')
         //阻止表单的默认行为
-        this.querySelector('#zora-auth-form').addEventListener('submit', function (e) {
+        this.form.addEventListener('submit', function (e) {
           e.preventDefault();
         })
         //监听input的输入事件
@@ -234,21 +236,25 @@ if(!customElements.get('zora-auth-form-component')){
             })
           }
           else{
-            this.loginSuccess(res.token)
+            this.loginSuccess(res.token,res.userInfo)
           }
         })
       }
       /**
        * @description 登录成功：1.重置表单 2.回到上一步的元素状态
        */
-      loginSuccess = (token) => {
+      loginSuccess = (token,info) => {
         sessionStorage.setItem(ZORA_TOKEN, token)
+        socket.emit('online',JSON.stringify(info))
         this.querySelector('#zora-auth-form').reset()
         document.querySelector('.zora-auth-container').classList.add('hidden')
         document.querySelector('.zora-container-active').classList.remove('hidden')
         document.querySelector('.zora-input-box').classList.remove('hidden')
+        document.querySelector('.zora-header-active-box').classList.remove('hidden')
         document.querySelector('.zora-message-box').className = 'zora-message-box-active'
         document.querySelector('.zora-chat-btn-component').classList.add('hidden')
+        document.querySelector('.zora-header').classList.add('hidden')
+
       }
       /**
        * @description 监听输入框
@@ -616,11 +622,20 @@ if(!customElements.get('zora-send-component')){
   class ZoraSendComponent extends HTMLElement {
     constructor() {
       super();
-      this.querySelector('.zora_icon_box.active-send').addEventListener('click', (e) => {
-        zoraFetch('/validateToken').then((response) => {
-          console.log(response)
-        })
-      })
+      this.querySelector('.zora_icon_box.active-send').addEventListener('click', this.sendMessage)
+      this.msg = undefined
+      this.inputEl = document.querySelector('.zora-message-input')
+      this.inputEl.addEventListener('input', this.listenInput)
+    }
+    sendMessage = ()=>{
+      socket.emit('sendMessage',JSON.stringify({
+        type: 'text',
+        message: this.msg
+      }))
+      console.log(this.msg)
+    }
+    listenInput = (e)=>{
+      this.msg = e.target.value.trim()
     }
   }
 
