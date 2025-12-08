@@ -3,7 +3,7 @@ import {zoraSocket} from "@Utils/socket.ts";
 function WithHook(WrapperComponent:any){
   function ComponentProps(props:any){
 
-    const socket = zoraSocket('wss://d32df8d4e015.ngrok-free.app');
+    const socket = zoraSocket('wss://zora-5fc1.onrender.com');
 
     return <WrapperComponent {...props} socket = { socket }></WrapperComponent>
   }

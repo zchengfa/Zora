@@ -1,4 +1,4 @@
-const socket = io('ws://localhost:8080',{
+const socket = io('wss://zora-5fc1.onrender.com',{
   transports: ['websocket'],
   headers:{
     "ngrok-skip-browser-warning": true, //绕过ngrok验证

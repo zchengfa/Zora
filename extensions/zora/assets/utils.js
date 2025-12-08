@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "http://localhost:8080";
+const FETCH_BASE_URL = "https://zora-5fc1.onrender.com";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {
