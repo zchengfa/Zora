@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 import express from "express"
 import cors from 'cors'
 import bodyParser from "body-parser"
-import prisma from '../app/db.server.ts'
+import {PrismaClient} from "@prisma/client"
 import Redis from 'ioredis'
 import {startSocketServer} from "./socketServer.ts"
 import {zoraApi} from "./zoraApi.ts";
@@ -13,6 +13,7 @@ import * as process from "node:process";
 dotenv.config({ path: '.env' })
 
 const redis = new Redis(process.env.REDIS_URL as string)
+const prisma = new PrismaClient()
 
 const app = express()
 app.use(cors({
