@@ -149,6 +149,7 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
               password: await bcrypt.hash(paramsObj.password, 10),
               market_email: paramsObj.marketEmail,
               market_sms: paramsObj.marketSMS,
+              verified_email: true
             }
           })
           //数据写入成功，执行一次redis写入

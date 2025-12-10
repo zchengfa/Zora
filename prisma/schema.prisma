@@ -102,7 +102,7 @@ model Message {
   id             String         @id @default(uuid())
   conversationId String         @db.VarChar(191)
   owner          String?        @db.VarChar(100)
-  msgStatus      Json?
+  msgStatus      MsgStatus?
   senderId       String         @db.VarChar(191)
   senderType     SenderType
   recipientId    String?        @db.VarChar(191)
@@ -110,6 +110,7 @@ model Message {
   contentType    ContentType    @default(TEXT)
   contentBody    String         @db.Text
   metadata       Json?
+  msgId          String?        @db.VarChar(100)
 
   timestamp DateTime @default(now())
   createdAt DateTime @default(now())
@@ -144,4 +145,12 @@ enum ContentType {
   PRODUCT
   ORDER
   SYSTEM
+}
+
+enum MsgStatus {
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }

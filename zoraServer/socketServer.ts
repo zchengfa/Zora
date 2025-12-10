@@ -1,10 +1,12 @@
-import {Server} from 'socket.io'
+import {Server,Socket} from 'socket.io'
 import type {Redis} from 'ioredis'
 import {PrismaClient} from "@prisma/client";
 import * as process from "node:process";
+import {SocketUtils} from '../plugins/socketUtils.ts'
 
 export async function startSocketServer({server,redis,prisma}:{server:Server,redis:Redis,prisma:PrismaClient}) {
-    try{
+   const redisExpired = 3600 * 24 * 7
+  try{
       const io = new Server(server,{
         cors: {
           origin: [
@@ -14,37 +16,22 @@ export async function startSocketServer({server,redis,prisma}:{server:Server,red
         transports: ['websocket','polling']
       })
 
+      //客户socket
       const users = new Map()
-      io.on('connection', (ws:any)=>{
-        ws.emit('test','hello')
-        ws.on('online',async (payload) => {
-          const user = JSON.parse(payload)
-          try{
-            const redisQuery = await redis.hget(`session:${user.userId}`, 'email')
-            if(!redisQuery){
-              const prismaQuery = await prisma.session.findUnique({
-                where:{
-                  userId: user.userId
-                }
-              })
-              users.set(prismaQuery.email,ws.id)
-              console.log(prismaQuery.email + '上线了')
-            }
-            else{
-              users.set(redisQuery,ws.id)
-              console.log(redisQuery+'上线了')
-            }
-          }
-          catch (e) {
-            console.log('出错了：socketServer.ts')
-          }
-        })
-        ws.on('sendMessage',(payload)=>{
-          console.log(payload)
-        })
+      //客服socket
+      const agent = new Map()
+      io.on('connection', (ws:Socket)=>{
+        const socketUtils = new SocketUtils({
+          redis,prisma,io,redisExpired
+        },ws,users,agent)
+
+        socketUtils.socketAgentOnline()
+
+        socketUtils.socketOnline()
+
+        socketUtils.socketOnSendMessage()
 
       })
-
       return '✅ zora socket服务启动成功'
     }
     catch (e){

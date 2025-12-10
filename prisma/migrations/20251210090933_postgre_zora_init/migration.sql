@@ -10,6 +10,9 @@ CREATE TYPE "RecipientType" AS ENUM ('CUSTOMER', 'AGENT');
 -- CreateEnum
 CREATE TYPE "ContentType" AS ENUM ('TEXT', 'IMAGE', 'PRODUCT', 'ORDER', 'SYSTEM');
 
+-- CreateEnum
+CREATE TYPE "MsgStatus" AS ENUM ('SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED');
+
 -- CreateTable
 CREATE TABLE "customer_addresses" (
     "id" BIGSERIAL NOT NULL,
@@ -113,7 +116,7 @@ CREATE TABLE "messages" (
     "id" TEXT NOT NULL,
     "conversationId" VARCHAR(191) NOT NULL,
     "owner" VARCHAR(100),
-    "msgStatus" JSONB,
+    "msgStatus" "MsgStatus",
     "senderId" VARCHAR(191) NOT NULL,
     "senderType" "SenderType" NOT NULL,
     "recipientId" VARCHAR(191),
@@ -121,6 +124,7 @@ CREATE TABLE "messages" (
     "contentType" "ContentType" NOT NULL DEFAULT 'TEXT',
     "contentBody" TEXT NOT NULL,
     "metadata" JSONB,
+    "msgId" VARCHAR(100),
     "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

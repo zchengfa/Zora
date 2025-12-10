@@ -10,6 +10,7 @@ interface SyncRedisType {
 export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
  try {
    const EXPIRED = 24 * 60 * 60
+   const conversations = await prisma.conversation.findMany()
    const customers = await prisma.customers.findMany()
    const customerTag = await prisma.customer_tags.findMany()
    const customerAddress = await prisma.customer_addresses.findMany()
@@ -27,6 +28,12 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
          ...customer
        });
        pipeline.expire(`customer:${customer.email}`,EXPIRED)
+     }
+
+     //存储消息会话
+     for (const conversation of conversations) {
+       pipeline.hset(`conversation:${conversation.id}`, {...conversation})
+       pipeline.expire(`conversation:${conversation.id}`,EXPIRED)
      }
 
      // 存储标签信息

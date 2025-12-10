@@ -1,4 +1,4 @@
-const socket = io('wss://zora-5fc1.onrender.com',{
+const socket = io('wss://163d6c873351.ngrok-free.app',{
   transports: ['websocket'],
   headers:{
     "ngrok-skip-browser-warning": true, //绕过ngrok验证
@@ -8,7 +8,20 @@ const socket = io('wss://zora-5fc1.onrender.com',{
 // 监听连接成功事件
 socket.on('connect', () => {
   console.log('✅ 已成功连接到服务器！');
+  const userInfo = sessionStorage.getItem('zora_userInfo');
+  if(userInfo){
+    socket.emit('online',userInfo)
+  }
 });
+
+socket.on('conversation_success',(conversation_id)=>{
+  sessionStorage.setItem('zora_conversation_id', conversation_id);
+})
+
+//接收后端回执
+socket.on('message_ack',(ack)=>{
+  console.log('消息回执',ack)
+})
 
 // 监听来自服务器的事件，例如 'message'
 socket.on('message', (data) => {

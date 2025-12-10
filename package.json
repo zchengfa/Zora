@@ -18,7 +18,7 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "zora-server": "ts-node zoraServer/zoraServer.ts"
+    "zora-server": "nodemon zoraServer/zoraServer.ts --tunnel-url https://163d6c873351.ngrok-free.app:8080"
   },
   "type": "module",
   "engines": {

@@ -236,7 +236,10 @@ if(!customElements.get('zora-auth-form-component')){
             })
           }
           else{
-            this.loginSuccess(res.token,res.userInfo)
+            this.loginSuccess(res.token,{
+              ...res.userInfo,
+              shop:document.querySelector('.zora-main').dataset['shop']
+            })
           }
         })
       }
@@ -245,6 +248,7 @@ if(!customElements.get('zora-auth-form-component')){
        */
       loginSuccess = (token,info) => {
         sessionStorage.setItem(ZORA_TOKEN, token)
+        sessionStorage.setItem('zora_userInfo',JSON.stringify(info))
         socket.emit('online',JSON.stringify(info))
         this.querySelector('#zora-auth-form').reset()
         document.querySelector('.zora-auth-container').classList.add('hidden')
@@ -629,8 +633,14 @@ if(!customElements.get('zora-send-component')){
     }
     sendMessage = ()=>{
       socket.emit('sendMessage',JSON.stringify({
-        type: 'text',
-        message: this.msg
+        senderId: JSON.parse(sessionStorage.getItem('zora_userInfo')).userId,
+        senderType: 'CUSTOMER',
+        contentType: 'TEXT',
+        msgStatus: 'SENDING',
+        recipientType: 'AGENT',
+        contentBody: this.msg,
+        msgId: 'msg_'+ new Date().getTime(),
+        conversationId: sessionStorage.getItem('zora_conversation_id')
       }))
       console.log(this.msg)
     }
