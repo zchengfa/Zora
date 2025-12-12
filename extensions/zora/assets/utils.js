@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "https://163d6c873351.ngrok-free.app";
+const FETCH_BASE_URL = "https://cc7a5f1b2dad.ngrok-free.app";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {
@@ -181,6 +181,9 @@ class ZoraResponse {
             code_error:'验证码错误',
             no_attempt_expired: '验证次数过多或验证码过期',
             password: '账号密码错误'
+          },
+          msg_status:{
+            READ: '已读',
           }
         }
       } ,
@@ -209,6 +212,9 @@ class ZoraResponse {
             code_error:'incorrect code',
             no_attempt_expired: 'Excessive verification attempts or expired verification code',
             password: 'incorrect password'
+          },
+          msg_status:{
+            READ: 'read',
           }
         }
       }
@@ -227,7 +233,7 @@ class ZoraResponse {
   }
   /**
    * @description 消息响应
-   * @param type {'success' | 'info' | 'warning' | 'error'} 消息类型
+   * @param type {'success' | 'info' | 'warning' | 'error' | 'msg_status'} 消息类型
    * @param msgType {string} 具体的消息类型
    * @returns {string} 返回响应后的文本
    * @example 使用示例：

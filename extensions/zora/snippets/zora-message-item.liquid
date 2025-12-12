@@ -12,6 +12,7 @@
     flex-direction: row-reverse;
   }
   .zora-msg-box{
+    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -44,7 +45,7 @@
   .zora-msg{
     flex: 1;
     margin-top: .3rem;
-    padding: .5rem;
+    padding: .5rem 1rem;
     background-color: #8b2929ff;
     border-radius: .5rem;
   }
@@ -52,6 +53,24 @@
     margin-right: .3rem;
     color: rgba(235, 235, 235, 1);
     font-size: small;
+  }
+  .msg-status-svg-box{
+    text-align: center;
+    font-size: 2rem;
+  }
+  .loading-icon{
+    transform: scale(.7)
+  }
+  .loading{
+    animation: loading 1.5s infinite linear;
+  }
+  @keyframes loading {
+    0%{
+      transform: scale(.7) rotate(0deg);
+    }
+    100%{
+      transform: scale(.7) rotate(360deg);
+    }
   }
 {% endstyle %}
 

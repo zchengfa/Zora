@@ -71,8 +71,9 @@
   </zora-button>
   {% render 'zora' %}
   {% render 'zora-toast' %}
-  <script defer src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script defer src="{{ 'socket.io-client.min.js' | asset_url }}"></script>
   <script defer src="{{ 'utils.js' | asset_url }}"></script>
+  <script defer src="{{ 'renderMessage.js' | asset_url }}"></script>
   <script defer src="{{ 'websocket.js' | asset_url }}"></script>
   <script defer src="{{ 'zora.js' | asset_url }}"></script>
 </div>

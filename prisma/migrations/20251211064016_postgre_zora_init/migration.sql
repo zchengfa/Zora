@@ -78,6 +78,21 @@ CREATE TABLE "customers" (
 );
 
 -- CreateTable
+CREATE TABLE "customer_service_staff" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT,
+    "phone" TEXT,
+    "avatarUrl" TEXT,
+    "department" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3),
+    "userId" BIGINT,
+
+    CONSTRAINT "customer_service_staff_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "session" (
     "id" TEXT NOT NULL,
     "session_id" TEXT,
@@ -150,6 +165,15 @@ CREATE UNIQUE INDEX "customers_shopify_customer_id_key" ON "customers"("shopify_
 CREATE UNIQUE INDEX "customers_email_key" ON "customers"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "customer_service_staff_id_key" ON "customer_service_staff"("id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "customer_service_staff_email_key" ON "customer_service_staff"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "customer_service_staff_userId_key" ON "customer_service_staff"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "session_userId_key" ON "session"("userId");
 
 -- CreateIndex
@@ -166,6 +190,9 @@ CREATE INDEX "messages_conversationId_timestamp_idx" ON "messages"("conversation
 
 -- CreateIndex
 CREATE INDEX "messages_senderId_timestamp_idx" ON "messages"("senderId", "timestamp");
+
+-- AddForeignKey
+ALTER TABLE "customer_service_staff" ADD CONSTRAINT "customer_service_staff_userId_fkey" FOREIGN KEY ("userId") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "messages" ADD CONSTRAINT "messages_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;

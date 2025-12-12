@@ -1,6 +1,7 @@
 
 const zoraResponse = new ZoraResponse(document.querySelector('.zora-main').dataset.locale)
 const zoraToast = new ZoraToast()
+const renderMessage = new RenderMessage()
 
 // 聊天盒自定义组件
 if(!customElements.get('zora-button')){
@@ -626,26 +627,41 @@ if(!customElements.get('zora-send-component')){
   class ZoraSendComponent extends HTMLElement {
     constructor() {
       super();
-      this.querySelector('.zora_icon_box.active-send').addEventListener('click', this.sendMessage)
+      this.activeSendEl = this.querySelector('.zora_icon_box.active-send')
+      this.normalSendEl = this.querySelector('.zora_icon_box.normal-send')
       this.msg = undefined
       this.inputEl = document.querySelector('.zora-message-input')
       this.inputEl.addEventListener('input', this.listenInput)
+      this.inputEl.addEventListener('keyup',this.enterKey)
+      this.activeSendEl.addEventListener('click', this.sendMessage)
     }
     sendMessage = ()=>{
-      socket.emit('sendMessage',JSON.stringify({
-        senderId: JSON.parse(sessionStorage.getItem('zora_userInfo')).userId,
-        senderType: 'CUSTOMER',
-        contentType: 'TEXT',
-        msgStatus: 'SENDING',
-        recipientType: 'AGENT',
-        contentBody: this.msg,
-        msgId: 'msg_'+ new Date().getTime(),
-        conversationId: sessionStorage.getItem('zora_conversation_id')
-      }))
-      console.log(this.msg)
+      if(this.msg.length){
+        const messageBody = {
+          senderId: JSON.parse(sessionStorage.getItem('zora_userInfo')).userId,
+          senderType: 'CUSTOMER',
+          contentType: 'TEXT',
+          msgStatus: 'SENDING',
+          recipientType: 'AGENT',
+          contentBody: this.msg,
+          msgId: 'msg_'+ new Date().getTime(),
+          conversationId: sessionStorage.getItem('zora_conversation_id')
+        }
+        socket.emit('sendMessage',JSON.stringify(messageBody))
+        renderMessage.addMessage(messageBody,0)
+        this.inputEl.value = ''
+        this.msg = ''
+        this.activeSendEl.classList.add('hidden')
+        this.normalSendEl.classList.remove('hidden')
+      }
     }
     listenInput = (e)=>{
       this.msg = e.target.value.trim()
+    }
+    enterKey = (e)=>{
+      if(e.keyCode === 13){
+        this.sendMessage()
+      }
     }
   }
 

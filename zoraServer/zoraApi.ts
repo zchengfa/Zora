@@ -7,6 +7,7 @@ import bcrypt from 'bcrypt';
 import {handlePrismaError} from "../plugins/handleZoraError.ts";
 import { v4 as uuidv4 } from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
+import * as process from "node:process";
 
 interface ZoraApiType {
   app:Express,
@@ -70,12 +71,33 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
           expires: expired,
         }
       })
-
+      //获取客服数据给客户
+      let agentInfo = undefined
+      const redisAgent = await redis.hgetall('AGENT:111111')
+      if(!Object.keys(redisAgent).length){
+        const prismaAgent = await prisma.customerServiceStaff.findUnique({
+          where:{
+            id: '111111'
+          },
+          select:{
+            id: true,
+            name: true,
+            avatarUrl: true,
+          }
+        })
+        agentInfo = prismaAgent
+        await redis.hset(`AGENT:${prismaAgent.id}`,{...prismaAgent})
+        await redis.expire(`AGENT:${prismaAgent.id}`, SESSION_EXPIRED_DURATION / 1000 )
+      }
+      else{
+        agentInfo = redisAgent
+      }
       await redis.hset(`session:${paramsObj.id}`,{...sessionPrismaUpsert})
       await redis.expire(`session:${paramsObj.id}`, SESSION_EXPIRED_DURATION / 1000)
 
       const token = createToken({session_id},'1d')
-      res.status(200).send({result:true,message:'login successfully',token,userInfo:{userId:paramsObj.id?.toString()}})
+      const username = sessionPrismaUpsert.firstName as string + sessionPrismaUpsert.lastName as string
+      res.status(200).send({result:true,message:'login successfully',token,userInfo:{userId:paramsObj.id?.toString(),username,avatar:paramsObj.image_url,agentInfo}})
     }
     else{
       res.status(200).send({result:false,message:'login failed with invalid credentials'})
@@ -115,13 +137,17 @@ const loginFunction = async ({redis,prisma,paramsObj,res}:{redis:Redis,prisma:Pr
 export function zoraApi({app,redis,prisma}:ZoraApiType) {
   app.post('/authenticator', RATE_LIMITS.STRICT,async (req, res) => {
     const paramsObj = req.body
+
     //先判断之前是否已经注册过了
     try{
-      const redisQuery = await redis.hget(`customer:${paramsObj.email}`,'userId')
+      const redisQuery = await redis.hgetall(`customer:${paramsObj.email}`)
       //检查是否命中，未命中则再去数据库查询
-      if(redisQuery){
+      if(Object.keys(redisQuery).length > 0){
         //redis命中，表示需要登录
-        paramsObj.id = redisQuery
+        paramsObj.id = redisQuery.id
+        paramsObj.firstName = redisQuery.first_name
+        paramsObj.lastName = redisQuery.last_name
+        paramsObj.image_url = redisQuery.image_url
         await loginFunction({redis,prisma,paramsObj,res})
       }
       else{
@@ -133,9 +159,13 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
         })
         //查询到数据，同步到redis中,执行登录操作
         if(prismaQuery){
-          await redis.hget(`customer:${paramsObj.email}`, {...prismaQuery})
+          await redis.hset(`customer:${paramsObj.email}`, {...prismaQuery})
+          await redis.expire(`customer:${paramsObj.email}`, 60 * 60 * 24)
           //登录
           paramsObj.id = prismaQuery.id
+          paramsObj.firstName = prismaQuery.first_name
+          paramsObj.lastName = prismaQuery.last_name
+          paramsObj.image_url = prismaQuery.image_url
           await loginFunction({redis,prisma,paramsObj,res})
         }
         else{
@@ -149,7 +179,8 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
               password: await bcrypt.hash(paramsObj.password, 10),
               market_email: paramsObj.marketEmail,
               market_sms: paramsObj.marketSMS,
-              verified_email: true
+              verified_email: true,
+              image_url: process.env.USER_DEFAULT_AVATAR
             }
           })
           //数据写入成功，执行一次redis写入
@@ -158,6 +189,7 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
             await redis.expire(`customer:${paramsObj.email}`,24 * 60 * 60)
             //执行登录
             paramsObj.id = newCustomer.id
+            paramsObj.image_url = newCustomer.image_url
             await loginFunction({redis,prisma,paramsObj,res})
           }
         }

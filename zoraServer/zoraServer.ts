@@ -8,7 +8,7 @@ import {startSocketServer} from "./socketServer.ts"
 import {zoraApi} from "./zoraApi.ts";
 import {syncRedis} from "../plugins/sync.ts";
 import interceptors from "../plugins/interceptors.ts";
-import * as process from "node:process";
+import PrismaSeed from "../prisma/prismaSeed.ts";
 
 dotenv.config({ path: '.env' })
 
@@ -44,7 +44,17 @@ startSocketServer({redis,prisma,server}).then(res=>{
     console.log(e)
   })
 
+PrismaSeed(prisma).then(res=>{
+  console.log(res)
+})
+  .catch(e=>{
+    console.log(e)
+  })
+
 syncRedis({prisma,redis}).then(res=>{
   console.log(res)
 })
+  .catch(e=>{
+    console.log(e)
+  })
 

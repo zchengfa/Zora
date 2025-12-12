@@ -63,11 +63,13 @@ export class SocketUtils{
         return 'server error'
       case 10004:
         return 'message delivered'
+      case 10005:
+        return 'read'
       default:
         break;
     }
   }
-  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED',codeType:number)=>{
+  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ',codeType:number)=>{
     this.config.io.to(sender).emit('message_ack',{
       type: 'ACK',
       msgId,
@@ -85,6 +87,7 @@ export class SocketUtils{
     //客服连接
     this.ws.on('agent',()=>{
       this.agent.set('id',this.ws.id)
+      console.log('客服上线了')
     })
   }
   public socketOnline = ()=>{

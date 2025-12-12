@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:19961212@localhost:5432/mall"
 }
 
 model customer_addresses {
@@ -62,6 +62,24 @@ model customers {
   updated_at          DateTime?
   market_email        Boolean   @default(false)
   market_sms          Boolean   @default(false)
+
+  customer_service_staff CustomerServiceStaff[]
+}
+
+model CustomerServiceStaff {
+  id         String    @id @unique @default(cuid())
+  name       String
+  email      String?   @unique
+  phone      String?
+  avatarUrl  String?
+  department String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  userId   BigInt?    @unique
+  customer customers? @relation(fields: [userId], references: [id])
+
+  @@map("customer_service_staff")
 }
 
 model session {
