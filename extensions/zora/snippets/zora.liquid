@@ -266,9 +266,7 @@
   </div>
   <div class="zora-content">
     <div class="zora-message-box">
-      <zora-message-component class="zora-message-component">
-        <div>message content</div>
-      </zora-message-component>
+      {% render 'zora-message' %}
     </div>
     <div class="zora-input-box hidden">
       <zora-emoji-component class="zora-emoji-component">
@@ -277,7 +275,7 @@
         </div>
       </zora-emoji-component>
       <zora-input-component class="zora-input-component" data-target="normal-send" data-target-active="active-send">
-        <input id="zora-input" placeholder={{ 'zora.placeholder' | t }} class="zora-input" />
+        <input id="zora-input"  class="zora-input zora-message-input" placeholder={{ 'zora.placeholder' | t }} />
       </zora-input-component>
       <zora-send-component class="zora-send-component" data-input="zora-input" >
         <div class="zora_icon_box normal-send">

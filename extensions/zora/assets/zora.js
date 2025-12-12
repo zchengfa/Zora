@@ -1,5 +1,7 @@
+
 const zoraResponse = new ZoraResponse(document.querySelector('.zora-main').dataset.locale)
 const zoraToast = new ZoraToast()
+const renderMessage = new RenderMessage()
 
 // 聊天盒自定义组件
 if(!customElements.get('zora-button')){
@@ -181,8 +183,9 @@ if(!customElements.get('zora-auth-form-component')){
         this.endTime = undefined
         this.zoraTimer = null
         this.validateStatus = false
+        this.form = this.querySelector('#zora-auth-form')
         //阻止表单的默认行为
-        this.querySelector('#zora-auth-form').addEventListener('submit', function (e) {
+        this.form.addEventListener('submit', function (e) {
           e.preventDefault();
         })
         //监听input的输入事件
@@ -234,21 +237,29 @@ if(!customElements.get('zora-auth-form-component')){
             })
           }
           else{
-            this.loginSuccess(res.token)
+            this.loginSuccess(res.token,{
+              ...res.userInfo,
+              shop:document.querySelector('.zora-main').dataset['shop']
+            })
           }
         })
       }
       /**
        * @description 登录成功：1.重置表单 2.回到上一步的元素状态
        */
-      loginSuccess = (token) => {
+      loginSuccess = (token,info) => {
         sessionStorage.setItem(ZORA_TOKEN, token)
+        sessionStorage.setItem('zora_userInfo',JSON.stringify(info))
+        socket.emit('online',JSON.stringify(info))
         this.querySelector('#zora-auth-form').reset()
         document.querySelector('.zora-auth-container').classList.add('hidden')
         document.querySelector('.zora-container-active').classList.remove('hidden')
         document.querySelector('.zora-input-box').classList.remove('hidden')
+        document.querySelector('.zora-header-active-box').classList.remove('hidden')
         document.querySelector('.zora-message-box').className = 'zora-message-box-active'
         document.querySelector('.zora-chat-btn-component').classList.add('hidden')
+        document.querySelector('.zora-header').classList.add('hidden')
+
       }
       /**
        * @description 监听输入框
@@ -616,11 +627,41 @@ if(!customElements.get('zora-send-component')){
   class ZoraSendComponent extends HTMLElement {
     constructor() {
       super();
-      this.querySelector('.zora_icon_box.active-send').addEventListener('click', (e) => {
-        zoraFetch('/validateToken').then((response) => {
-          console.log(response)
-        })
-      })
+      this.activeSendEl = this.querySelector('.zora_icon_box.active-send')
+      this.normalSendEl = this.querySelector('.zora_icon_box.normal-send')
+      this.msg = undefined
+      this.inputEl = document.querySelector('.zora-message-input')
+      this.inputEl.addEventListener('input', this.listenInput)
+      this.inputEl.addEventListener('keyup',this.enterKey)
+      this.activeSendEl.addEventListener('click', this.sendMessage)
+    }
+    sendMessage = ()=>{
+      if(this.msg.length){
+        const messageBody = {
+          senderId: JSON.parse(sessionStorage.getItem('zora_userInfo')).userId,
+          senderType: 'CUSTOMER',
+          contentType: 'TEXT',
+          msgStatus: 'SENDING',
+          recipientType: 'AGENT',
+          contentBody: this.msg,
+          msgId: 'msg_'+ new Date().getTime(),
+          conversationId: sessionStorage.getItem('zora_conversation_id')
+        }
+        socket.emit('sendMessage',JSON.stringify(messageBody))
+        renderMessage.addMessage(messageBody,0)
+        this.inputEl.value = ''
+        this.msg = ''
+        this.activeSendEl.classList.add('hidden')
+        this.normalSendEl.classList.remove('hidden')
+      }
+    }
+    listenInput = (e)=>{
+      this.msg = e.target.value.trim()
+    }
+    enterKey = (e)=>{
+      if(e.keyCode === 13){
+        this.sendMessage()
+      }
     }
   }
 

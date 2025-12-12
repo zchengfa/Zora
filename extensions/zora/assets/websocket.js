@@ -1,7 +1,37 @@
-const startSocket = ()=>{
-  const ws = new WebSocket('ws://localhost:8080');
-  ws.onopen = () => {
-    console.log('Connection opened');
+const socket = io('wss://cc7a5f1b2dad.ngrok-free.app',{
+  transports: ['websocket'],
+  headers:{
+    "ngrok-skip-browser-warning": true, //绕过ngrok验证
   }
-}
-startSocket();
+});
+
+// 监听连接成功事件
+socket.on('connect', () => {
+  console.log('✅ 已成功连接到服务器！');
+  const userInfo = sessionStorage.getItem('zora_userInfo');
+  if(userInfo){
+    socket.emit('online',userInfo)
+  }
+});
+
+socket.on('conversation_success',(conversation_id)=>{
+  sessionStorage.setItem('zora_conversation_id', conversation_id);
+})
+
+//接收后端回执
+socket.on('message_ack',(ack)=>{
+  console.log('消息回执',ack)
+  renderMessage.updateMessageStatus(ack.msgId,ack.msgStatus)
+})
+
+// 监听来自服务器的事件，例如 'message'
+socket.on('message', (data) => {
+  console.log('收到服务器消息:', data);
+  renderMessage.addMessage(data,1);
+});
+
+// 监听连接断开事件
+socket.on('disconnect', () => {
+  console.log('❌ 与服务器的连接已断开。');
+});
+

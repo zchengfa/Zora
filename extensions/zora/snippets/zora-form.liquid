@@ -7,7 +7,7 @@
   data-market-Sms="zora-market-sms"
   data-submit="zora-submit"
 >
-  <form action="#" id="zora-auth-form">
+  <form action="#" id="zora-auth-form" onkeydown="if (event.keyCode === 13) return false;">
     <input id="zora-firstName" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.firstName' | t }}" />
     <input id="zora-lastName" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.lastName' | t }}" />
     <div class="zora-form-email-box">

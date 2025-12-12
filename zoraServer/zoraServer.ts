@@ -2,21 +2,28 @@ import dotenv from 'dotenv'
 import express from "express"
 import cors from 'cors'
 import bodyParser from "body-parser"
-import prisma from '../app/db.server.ts'
+import {PrismaClient} from "@prisma/client"
 import Redis from 'ioredis'
 import {startSocketServer} from "./socketServer.ts"
 import {zoraApi} from "./zoraApi.ts";
 import {syncRedis} from "../plugins/sync.ts";
 import interceptors from "../plugins/interceptors.ts";
+import PrismaSeed from "../prisma/prismaSeed.ts";
 
 dotenv.config({ path: '.env' })
 
-const redis = new Redis()
+const redis = new Redis(process.env.REDIS_URL as string)
+const prisma = new PrismaClient()
 
 const app = express()
 app.use(cors({
-  origin: 'https://raylin-flower.myshopify.com'
+  origin: [
+    ...((process.env.SERVER_ORIGIN as string).split(','))
+  ],
 }))
+
+//信任代理
+app.set("trust proxy", 1);
 
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
@@ -30,9 +37,24 @@ const server = app.listen(8080,()=>{
 zoraApi({app,redis,prisma})
 
 //启动socket服务
-startSocketServer(server)
+startSocketServer({redis,prisma,server}).then(res=>{
+  console.log(res)
+})
+  .catch(e=>{
+    console.log(e)
+  })
+
+PrismaSeed(prisma).then(res=>{
+  console.log(res)
+})
+  .catch(e=>{
+    console.log(e)
+  })
 
 syncRedis({prisma,redis}).then(res=>{
   console.log(res)
 })
+  .catch(e=>{
+    console.log(e)
+  })
 

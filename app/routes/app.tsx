@@ -2,12 +2,12 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
-
-import { authenticate } from "@/shopify.server";
+import { authenticate } from "@/shopify.server.ts";
 
 import '@styles/_variables.scss'
 
 import {useEffect} from "react";
+import WithHook from "@hooks/WithHook.tsx";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -16,8 +16,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
-export default function App() {
+function App() {
   const { apiKey } = useLoaderData<typeof loader>();
+
+  useEffect(() => {
+
+  }, []);
+
+
   //设置主题
   const setTheme = ()=>{
     const theme = localStorage.getItem('YCChat_application_theme') || 'light'
@@ -52,3 +58,5 @@ export function ErrorBoundary() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+export default WithHook(App)
