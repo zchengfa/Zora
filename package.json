@@ -18,7 +18,7 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "zora-server": "nodemon zoraServer/zoraServer.ts --tunnel-url https://cc7a5f1b2dad.ngrok-free.app:8080"
+    "zora-server": "nodemon zoraServer/zoraServer.ts --tunnel-url https://83f3595da512.ngrok-free.app:8080"
   },
   "type": "module",
   "engines": {
@@ -54,7 +54,8 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "uuid": "^13.0.0",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@shopify/api-codegen-preset": "^1.2.0",
@@ -68,6 +69,7 @@
     "@types/react": "^18.3.25",
     "@types/react-dom": "^18.3.7",
     "@types/socket.io": "^3.0.1",
+    "@types/socket.io-client": "^1.4.36",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.57.1",

@@ -1,38 +1,77 @@
-import type {LoaderFunctionArgs} from "react-router";
-import {useLoaderData} from "react-router";
+import {LoaderFunctionArgs, useLoaderData} from "react-router";
 import {authenticate} from "@/shopify.server";
-
 import indexStyle from '@styles/pages/app_index.module.scss'
 import ZoraSearch from '@components/ZoraSearch'
 import ZoraCustomerList from '@components/ZoraCustomerList'
-import {useState} from "react";
-import type {CustomerDataType,MessageBoxType} from "@/type";
+import {useEffect, useState} from "react";
+import type {CustomerDataType, MessageBoxType} from "@/type";
 
 import ZoraMessageItems from "@components/ZoraMessageItems";
+import {useSocketService} from "@hooks/useSocketService.ts";
+import {useMessageStore} from "@/zustand/zustand.ts";
+import {shopifyRequestUserInfo} from "@/network/request.ts";
+//import {shopifyRequestUserInfo} from "@/network/request.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
-  const {admin} = await authenticate.admin(request)
-  const result = await admin.graphql(
-    `query shopInfo {
-      shop {
-        myshopifyDomain
-      }
-      products(first:100) {
-        nodes {
-          id
-          title
-        }
-      }
-    }
-    `
-  )
+  await authenticate.admin(request)
+  const params = request.url.substring(request.url.indexOf('?'),request.url.length)
 
-  return await result.json()
+  return {
+    params
+  }
+  // return shopifyRequestUserInfo(params)
+  // const result = await admin.graphql(
+  //   `query shopInfo {
+  //     shop {
+  //       myshopifyDomain
+  //     }
+  //     products(first:100) {
+  //       nodes {
+  //         id
+  //         title
+  //       }
+  //     }
+  //   }
+  //   `
+  // )
+
+  //return await requestUserInfo()
 }
 
-export default function Index(){
-  const result = useLoaderData<typeof loader>();
-  const products = result?.data?.products?.nodes;
+function Index(){
+  const {params} = useLoaderData<typeof loader>();
+  // const products = result?.data?.products?.nodes;
+  const {message} = useSocketService();
+  const messageStore = useMessageStore();
+
+  useEffect(() => {
+    if(message){
+      let isExistUser = false
+      const userList = messageStore.chatList
+      if(!userList.length){
+        isExistUser = false
+      }
+      else{
+        userList.forEach(user=>{
+          isExistUser =  user.id === message.senderId
+        })
+      }
+      if(!isExistUser){
+        shopifyRequestUserInfo(params+'&id='+message.senderId).then(res=>{
+          const {userInfo} = res.data
+          messageStore.pushChatList({
+            id:userInfo.id,
+            firstName: userInfo.first_name,
+            lastName: userInfo.last_name,
+            avatar: userInfo.image_url,
+            lastMessage: message.contentBody
+          })
+        }).catch(err=>{
+            console.log(err)
+          })
+      }
+    }
+  }, [message]);
   //客户信息列表数据
   const [userData,setUserData] = useState([
     {
@@ -105,7 +144,7 @@ export default function Index(){
           {/*客户列表*/}
           <div className={indexStyle.chatLeft}>
             <ZoraSearch placeholder={'Search'}></ZoraSearch>
-            <ZoraCustomerList customerData={userData} ItemClick={customerItemClick}></ZoraCustomerList>
+            <ZoraCustomerList customerData={messageStore.chatList} ItemClick={customerItemClick}></ZoraCustomerList>
           </div>
           {/*聊天部分*/}
           <div className={indexStyle.chatMiddle}>
@@ -118,3 +157,4 @@ export default function Index(){
   </div>
 }
 
+export default Index

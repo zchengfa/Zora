@@ -6,6 +6,7 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import {shopifyApiClientInit} from "@/network/request.ts";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -20,27 +21,16 @@ const shopify = shopifyApp({
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
   hooks:{
-    //应用安装完成，同步店铺数据
+    //应用安装完成，会触发该钩子
     afterAuth: async ({ session }) => {
-      const { shop } = session;
+      const {shop,accessToken} = session
+      //应用安装完成，告诉后端可以实例一个shopifyApiClient用作后端使用该用户的数据请求
+      shopifyApiClientInit({shop,accessToken:accessToken as string}).then(()=>{
+        console.log(`Shop：${shop}已安装Zora应用，并且后端服务已初始化了shopifyApiClient实例`)
+      }).catch((err)=>{
+        console.log(`Shop：${shop}已安装Zora应用，但后端服务初始化shopifyApiClient实例失败：${err}`)
+      })
 
-      console.log(`🎯 应用安装完成，开始为店铺 ${shop} 同步客户数据功能待开发`);
-
-      // try{
-      //   const utils = new ShopifyUtils(session)
-      //   utils.syncShopifyData().then(res=>{
-      //     console.log(res)
-      //   })
-      // }
-      // catch (e){
-      //   console.error(e);
-      // }
-
-      // 异步执行同步，不阻塞OAuth流程的重定向
-      // syncShopifyCustomers(shop, accessToken).catch(error => {
-      //   console.error(`❌ ${shop} 初始同步失败:`, error);
-      //   // 生产环境中应集成错误上报系统
-      // });
     },
   }
 });

@@ -1,5 +1,5 @@
 import type { Express,Response } from "express-serve-static-core"
-import {validateMail} from "../plugins/validateMail.ts";
+import {validate} from "../plugins/validate.ts";
 import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
@@ -7,7 +7,6 @@ import bcrypt from 'bcrypt';
 import {handlePrismaError} from "../plugins/handleZoraError.ts";
 import { v4 as uuidv4 } from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
-import * as process from "node:process";
 
 interface ZoraApiType {
   app:Express,
@@ -86,8 +85,8 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
           }
         })
         agentInfo = prismaAgent
-        await redis.hset(`AGENT:${prismaAgent.id}`,{...prismaAgent})
-        await redis.expire(`AGENT:${prismaAgent.id}`, SESSION_EXPIRED_DURATION / 1000 )
+        await redis.hset(`AGENT:${prismaAgent?.id}`,{...prismaAgent})
+        await redis.expire(`AGENT:${prismaAgent?.id}`, SESSION_EXPIRED_DURATION / 1000 )
       }
       else{
         agentInfo = redisAgent
@@ -248,7 +247,7 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
   app.post('/sendVerifyCodeToEmail',RATE_LIMITS.STRICT,async (req,res)=>{
      const {email} = req.body
      try {
-       const data = await validateMail({email,expired:EXPIRED})
+       const data = await validate({email,expired:EXPIRED})
        //发送成功保存验证码到redis中，并设置过期时间，并清除之前验证的次数，防止用户在验证次数时间未过期时重新获取验证码却还是提示验证次数过多
        await redis.multi()
            .setex(getRedisStorageKey(email),EXPIRED,data.code)
@@ -312,5 +311,42 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
         catch (error) {
            res.status(500).send({server_error: true,message:'server error'})
         }
+    })
+
+    app.get('/shopifyUserInfo',async (req, res)=>{
+      const {id} = req.query
+      try{
+        const redisQueryCustomer = await redis.hgetall(`customer:${id}`)
+        let userInfo = {}
+        if(!Object.keys(redisQueryCustomer).length){
+          const prismaQueryCustomer = await prisma.customers.findUnique({
+            where:{
+              id: Number(id),
+            }
+          })
+          await redis.hset(`customer:${id}`, {...prismaQueryCustomer})
+          await redis.expire(`customer:${id}`, SESSION_EXPIRED_DURATION / 7)
+          userInfo = {
+            id: prismaQueryCustomer?.id.toString(),
+            first_name: prismaQueryCustomer?.first_name,
+            last_name: prismaQueryCustomer?.last_name,
+            image_url: prismaQueryCustomer?.image_url
+          }
+        }
+        else{
+          userInfo = {
+            id: redisQueryCustomer?.id.toString(),
+            first_name: redisQueryCustomer?.first_name,
+            last_name: redisQueryCustomer?.last_name,
+            image_url: redisQueryCustomer?.image_url
+          }
+        }
+
+        res.status(200).send({result:true,userInfo})
+      }
+      catch (e){
+        res.status(500).send({server_error: true,message:'server error'})
+      }
+
     })
 }
