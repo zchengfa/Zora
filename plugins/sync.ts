@@ -24,10 +24,10 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
 
      // 存储客户基本信息为 Hash
      for (const customer of customers) {
-       pipeline.hset(`customer:${customer.email}`, {
+       pipeline.hset(`customer:${customer.id}`, {
          ...customer
        });
-       pipeline.expire(`customer:${customer.email}`,EXPIRED)
+       pipeline.expire(`customer:${customer.id}`,EXPIRED)
      }
 
      //存储消息会话
@@ -61,7 +61,7 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
 
      //存储session
      for (const item of session){
-       const id = item.userId ? item.userId : 999999999
+       const id = item.userId ? item.userId : item.shop
        pipeline.hset(`session:${id}`,{...item})
        pipeline.expire(`session:${id}`,EXPIRED)
      }

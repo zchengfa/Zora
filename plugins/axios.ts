@@ -1,5 +1,6 @@
-import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-
+import axios, { AxiosError } from 'axios';
+type AxiosRequestConfig = axios.AxiosRequestConfig
+type AxiosResponse = axios.AxiosResponse;
 // Shopify 专用配置接口
 interface ShopifyRequestConfig extends AxiosRequestConfig {
   shopDomain: string; // 商店域名，如 'your-store.myshopify.com'
@@ -35,7 +36,7 @@ interface ShopifyResponse<T = any> {
 }
 
 export class ShopifyAPI {
-  private defaultApiVersion = '2024-01';
+  private defaultApiVersion = '2025-10';
 
   /**
    * 构建 Shopify API URL

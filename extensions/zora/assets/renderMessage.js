@@ -18,10 +18,10 @@ class RenderMessage {
         <div class="zora-msg-box">
           <span class="zora-user">${username}</span>
           <div class="zora-msg-content">
-            <span class="zora-msg">${payload.contentBody}</span>
-            <div class="msg-status-svg-box"></div>
-            <span class="zora-msg-read-state hidden">${zoraResponse.responseMessage('msg_status','READ')}</span>
-        </div>
+              <span class="zora-msg">${payload.contentBody}</span>
+              <div class="msg-status-svg-box"></div>
+              <span class="zora-msg-read-state hidden">${zoraResponse.responseMessage('msg_status','READ')}</span>
+          </div>
         </div>
       </div>
     `
@@ -38,12 +38,12 @@ class RenderMessage {
       this.updateMessageStatus(payload.msgId,'FAILED')
     },this.MAX_WAITING_THRESHOLD)
     this.zoraMaxWaitingTimer.set(payload.msgId,msgMaxTimer)
-    
+
   }
   updateMessageStatus = (msgId,status)=>{
     const el = document.querySelector(`[data-msg-unique="${msgId}"]`)
     const svgBoxEl = el.querySelector('.msg-status-svg-box')
-  
+
     const msgTimer = this.zoraMsgStateTimer.get(msgId)
     const msgMaxTimer = this.zoraMaxWaitingTimer.get(msgId)
     //清除之前的定时器
@@ -55,7 +55,7 @@ class RenderMessage {
       clearTimeout(msgMaxTimer)
       this.zoraMaxWaitingTimer.delete(msgId)
     }
-    
+
     svgBoxEl.innerHTML = this.getRenderStatusSvg(status,msgId)
   }
   getRenderStatusSvg = (status,msgId)=>{
@@ -71,10 +71,10 @@ class RenderMessage {
           `
       case 'READ':
         readStateEl.classList.remove('hidden')
-        return ''      
+        return ''
       default:
         readStateEl.classList.add('hidden')
-        return ''         
+        return ''
     }
   }
 }

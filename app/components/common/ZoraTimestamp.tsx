@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from "react";
+import React from "react";
 import ZoraTimestampStyle from '@styles/componentStyles/ZoraTimestamp.module.scss'
 import {dealMsgTime} from "@Utils/Utils";
 
@@ -11,14 +11,8 @@ const ZoraTimestamp:React.FC<Timestamp> = (
     timestamp
   })=>{
 
-  const [ZoraTime,setZoraTime] = useState(timestamp)
-
-  const memoTime = useMemo(()=>{
-    return dealMsgTime(Number(ZoraTime))
-  },[ZoraTime])
-
   return <div className={ZoraTimestampStyle.timeBox}>
-    <span className={ZoraTimestampStyle.time}>{memoTime}</span>
+    <span className={ZoraTimestampStyle.time}>{dealMsgTime(Number(timestamp))}</span>
   </div>
 }
 

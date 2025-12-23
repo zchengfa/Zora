@@ -1,10 +1,9 @@
-import {Session} from "@shopify/shopify-api";
-import {ShopifyAPI} from "@plugins/axios.ts"
+import {ShopifyAPI} from "./axios.ts"
 
-export class ShopifyUtils {
+export class ShopifyApiClient {
   private readonly shopConfig: { apiVersion: string; shopDomain: string; accessToken: string };
   private shopifyApi: ShopifyAPI;
-  constructor(session:Session) {
+  constructor(session:{shop:string,accessToken:string}) {
     this.shopifyApi = new ShopifyAPI()
     this.shopConfig = {
       shopDomain:session.shop,
@@ -13,18 +12,4 @@ export class ShopifyUtils {
     }
   }
 
-  syncShopifyData = async ()=>{
-    // return await this.shopifyApi.graphql({
-    //   ...this.shopConfig,
-    //   query: CUSTOMER_QUERY,
-    //   variables:{
-    //     limit: 10
-    //   }
-    // }
-
-    return await this.shopifyApi.get({
-      ...this.shopConfig,
-      url:'/orders.json'
-    })
-  }
 }

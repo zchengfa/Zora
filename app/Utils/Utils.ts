@@ -160,3 +160,44 @@ export function timeFormatting (fm:string,time?:Date | number | string){
   }
 
 }
+
+type DeepClone<T> = T extends Function | symbol | bigint
+  ? T
+  : T extends Date
+    ? Date
+    : T extends RegExp
+      ? RegExp
+      : T extends Map<infer K, infer V>
+        ? Map<DeepClone<K>, DeepClone<V>>
+        : T extends Set<infer V>
+          ? Set<DeepClone<V>>
+          : T extends object
+            ? { [K in keyof T]: DeepClone<T[K]> }
+            : T;
+
+export function deepCloneTS<T>(source: T, seen = new WeakMap<object, any>()): DeepClone<T> {
+  if (source === null || typeof source !== 'object') return source as DeepClone<T>;
+  if (seen.has(source)) return seen.get(source);
+
+  if (source instanceof Date) return new Date(source) as DeepClone<T>;
+  if (source instanceof RegExp) return new RegExp(source.source, source.flags) as DeepClone<T>;
+  if (source instanceof Map) {
+    const m = new Map<DeepClone<any>, DeepClone<any>>();
+    seen.set(source, m);
+    for (const [k, v] of source) m.set(deepCloneTS(k, seen), deepCloneTS(v, seen));
+    return m as DeepClone<T>;
+  }
+  if (source instanceof Set) {
+    const s = new Set<DeepClone<any>>();
+    seen.set(source, s);
+    for (const v of source) s.add(deepCloneTS(v, seen));
+    return s as DeepClone<T>;
+  }
+
+  const copy: any = Array.isArray(source) ? [] : {};
+  seen.set(source, copy);
+  Reflect.ownKeys(source).forEach(key => {
+    copy[key] = deepCloneTS((source as any)[key], seen);
+  });
+  return copy;
+}

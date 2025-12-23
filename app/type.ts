@@ -10,6 +10,7 @@ export interface CustomerDataType {
   hadRead:boolean,
   isActive:boolean,
   unreadMessageCount:number,
+  conversationId:string,
 }
 
 type OwnerType = "customer_msg" | "agent_msg" | "bot_msg"

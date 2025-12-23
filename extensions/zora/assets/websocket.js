@@ -1,4 +1,4 @@
-const socket = io('wss://cc7a5f1b2dad.ngrok-free.app',{
+const socket = io('wss://1b88efe3a869.ngrok-free.app',{
   transports: ['websocket'],
   headers:{
     "ngrok-skip-browser-warning": true, //绕过ngrok验证

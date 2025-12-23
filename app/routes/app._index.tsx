@@ -1,94 +1,100 @@
-import type {LoaderFunctionArgs} from "react-router";
-import {useLoaderData} from "react-router";
+import {LoaderFunctionArgs, useLoaderData} from "react-router";
 import {authenticate} from "@/shopify.server";
-
 import indexStyle from '@styles/pages/app_index.module.scss'
 import ZoraSearch from '@components/ZoraSearch'
 import ZoraCustomerList from '@components/ZoraCustomerList'
-import {useState} from "react";
-import type {CustomerDataType,MessageBoxType} from "@/type";
-
 import ZoraMessageItems from "@components/ZoraMessageItems";
+import ZoraChat from "@components/ZoraChat.tsx";
+import {useSocketService} from "@hooks/useSocketService.ts";
+import {useEffect} from "react";
+import {useMessageStore} from "@/zustand/zustand.ts";
+import {shopifyRequestUserInfo} from "@/network/request.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
-  const {admin} = await authenticate.admin(request)
-  const result = await admin.graphql(
-    `query shopInfo {
-      shop {
-        myshopifyDomain
-      }
-      products(first:100) {
-        nodes {
-          id
-          title
-        }
-      }
-    }
-    `
-  )
+  await authenticate.admin(request)
+  const params = request.url.substring(request.url.indexOf('?'),request.url.length)
 
-  return await result.json()
+  return {
+    params
+  }
+  // return shopifyRequestUserInfo(params)
+  // const result = await admin.graphql(
+  //   `query shopInfo {
+  //     shop {
+  //       myshopifyDomain
+  //     }
+  //     products(first:100) {
+  //       nodes {
+  //         id
+  //         title
+  //       }
+  //     }
+  //   }
+  //   `
+  // )
+
+  //return await requestUserInfo()
 }
 
-export default function Index(){
-  const result = useLoaderData<typeof loader>();
-  const products = result?.data?.products?.nodes;
-  //客户信息列表数据
-  const [userData,setUserData] = useState([
-    {
-      id: (new Date().getTime()).toString(),
-      firstName:'z',
-      lastName:'raylin',
-      avatar:null,
-      isOnline:true,
-      lastMessage:'helloememememeemememememem',
-      lastTimestamp:(new Date().getTime()).toString(),
-      hadRead:false,
-      isActive:false,
-      unreadMessageCount:1
-    }
-  ])
+function Index(){
+  const {params} = useLoaderData<typeof loader>();
+  // const products = result?.data?.products?.nodes;
+  const {message} = useSocketService();
+  const messageStore = useMessageStore();
 
-  const messageData: MessageBoxType[] = [
-    {
-      id: '23423432432',
-      conversation_id:'fefsfse',
-      owner: "customer_msg",
-      msg_status:{
-        read:false,
-        sent:false,
-        delivered: false
-      },
-      sender:{
-        id: 'sfsfsefs',
-        type: 'customer'
-      },
-      recipient: {
-        id: '342432',
-        type: 'agent'
-      },
-      content:{
-        type: 'text',
-        body: 'this is test message'
-      }
-    }
-  ]
+  useEffect(() => {
+    messageStore.initZustandState()
+    messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+  }, []);
 
-  const customerItemClick = (index:number)=>{
-    //点击对应的客户项，修改成已读并使其变为激活状态,未读信息数也要清零
-    const data = JSON.parse(JSON.stringify(userData))
-    data.forEach((item:CustomerDataType,i:number)=>{
-      if(i === index){
-        item.hadRead = true
-        item.isActive = true
-        item.unreadMessageCount = 0
+  useEffect(() => {
+    if(message){
+      let isExistUser = false
+      const userList = messageStore.chatList
+      if(!userList.length){
+        isExistUser = false
       }
       else{
-        item.isActive = false
+        userList.forEach(user=>{
+          isExistUser =  user.id === message.senderId
+        })
       }
-    })
+      //列表不存在该客户信息，需要新增客户聊天列表项
+      if(!isExistUser){
+        shopifyRequestUserInfo(params+'&id='+message.senderId).then(res=>{
+          const {userInfo} = res.data
+          messageStore.pushChatList({
+            id:userInfo.id,
+            firstName: userInfo.first_name,
+            lastName: userInfo.last_name,
+            avatar: userInfo.image_url,
+            lastMessage: message.contentBody,
+            conversationId: message.conversationId,
+            lastTimestamp: message.timestamp
+          })
+          messageStore.addMessage(message)
+        }).catch(err=>{
+            console.log(err)
+          })
+      }
+      //存在，只需更新对应列表项的部分数据
+      else{
+        messageStore.updateChatList(message)
+        messageStore.addMessage(message)
+      }
 
-    setUserData(data)
+    }
+  }, [message]);
+
+  const customerItemClick = async (conversationId:string)=>{
+    if(messageStore.activeCustomerItem !== conversationId){
+      messageStore.readChatList(conversationId)
+      await messageStore.changeMessages({
+        conversationId,
+        page:messageStore.page,
+        pageSize: messageStore.pageSize
+      })
+    }
   }
 
   return <div className={indexStyle.container}>
@@ -105,11 +111,12 @@ export default function Index(){
           {/*客户列表*/}
           <div className={indexStyle.chatLeft}>
             <ZoraSearch placeholder={'Search'}></ZoraSearch>
-            <ZoraCustomerList customerData={userData} ItemClick={customerItemClick}></ZoraCustomerList>
+            <ZoraCustomerList customerData={messageStore.chatList} ItemClick={customerItemClick}></ZoraCustomerList>
           </div>
           {/*聊天部分*/}
           <div className={indexStyle.chatMiddle}>
-            <ZoraMessageItems messageData={messageData}></ZoraMessageItems>
+            <ZoraMessageItems messageData={messageStore.messages}></ZoraMessageItems>
+            <ZoraChat ></ZoraChat>
           </div>
           <div className={indexStyle.chatRight}></div>
         </div>
@@ -118,3 +125,4 @@ export default function Index(){
   </div>
 }
 
+export default Index
