@@ -1,12 +1,12 @@
 import ZoraCustomerListStyle from '@styles/componentStyles/ZoraCustomerList.module.scss'
 import type {CustomerDataType} from '@/type'
 import Badge from "@components/common/Badge";
-import React, {useState} from "react";
+import React from "react";
 import ZoraTimestamp from "@components/common/ZoraTimestamp";
 
 interface ZoraCustomerListProps {
   customerData: CustomerDataType[],
-  ItemClick:(index:number)=> void
+  ItemClick:(conversationId:string)=> void
 }
 
 
@@ -14,8 +14,8 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
   {customerData,ItemClick}
 ) => {
 
-  const handlerClick = (index:number)=>{
-    ItemClick(index)
+  const handlerClick = (conversationId:string)=>{
+    ItemClick(conversationId)
   }
 
   return <div className={ZoraCustomerListStyle.container}>
@@ -23,8 +23,8 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
       customerData?.length ?
         <div className={ZoraCustomerListStyle.customerList}>
           {
-            customerData?.map((item: CustomerDataType, index: number) => {
-              return <div onClick={()=> handlerClick(index)} className={item.isActive ? ZoraCustomerListStyle.customerItem + ' ' + ZoraCustomerListStyle.active : ZoraCustomerListStyle.customerItem} key={index}>
+            customerData?.map((item: CustomerDataType) => {
+              return <div onClick={()=> handlerClick(item.conversationId)} className={item.isActive ? ZoraCustomerListStyle.customerItem + ' ' + ZoraCustomerListStyle.active : ZoraCustomerListStyle.customerItem} key={item.conversationId}>
                 <div className={item.isOnline ? ZoraCustomerListStyle.leftBox + ' '+ ZoraCustomerListStyle.onlineTip  :  ZoraCustomerListStyle.leftBox}>
                   {
                     item.avatar ? <img className={ZoraCustomerListStyle.avatar} src={item.avatar} alt="avatar" />

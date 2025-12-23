@@ -1,23 +1,23 @@
 import React from "react";
-import type {MessageBoxType} from "@/type";
 import ZoraMessageItemsStyle from '@styles/componentStyles/ZoraMessageItems.module.scss'
 import ZoraMessageItem from "@components/ZoraMessageItem"
+import {MessageDataType} from "@Utils/socket.ts";
 
 interface MessagePropsType{
-  messageData: MessageBoxType[];
+  messageData: MessageDataType[];
 }
 
 const ZoraMessageItems:React.FC<MessagePropsType> = (
   {
     messageData
   })=>{
-  return <div className={ZoraMessageItemsStyle.contanier}>
+  return <div className={ZoraMessageItemsStyle.container}>
     {
       messageData?.length ?
         <div className={ZoraMessageItemsStyle.messageBox}>
           {
-            messageData.map((item:MessageBoxType,index:number)=>{
-              return <ZoraMessageItem itemData={item} key={index}></ZoraMessageItem>
+            messageData.map((item:MessageDataType,index:number)=>{
+              return <ZoraMessageItem itemData={item} key={item.conversationId+index}></ZoraMessageItem>
             })
           }
         </div>

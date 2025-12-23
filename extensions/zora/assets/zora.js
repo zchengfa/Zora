@@ -645,7 +645,8 @@ if(!customElements.get('zora-send-component')){
           recipientType: 'AGENT',
           contentBody: this.msg,
           msgId: 'msg_'+ new Date().getTime(),
-          conversationId: sessionStorage.getItem('zora_conversation_id')
+          conversationId: sessionStorage.getItem('zora_conversation_id'),
+          timestamp: new Date().getTime(),
         }
         socket.emit('sendMessage',JSON.stringify(messageBody))
         renderMessage.addMessage(messageBody,0)

@@ -19,11 +19,11 @@ const interceptors = async ({req,res,next}:{req:Request,res:Response,next:NextFu
         if(req.query.hmac && !shopifyRequestValidate.result){
           return res.status(401).send({result:shopifyRequestValidate.result,message:shopifyRequestValidate.message})
         }
+        else if(!req.query.hmac){
+          return res.status(401).send({result:false,message: 'Authentication token missing'})
+        }
         else {
           next()
-        }
-        if(!req.query.hmac){
-          return res.status(401).send({result:false,message: 'Authentication token missing'})
         }
       }
       else{

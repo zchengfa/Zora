@@ -1,6 +1,7 @@
 import SocketService, {MessageDataType} from "@Utils/socket.ts";
 import {useEffect,useState} from "react";
-const socketService = new SocketService({url:'wss://83f3595da512.ngrok-free.app'})
+
+const socketService = new SocketService({url:import.meta.env.VITE_BASE_URL.replace('https','wss')});
 socketService.connect()
 export const useSocketService = ()=>{
   const [message,setMessage] = useState<MessageDataType | null>(null)

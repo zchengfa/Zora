@@ -1,3 +1,70 @@
+
+{% schema %}
+{
+  "name": "Zora",
+  "target": "body",
+  "settings": [
+    {
+      "type": "color",
+      "id": "zora_bg_color",
+      "label": "t:schema.zora.settings.zora_bg_color.label",
+      "info": "t:schema.zora.settings.zora_bg_color.info",
+      "default": "#6bb2deff"
+    },
+    {
+      "type": "color",
+      "id": "zora_success_color",
+      "label": "t:schema.zora.settings.zora_success_color.label",
+      "info": "t:schema.zora.settings.zora_success_color.info",
+      "default": "#6fde6bff"
+    },
+    {
+      "type": "color",
+      "id": "zora_info_color",
+      "label": "t:schema.zora.settings.zora_info_color.label",
+      "info": "t:schema.zora.settings.zora_info_color.info",
+      "default": "#eaeef1ff"
+    },
+    {
+      "type": "color",
+      "id": "zora_error_color",
+      "label": "t:schema.zora.settings.zora_error_color.label",
+      "info": "t:schema.zora.settings.zora_error_color.info",
+      "default": "#e64048ff"
+    },
+    {
+      "type": "color",
+      "id": "zora_warning_color",
+      "label": "t:schema.zora.settings.zora_warning_color.label",
+      "info": "t:schema.zora.settings.zora_warning_color.info",
+      "default": "#e9cb67ff"
+    },
+    {
+      "type": "range",
+      "id": "zora_size_position_x",
+      "label": "t:schema.zora.settings.zora_size_position_x.label",
+      "info": "t:schema.zora.settings.zora_size_position_x.info",
+      "min": 0,
+      "max": 5,
+      "unit": "rem",
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "zora_size_position_y",
+      "label": "t:schema.zora.settings.zora_size_position_y.label",
+      "info": "t:schema.zora.settings.zora_size_position_y.info",
+      "min": 0,
+      "max": 50,
+      "unit": "dvh",
+      "step": 1,
+      "default": 10
+    }
+  ]
+}
+{% endschema %}
+
 {% style %}
 :root{
   --zora-error-color: {{ block.settings.zora_error_color }};
@@ -77,70 +144,3 @@
   <script defer src="{{ 'websocket.js' | asset_url }}"></script>
   <script defer src="{{ 'zora.js' | asset_url }}"></script>
 </div>
-
-{% schema %}
-{
-  "name": "Zora",
-  "target": "body",
-  "settings": [
-    {
-      "type": "color",
-      "id": "zora_bg_color",
-      "label": "t:schema.zora.settings.zora_bg_color.label",
-      "info": "t:schema.zora.settings.zora_bg_color.info",
-      "default": "#6bb2deff"
-    },
-    {
-      "type": "color",
-      "id": "zora_success_color",
-      "label": "t:schema.zora.settings.zora_success_color.label",
-      "info": "t:schema.zora.settings.zora_success_color.info",
-      "default": "#6fde6bff"
-    },
-    {
-      "type": "color",
-      "id": "zora_info_color",
-      "label": "t:schema.zora.settings.zora_info_color.label",
-      "info": "t:schema.zora.settings.zora_info_color.info",
-      "default": "#eaeef1ff"
-    },
-    {
-      "type": "color",
-      "id": "zora_error_color",
-      "label": "t:schema.zora.settings.zora_error_color.label",
-      "info": "t:schema.zora.settings.zora_error_color.info",
-      "default": "#e64048ff"
-    },
-    {
-      "type": "color",
-      "id": "zora_warning_color",
-      "label": "t:schema.zora.settings.zora_warning_color.label",
-      "info": "t:schema.zora.settings.zora_warning_color.info",
-      "default": "#e9cb67ff"
-    },
-    {
-      "type": "range",
-      "id": "zora_size_position_x",
-      "label": "t:schema.zora.settings.zora_size_position_x.label",
-      "info": "t:schema.zora.settings.zora_size_position_x.info",
-      "min": 0,
-      "max": 5,
-      "unit": "rem",
-      "step": 1,
-      "default": 1
-    },
-    {
-      "type": "range",
-      "id": "zora_size_position_y",
-      "label": "t:schema.zora.settings.zora_size_position_y.label",
-      "info": "t:schema.zora.settings.zora_size_position_y.info",
-      "min": 0,
-      "max": 50,
-      "unit": "dvh",
-      "step": 1,
-      "default": 10
-    }
-  ]
-}
-{% endschema %}
-

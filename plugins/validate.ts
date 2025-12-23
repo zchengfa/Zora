@@ -129,7 +129,7 @@ function verifyShopDomain(shopParam:string) {
   return shopRegex.test(shopParam);
 }
 
-export function validateShopifyRequest(query:ShopifyUrlQueryType,validateTimestamp:false) {
+export function validateShopifyRequest(query:ShopifyUrlQueryType,validateTimestamp = false) {
   const { shop, hmac, id_token, timestamp } = query;
   // 1. 验证必需参数存在
   if (!shop || !hmac || !id_token || !timestamp) {
@@ -140,10 +140,18 @@ export function validateShopifyRequest(query:ShopifyUrlQueryType,validateTimesta
   }
 
   // 2. 验证HMAC
-  if (!verifyShopifyHmac(query, process.env.SHOPIFY_API_SECRET as string)) {
+  if(process.env.SHOPIFY_API_SECRET){
+    if (!verifyShopifyHmac(query, process.env.SHOPIFY_API_SECRET as string)) {
+      return {
+        result:false,
+        message: 'Invalid HMAC signature'
+      }
+    }
+  }
+  else{
     return {
       result:false,
-      message: 'Invalid HMAC signature'
+      message: 'Not found SHOPIFY_API_SECRET in environment variables'
     }
   }
 

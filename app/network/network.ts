@@ -1,5 +1,6 @@
 import axios, {AxiosError, AxiosRequestConfig, AxiosResponse} from 'axios'
-const baseURL = 'https://83f3595da512.ngrok-free.app';
+
+const baseURL = import.meta.env.VITE_BASE_URL;
 const timeout = 5000
 
 const instance = axios.create({

@@ -17,7 +17,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 function App() {
   const { apiKey } = useLoaderData<typeof loader>();
-
   //设置主题
   const setTheme = ()=>{
     const theme = localStorage.getItem('YCChat_application_theme') || 'light'

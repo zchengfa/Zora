@@ -32,8 +32,8 @@ app.use(bodyParser.urlencoded({ extended: true }))
 
 app.use((req,res,next)=> interceptors({res,req,next}))
 
-const server = app.listen(8080,()=>{
-  console.log("zora服务启动成功，端口：8080")
+const server = app.listen(3001,()=>{
+  console.log("zora服务启动成功，端口：3001")
 })
 
 app.post('/shopifyApiClientInit',(req, res)=>{

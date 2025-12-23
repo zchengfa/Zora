@@ -3,14 +3,12 @@ import {authenticate} from "@/shopify.server";
 import indexStyle from '@styles/pages/app_index.module.scss'
 import ZoraSearch from '@components/ZoraSearch'
 import ZoraCustomerList from '@components/ZoraCustomerList'
-import {useEffect, useState} from "react";
-import type {CustomerDataType, MessageBoxType} from "@/type";
-
 import ZoraMessageItems from "@components/ZoraMessageItems";
+import ZoraChat from "@components/ZoraChat.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
+import {useEffect} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {shopifyRequestUserInfo} from "@/network/request.ts";
-//import {shopifyRequestUserInfo} from "@/network/request.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   await authenticate.admin(request)
@@ -45,6 +43,11 @@ function Index(){
   const messageStore = useMessageStore();
 
   useEffect(() => {
+    messageStore.initZustandState()
+    messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+  }, []);
+
+  useEffect(() => {
     if(message){
       let isExistUser = false
       const userList = messageStore.chatList
@@ -56,6 +59,7 @@ function Index(){
           isExistUser =  user.id === message.senderId
         })
       }
+      //列表不存在该客户信息，需要新增客户聊天列表项
       if(!isExistUser){
         shopifyRequestUserInfo(params+'&id='+message.senderId).then(res=>{
           const {userInfo} = res.data
@@ -64,70 +68,33 @@ function Index(){
             firstName: userInfo.first_name,
             lastName: userInfo.last_name,
             avatar: userInfo.image_url,
-            lastMessage: message.contentBody
+            lastMessage: message.contentBody,
+            conversationId: message.conversationId,
+            lastTimestamp: message.timestamp
           })
+          messageStore.addMessage(message)
         }).catch(err=>{
             console.log(err)
           })
       }
+      //存在，只需更新对应列表项的部分数据
+      else{
+        messageStore.updateChatList(message)
+        messageStore.addMessage(message)
+      }
+
     }
   }, [message]);
-  //客户信息列表数据
-  const [userData,setUserData] = useState([
-    {
-      id: (new Date().getTime()).toString(),
-      firstName:'z',
-      lastName:'raylin',
-      avatar:null,
-      isOnline:true,
-      lastMessage:'helloememememeemememememem',
-      lastTimestamp:(new Date().getTime()).toString(),
-      hadRead:false,
-      isActive:false,
-      unreadMessageCount:1
+
+  const customerItemClick = async (conversationId:string)=>{
+    if(messageStore.activeCustomerItem !== conversationId){
+      messageStore.readChatList(conversationId)
+      await messageStore.changeMessages({
+        conversationId,
+        page:messageStore.page,
+        pageSize: messageStore.pageSize
+      })
     }
-  ])
-
-  const messageData: MessageBoxType[] = [
-    {
-      id: '23423432432',
-      conversation_id:'fefsfse',
-      owner: "customer_msg",
-      msg_status:{
-        read:false,
-        sent:false,
-        delivered: false
-      },
-      sender:{
-        id: 'sfsfsefs',
-        type: 'customer'
-      },
-      recipient: {
-        id: '342432',
-        type: 'agent'
-      },
-      content:{
-        type: 'text',
-        body: 'this is test message'
-      }
-    }
-  ]
-
-  const customerItemClick = (index:number)=>{
-    //点击对应的客户项，修改成已读并使其变为激活状态,未读信息数也要清零
-    const data = JSON.parse(JSON.stringify(userData))
-    data.forEach((item:CustomerDataType,i:number)=>{
-      if(i === index){
-        item.hadRead = true
-        item.isActive = true
-        item.unreadMessageCount = 0
-      }
-      else{
-        item.isActive = false
-      }
-    })
-
-    setUserData(data)
   }
 
   return <div className={indexStyle.container}>
@@ -148,7 +115,8 @@ function Index(){
           </div>
           {/*聊天部分*/}
           <div className={indexStyle.chatMiddle}>
-            <ZoraMessageItems messageData={messageData}></ZoraMessageItems>
+            <ZoraMessageItems messageData={messageStore.messages}></ZoraMessageItems>
+            <ZoraChat ></ZoraChat>
           </div>
           <div className={indexStyle.chatRight}></div>
         </div>

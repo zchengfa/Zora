@@ -158,8 +158,8 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
         })
         //查询到数据，同步到redis中,执行登录操作
         if(prismaQuery){
-          await redis.hset(`customer:${paramsObj.email}`, {...prismaQuery})
-          await redis.expire(`customer:${paramsObj.email}`, 60 * 60 * 24)
+          await redis.hset(`customer:${prismaQuery.id}`, {...prismaQuery})
+          await redis.expire(`customer:${prismaQuery.id}`, 60 * 60 * 24)
           //登录
           paramsObj.id = prismaQuery.id
           paramsObj.firstName = prismaQuery.first_name
@@ -184,8 +184,8 @@ export function zoraApi({app,redis,prisma}:ZoraApiType) {
           })
           //数据写入成功，执行一次redis写入
           if(newCustomer){
-            await redis.hset(`customer:${paramsObj.email}`, {...newCustomer})
-            await redis.expire(`customer:${paramsObj.email}`,24 * 60 * 60)
+            await redis.hset(`customer:${newCustomer.id}`, {...newCustomer})
+            await redis.expire(`customer:${newCustomer.id}`,24 * 60 * 60)
             //执行登录
             paramsObj.id = newCustomer.id
             paramsObj.image_url = newCustomer.image_url

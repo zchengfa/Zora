@@ -8,7 +8,8 @@ export type MessageDataType = {
   msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED'
   recipientType: 'CUSTOMER' | 'AGENT' | 'SYSTEM'
   senderId:string
-  senderType: 'CUSTOMER' | 'SYSTEM' | 'AGENT'
+  senderType: 'CUSTOMER' | 'SYSTEM' | 'AGENT',
+  timestamp: string
 }
 
 // 定义一个接口来描述可能的配置项，如果有需要的话
