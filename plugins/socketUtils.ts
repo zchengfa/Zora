@@ -80,7 +80,15 @@ export class SocketUtils{
   }
   private repostMessageAck = ()=>{
     this.ws.on('message_delivered',(payload)=>{
-      this.sendMessageAck(this.users.get(payload.recipientId) as string,payload.msgId,'DELIVERED',10004)
+      let receiver = ''
+      //发送者为客户，并且没有接收者id，说明是用户发给客服的消息回执
+      if(payload.senderType === 'CUSTOMER' && !payload.recipientId){
+        receiver = this.agent.get('id') as string
+      }
+      else{
+        receiver = this.users.get(payload.recipientId) as string
+      }
+      this.sendMessageAck(receiver,payload.msgId,'DELIVERED',10004)
     })
   }
   public socketAgentOnline = ()=>{

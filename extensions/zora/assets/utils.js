@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "https://1b88efe3a869.ngrok-free.app";
+const FETCH_BASE_URL = "https://cc350ce7d4b5.ngrok-free.app:";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {

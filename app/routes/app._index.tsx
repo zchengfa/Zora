@@ -8,44 +8,43 @@ import ZoraChat from "@components/ZoraChat.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
 import {useEffect} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
-import {shopifyRequestUserInfo} from "@/network/request.ts";
+import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
-  await authenticate.admin(request)
+  const {admin} = await authenticate.admin(request)
   const params = request.url.substring(request.url.indexOf('?'),request.url.length)
-
+  console.log(request.url)
+  const shopOwnerName = await admin.graphql(
+    `query shopOwnerName {
+        shop {
+          email
+          shopOwnerName
+        }
+    }`
+  )
+  const {data} = await shopOwnerName.json()
+  const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName)
   return {
-    params
+    params,
+    customerStaff: result.data
   }
-  // return shopifyRequestUserInfo(params)
-  // const result = await admin.graphql(
-  //   `query shopInfo {
-  //     shop {
-  //       myshopifyDomain
-  //     }
-  //     products(first:100) {
-  //       nodes {
-  //         id
-  //         title
-  //       }
-  //     }
-  //   }
-  //   `
-  // )
-
-  //return await requestUserInfo()
 }
 
 function Index(){
-  const {params} = useLoaderData<typeof loader>();
-  // const products = result?.data?.products?.nodes;
-  const {message} = useSocketService();
+  const {params,customerStaff} = useLoaderData<typeof loader>();
+  const {message,socket,messageAck} = useSocketService();
   const messageStore = useMessageStore();
 
   useEffect(() => {
-    messageStore.initZustandState()
+    messageStore.initZustandState(customerStaff)
     messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
   }, []);
+
+  useEffect(() => {
+    if(!messageAck){
+      console.log(messageAck,'我是消息回执')
+    }
+  }, [messageAck]);
 
   useEffect(() => {
     if(message){
@@ -97,6 +96,24 @@ function Index(){
     }
   }
 
+  const sendMsg = (msg:string)=>{
+    const msgData = {
+      senderId: undefined,
+      senderType: 'AGENT',
+      contentType: 'TEXT',
+      msgStatus: 'SENDING',
+      recipientType: 'CUSTOMER',
+      recipientId: messageStore.activeCustomerInfo.id,
+      contentBody: msg,
+      msgId: 'msg_'+ new Date().getTime(),
+      conversationId: messageStore.activeCustomerItem,
+      timestamp: new Date().getTime(),
+    }
+    socket.emit('sendMessage',JSON.stringify(msgData))
+    messageStore.updateChatList(msgData,true)
+    messageStore.addMessage(msgData).then()
+  }
+
   return <div className={indexStyle.container}>
     <div className={indexStyle.content}>
       <div className={indexStyle.statusBox}>
@@ -116,7 +133,7 @@ function Index(){
           {/*聊天部分*/}
           <div className={indexStyle.chatMiddle}>
             <ZoraMessageItems messageData={messageStore.messages}></ZoraMessageItems>
-            <ZoraChat ></ZoraChat>
+            <ZoraChat sendMessage={sendMsg}></ZoraChat>
           </div>
           <div className={indexStyle.chatRight}></div>
         </div>

@@ -44,7 +44,7 @@ app.post('/shopifyApiClientInit',(req, res)=>{
   console.log(`${shop}的shopifyApiClient初始化完成`)
 })
 //接口
-zoraApi({app,redis,prisma})
+zoraApi({app,redis,prisma,shopifyApiClients})
 
 //启动socket服务
 startSocketServer({redis,prisma,server}).then(res=>{
@@ -54,12 +54,12 @@ startSocketServer({redis,prisma,server}).then(res=>{
     console.log(e)
   })
 
-PrismaSeed(prisma).then(res=>{
-  console.log(res)
-})
-  .catch(e=>{
-    console.log(e)
-  })
+// PrismaSeed(prisma).then(res=>{
+//   console.log(res)
+// })
+//   .catch(e=>{
+//     console.log(e)
+//   })
 
 syncRedis({prisma,redis}).then(res=>{
   console.log(res)

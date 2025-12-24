@@ -3,11 +3,23 @@
   justify-content: flex-start;
   align-items: flex-start;
   padding: 1rem .5rem;
+  width: 100%;
   &.zoraMessageLeft{
     flex-direction: row;
+    .zoraMsg{
+      background-color: #8b2929ff;
+      color: var(--z-secondary_background_color);
+    }
   }
   &.zoraMessageRight{
+    .zoraMsg{
+      background-color: var(--z-primary_background_color);
+
+    }
     flex-direction: row-reverse;
+    .zoraMsgContent{
+      flex-direction: row-reverse;
+    }
   }
 }
 .zoraMsgBox{
@@ -51,7 +63,6 @@
   flex: 1;
   margin-top: .3rem;
   padding: .5rem 1rem;
-  background-color: #8b2929ff;
   border-radius: .5rem;
 }
 .zoraMsgReadState{
@@ -69,6 +80,7 @@
 .loading{
   animation: loading 1.5s infinite linear;
 }
+
 @keyframes loading {
   0%{
     transform: scale(.7) rotate(0deg);

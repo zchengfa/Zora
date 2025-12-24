@@ -1,7 +1,7 @@
 import {create} from "zustand/react";
 import {deepCloneTS} from "@Utils/Utils.ts";
 import {MessageDataType} from "@Utils/socket.ts";
-import {CustomerDataType} from "@/type.ts";
+import {CustomerDataType,CustomerStaffType} from "@/type.ts";
 import {insertMessageToIndexedDB, readMessagesFromIndexedDB} from "@Utils/zustandWithIndexedDB.ts";
 const SESSION_STORAGE_CHAT_LIST_KEY = "zora_chat_list";
 const SESSION_STORAGE_ACTIVE_ITEM_KEY = "zora_active_item";
@@ -13,7 +13,8 @@ export const useMessageStore = create((set)=>{
       chatList: [],
       page: 1,
       pageSize: 20,
-      activeCustomerInfo:undefined,
+      customerStaff: null,
+      activeCustomerInfo:null,
       activeCustomerItem: undefined,
       initMessages:async (target:string)=>{
         let messages = []
@@ -31,15 +32,16 @@ export const useMessageStore = create((set)=>{
           }
         })
       },
-      initZustandState:()=>{
+      initZustandState:(customerStaff:CustomerStaffType)=>{
         set(()=>{
           const chatList = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_CHAT_LIST_KEY) as string) || []
           const activeCustomerItem = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) as string) || undefined
-          const activeCustomerInfo = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) || undefined
+          const activeCustomerInfo = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) || null
           return {
             chatList,
             activeCustomerItem,
-            activeCustomerInfo
+            activeCustomerInfo,
+            customerStaff
           }
         })
       },
@@ -97,25 +99,33 @@ export const useMessageStore = create((set)=>{
           }
         })
       },
-      updateChatList:(payload:MessageDataType)=>{
+      updateChatList:(payload:MessageDataType,fromAgent = false)=>{
         set((state)=>{
           const newChatList = deepCloneTS(state.chatList);
           newChatList.map((item:CustomerDataType)=>{
-            if(item.id === payload.senderId){
-              item.lastMessage = payload.contentBody
-              item.lastTimestamp = payload.timestamp
-              if(item.conversationId === state.activeCustomerItem){
-                item.hadRead = true
-                item.unreadMessageCount = 0
-                item.isActive = true
+            if(!fromAgent){
+              if(item.id === payload.senderId){
+                item.lastMessage = payload.contentBody
+                item.lastTimestamp = payload.timestamp
+                if(item.conversationId === state.activeCustomerItem){
+                  item.hadRead = true
+                  item.unreadMessageCount = 0
+                  item.isActive = true
+                }
+                else{
+                  item.hadRead = false
+                  item.unreadMessageCount ++
+                  item.isActive = false
+                }
               }
-              else{
-                item.hadRead = false
-                item.unreadMessageCount ++
-                item.isActive = false
-              }
-              return item
             }
+            else{
+              if(item.conversationId === state.activeCustomerItem){
+                item.lastMessage = payload.contentBody
+                item.lastTimestamp = payload.timestamp
+              }
+            }
+            return item
           })
           //将更新后的列表保存至sessionStorage
           somethingSaveToSessionStorage(SESSION_STORAGE_CHAT_LIST_KEY,newChatList)

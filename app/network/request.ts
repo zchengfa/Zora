@@ -14,3 +14,12 @@ export const shopifyApiClientInit = ({shop,accessToken}:{shop:string,accessToken
     }
   })
 }
+
+export const shopifyCustomerStaffInit = (params:string,email:string,shopOwnerName:string)=>{
+  return Post({
+    url:`/shopifyCustomerStaffInit${params}`,
+    data:{
+      email,shopOwnerName
+    }
+  })
+}

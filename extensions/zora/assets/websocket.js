@@ -1,4 +1,4 @@
-const socket = io('wss://1b88efe3a869.ngrok-free.app',{
+const socket = io('wss://cc350ce7d4b5.ngrok-free.app:',{
   transports: ['websocket'],
   headers:{
     "ngrok-skip-browser-warning": true, //绕过ngrok验证
@@ -27,6 +27,12 @@ socket.on('message_ack',(ack)=>{
 // 监听来自服务器的事件，例如 'message'
 socket.on('message', (data) => {
   console.log('收到服务器消息:', data);
+  socket.emit('message_delivered',{
+    type: 'ACK',
+    senderType: 'CUSTOMER',
+    recipientId: data.senderId,
+    msgId: data.msgId,
+  })
   renderMessage.addMessage(data,1);
 });
 
