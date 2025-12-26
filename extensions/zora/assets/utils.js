@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "https://1b88efe3a869.ngrok-free.app";
+const FETCH_BASE_URL = "https://3c75bf1da8e9.ngrok-free.app";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {
@@ -184,6 +184,7 @@ class ZoraResponse {
           },
           msg_status:{
             READ: '已读',
+            DELIVERED: '未读'
           }
         }
       } ,
@@ -215,6 +216,7 @@ class ZoraResponse {
           },
           msg_status:{
             READ: 'read',
+            DELIVERED: 'unread'
           }
         }
       }
@@ -229,7 +231,7 @@ class ZoraResponse {
    * zoraResponse.responseTitle('error')
    */
   responseTitle = (type = 'success')=>{
-    return this.localeCache[this.locale].title[type]
+    return this.localeCache[this.locale].title[type] || ''
   }
   /**
    * @description 消息响应
@@ -240,6 +242,7 @@ class ZoraResponse {
    * zoraResponse.responseMessage('error','code')
    */
   responseMessage = (type,msgType)=>{
-    return this.localeCache[this.locale].message[type][msgType]
+    console.log(this.localeCache[this.locale].message[type][msgType],type,msgType)
+    return this.localeCache[this.locale].message[type][msgType] || ''
   }
 }

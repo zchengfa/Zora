@@ -13,6 +13,13 @@ export interface CustomerDataType {
   conversationId:string,
 }
 
+export interface CustomerStaffType {
+  id?:string,
+  name?:string
+  email?:string,
+  avatarUrl?:string
+}
+
 type OwnerType = "customer_msg" | "agent_msg" | "bot_msg"
 type RoleType = "customer" | "agent" | "bot"
 type MsgType = "text" | "Image" | "product_card"

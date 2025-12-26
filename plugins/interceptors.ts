@@ -5,7 +5,7 @@ import {validateShopifyRequest} from "./validate.ts";
 
 const interceptors = async ({req,res,next}:{req:Request,res:Response,next:NextFunction})=>{
   const path = req.path
-  const publicRoutes = ['/shopifyApiClientInit','/validateToken','/checkEmail','/sendVerifyCodeToEmail','/verifyCode','/authenticator']
+  const publicRoutes = ['/app','/shopifyApiClientInit','/validateToken','/checkEmail','/sendVerifyCodeToEmail','/verifyCode','/authenticator']
   const token = req.headers.authorization?.split(' ')[1]  as string
   try{
     if (publicRoutes.includes(path)) {

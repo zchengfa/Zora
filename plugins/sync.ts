@@ -16,6 +16,7 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
    const customerAddress = await prisma.customer_addresses.findMany()
    const customerTagRelation = await prisma.customer_tag_relations.findMany()
    const session = await prisma.session.findMany()
+   const customerStaff = await prisma.customerServiceStaff.findMany()
 
    // 如果数据不为空，则写入Redis
    if (customers.length > 0) {
@@ -64,6 +65,11 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
        const id = item.userId ? item.userId : item.shop
        pipeline.hset(`session:${id}`,{...item})
        pipeline.expire(`session:${id}`,EXPIRED)
+     }
+
+     for (const staff of customerStaff){
+       pipeline.hset(`AGENT:${staff.id}`,{...staff})
+       pipeline.expire(`session:${staff.id}`,EXPIRED)
      }
 
      // 执行管道中的命令

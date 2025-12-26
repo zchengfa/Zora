@@ -5,11 +5,12 @@ export type MessageDataType = {
   contentType:string
   conversationId:string
   msgId:string
-  msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED'
+  msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED' | 'READ'
   recipientType: 'CUSTOMER' | 'AGENT' | 'SYSTEM'
   senderId:string
   senderType: 'CUSTOMER' | 'SYSTEM' | 'AGENT',
-  timestamp: string
+  timestamp: string,
+  timer?: number | undefined
 }
 
 // 定义一个接口来描述可能的配置项，如果有需要的话
@@ -31,10 +32,6 @@ class SocketService {
       },
       transports: ['websocket'],
       ...this.config.options
-    });
-    this.socket.on('connect', () => {
-      console.log('✅ 已成功连接到服务器！');
-      this.emit('agent')
     });
     this.socket.on('disconnect', () => {
       console.log('❌ 与服务器的连接已断开。');

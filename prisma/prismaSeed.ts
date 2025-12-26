@@ -11,7 +11,6 @@ export default async function PrismaSeed (prisma:PrismaClient){
     if(!prismaQuery){
       await prisma.customerServiceStaff.create({
         data:{
-          id: '111111',
           name: "小雅",
           avatarUrl: process.env.AGENT_DEFAULT_AVATAR,
         }

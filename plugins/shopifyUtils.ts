@@ -1,4 +1,5 @@
 import {ShopifyAPI} from "./axios.ts"
+import {SHOP_OWNER_NAME_QUERY} from "./shopifyQuery.ts";
 
 export class ShopifyApiClient {
   private readonly shopConfig: { apiVersion: string; shopDomain: string; accessToken: string };
@@ -11,5 +12,10 @@ export class ShopifyApiClient {
       apiVersion: '2025-10'
     }
   }
-
+  public shopOwner = ()=>{
+    return this.shopifyApi.graphql({
+      ...this.shopConfig,
+      query: SHOP_OWNER_NAME_QUERY
+    })
+  }
 }

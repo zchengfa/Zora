@@ -64,3 +64,12 @@ export const CUSTOMER_COUNT_QUERY = `
   }
 `
 
+export const SHOP_OWNER_NAME_QUERY = `
+  query shopOwnerNameQuery {
+    shop {
+      email
+      shopOwnerName
+    }
+  }
+`
+

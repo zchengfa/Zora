@@ -637,12 +637,14 @@ if(!customElements.get('zora-send-component')){
     }
     sendMessage = ()=>{
       if(this.msg.length){
+        const {agentInfo,userId} = JSON.parse(sessionStorage.getItem('zora_userInfo'))
         const messageBody = {
-          senderId: JSON.parse(sessionStorage.getItem('zora_userInfo')).userId,
+          senderId: userId,
           senderType: 'CUSTOMER',
           contentType: 'TEXT',
           msgStatus: 'SENDING',
           recipientType: 'AGENT',
+          recipientId: agentInfo.id,
           contentBody: this.msg,
           msgId: 'msg_'+ new Date().getTime(),
           conversationId: sessionStorage.getItem('zora_conversation_id'),

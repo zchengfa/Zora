@@ -1,5 +1,6 @@
-import {openDB, getDataByCursorIndex, insertDataToDB} from "@/indexedDB/indexedDB.ts";
+import {openDB, getDataByCursorIndex, insertDataToDB, updateDB} from "@/indexedDB/indexedDB.ts";
 import {MessageDataType} from "@Utils/socket.ts";
+import {data} from "react-router";
 
 const INDEXED_DB_STORE_NAME='zora_chat'
 
@@ -7,7 +8,7 @@ export const initIndexedDB =async ()=>{
   return await openDB('zora_chat_indexedDB',{
     storeName: INDEXED_DB_STORE_NAME,
     storeOptions:{
-      keyPath: 'ID',
+      keyPath: 'msgId',
       autoIncrement: true
     },
     indexArr: ['conversationId', 'timestamp'],
@@ -27,4 +28,9 @@ export const readMessagesFromIndexedDB = async (options:{page:number,pageSize:nu
     withIndex: true,
     indexName:'conversationId',
   })
+}
+
+export const syncMessageToIndexedDB = async (data:MessageDataType)=>{
+  const {db} = await initIndexedDB() as {db:IDBDatabase}
+  return updateDB(db,INDEXED_DB_STORE_NAME,data)
 }

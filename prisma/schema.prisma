@@ -67,7 +67,7 @@ model customers {
 }
 
 model CustomerServiceStaff {
-  id         String    @id @unique @default(cuid())
+  id         String    @id @unique @default(uuid())
   name       String
   email      String?   @unique
   phone      String?

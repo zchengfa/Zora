@@ -59,6 +59,9 @@
         }
         .chatMiddle{
           display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
           flex: 2.5;
           background-color: var(--z-white);
           border-radius: var(--z-primary_border_radius);
