@@ -8,12 +8,6 @@ export const useSocketService = ()=>{
   const [messageAck, setMessageAck] = useState(null)
   useEffect(()=>{
     const handleMessage = (data:MessageDataType)=>{
-      socketService.emit('message_delivered',{
-        type: 'ACK',
-        senderType: 'AGENT',
-        recipientId: data.senderId,
-        msgId: data.msgId,
-      })
       setMessage(data)
     }
 

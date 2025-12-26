@@ -4,46 +4,111 @@ class RenderMessage {
     this.zoraMessageContainer = document.getElementsByClassName('zora-message-item-component').item(0)
     this.zoraMsgStateTimer = new Map()
     this.zoraMaxWaitingTimer = new Map()
+    this.msgStatusMap = new Map()
     this.SENDING_THRESHOLD = SENDING_THRESHOLD
     this.MAX_WAITING_THRESHOLD = MAX_WAITING_THRESHOLD
+    this.intersection = new IntersectionObserver((entries)=>{
+      entries.forEach(entry=>{
+        const targetEl = this.zoraMessageContainer.querySelector(`[data-msg-unique=${entry.target.dataset['msgUnique']}]`)
+        if(entry.isIntersecting){
+          targetEl?.classList.remove('is-not-intersecting')
+        }
+        else{
+          targetEl?.classList.add('is-not-intersecting')
+        }
+      })
+    },{
+      rootMargin: '0px 0px -50px 0px',
+    })
+    this.mutationObserver = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          //如果是node节点添加了，就把这个节点交给IntersectionObserver进行监听
+          if (node.nodeType === 1) {
+            this.intersection.observe(node);
+          }
+        });
+      });
+    });
+    //监听父容器中的子节点变化
+    this.mutationObserver.observe(this.zoraMessageContainer , { childList: true, subtree: true })
   }
   addMessage = (payload)=>{
-    const {avatar,username} = JSON.parse(sessionStorage.getItem('zora_userInfo'))
-    const itemClass = payload.senderType === 'CUSTOMER' ? 'zora-message-right' : 'zora-message-left'
+    const elData = this.getElData(payload.senderType,payload.msgStatus)
     const messageHtml = `
-      <div class="zora-message-item ${itemClass}" data-msg-unique="${payload.msgId}">
+      <div class="zora-message-item ${elData.itemClass}" data-msg-unique="${payload.msgId}">
         <div class="zora-message-avatar">
-          <img class="zora-avatar" width="32px" height="32px" src="${avatar}" alt="zora_avatar" />
+          <img class="zora-avatar" width="32px" height="32px" src="${elData.avatar}" alt="zora_avatar" />
         </div>
         <div class="zora-msg-box">
-          <span class="zora-user">${username}</span>
+          <span class="zora-user">${elData.username}</span>
           <div class="zora-msg-content">
               <span class="zora-msg">${payload.contentBody}</span>
-              <div class="msg-status-svg-box"></div>
-              <span class="zora-msg-read-state hidden">${zoraResponse.responseMessage('msg_status','READ')}</span>
+              ${elData.statusSvg}
+              ${elData.stateEl}
           </div>
         </div>
       </div>
     `
     this.zoraMessageContainer.insertAdjacentHTML('beforeend',messageHtml)
-    let sendingTimer = setTimeout(()=>{
-      if(payload.msgStatus === 'SENDING'){
-        this.updateMessageStatus(payload.msgId,payload.msgStatus)
+    const parentEl = this.zoraMessageContainer.parentNode
+    const msgBoxEl = document.querySelector('.zora-message-box-active')
+    if(msgBoxEl){
+      parentEl.scrollTo({
+        top: parentEl.scrollHeight,
+        behavior: 'smooth'
+      })
+    }
+    if(payload.senderType === 'CUSTOMER'){
+      this.setMessageStatus(payload.msgId, 'SENDING');
+      let sendingTimer = setTimeout(()=>{
+        this.zoraMsgStateTimer.delete(payload.msgId)
+        if(this.getMessageStatus(payload.msgId) === 'SENDING'){
+          this.updateMessageStatus(payload.msgId,payload.msgStatus)
+        }
+      },this.SENDING_THRESHOLD)
+
+      //兜底，防止消息长时间没有回执
+      let msgMaxTimer = setTimeout(()=>{
+        this.zoraMaxWaitingTimer.delete(payload.msgId)
+        if (this.getMessageStatus(payload.msgId) === 'SENDING') {
+          this.updateMessageStatus(payload.msgId, 'FAILED')
+        }
+      },this.MAX_WAITING_THRESHOLD)
+      this.zoraMsgStateTimer.set(payload.msgId,sendingTimer)
+      this.zoraMaxWaitingTimer.set(payload.msgId,msgMaxTimer)
+    }
+  }
+  getMessageStatus(msgId) {
+    return this.msgStatusMap.get(msgId) || 'SENDING';
+  }
+  setMessageStatus(msgId, status) {
+    this.msgStatusMap.set(msgId, status);
+  }
+  getElData = (senderType,msgStatus)=>{
+    //`<span class="zora-msg-read-state hidden">${zoraResponse.responseMessage('msg_status','READ')}</span>`
+    const {avatar,username,agentInfo} = JSON.parse(sessionStorage.getItem('zora_userInfo'))
+    if(senderType === 'CUSTOMER'){
+      return {
+        itemClass: 'zora-message-right',
+        stateEl: `<span class="zora-msg-read-state hidden">${zoraResponse.responseMessage('msg_status',msgStatus)}</span>`,
+        username,
+        avatar,
+        statusSvg: `<div class="msg-status-svg-box"></div>`
       }
-    },this.SENDING_THRESHOLD)
-    this.zoraMsgStateTimer.set(payload.msgId,sendingTimer)
-
-    //兜底，防止消息长时间没有回执
-    let msgMaxTimer = setTimeout(()=>{
-      this.updateMessageStatus(payload.msgId,'FAILED')
-    },this.MAX_WAITING_THRESHOLD)
-    this.zoraMaxWaitingTimer.set(payload.msgId,msgMaxTimer)
-
+    }
+    return {
+      itemClass: 'zora-message-left',
+      stateEl: '',
+      username: agentInfo.name,
+      avatar: agentInfo.avatarUrl,
+      statusSvg: ''
+    }
   }
   updateMessageStatus = (msgId,status)=>{
     const el = document.querySelector(`[data-msg-unique="${msgId}"]`)
+    if(!el) return ;
     const svgBoxEl = el.querySelector('.msg-status-svg-box')
-
     const msgTimer = this.zoraMsgStateTimer.get(msgId)
     const msgMaxTimer = this.zoraMaxWaitingTimer.get(msgId)
     //清除之前的定时器
@@ -51,7 +116,7 @@ class RenderMessage {
       clearTimeout(msgTimer)
       this.zoraMsgStateTimer.delete(msgId)
     }
-    if(msgMaxTimer){
+    if(msgMaxTimer && this.getMessageStatus(msgId) !== 'SENDING'){
       clearTimeout(msgMaxTimer)
       this.zoraMaxWaitingTimer.delete(msgId)
     }
@@ -60,6 +125,7 @@ class RenderMessage {
   }
   getRenderStatusSvg = (status,msgId)=>{
     const readStateEl = document.querySelector(`[data-msg-unique="${msgId}"] .zora-msg-read-state`)
+    if(!readStateEl) return '';
     switch (status){
       case 'FAILED':
         readStateEl.classList.add('hidden')
@@ -71,6 +137,11 @@ class RenderMessage {
           `
       case 'READ':
         readStateEl.classList.remove('hidden')
+        readStateEl.textContent = `${zoraResponse.responseMessage('msg_status',status)}`
+        return ''
+      case 'DELIVERED':
+        readStateEl.classList.remove('hidden')
+        readStateEl.textContent = `${zoraResponse.responseMessage('msg_status',status)}`
         return ''
       default:
         readStateEl.classList.add('hidden')

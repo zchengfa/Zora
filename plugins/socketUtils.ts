@@ -69,7 +69,7 @@ export class SocketUtils{
         break;
     }
   }
-  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ',codeType:number)=>{
+  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD',codeType:number)=>{
     this.config.io.to(sender).emit('message_ack',{
       type: 'ACK',
       msgId,
@@ -82,20 +82,22 @@ export class SocketUtils{
     this.ws.on('message_delivered',(payload)=>{
       let receiver = ''
       //发送者为客户，并且没有接收者id，说明是用户发给客服的消息回执
-      if(payload.senderType === 'CUSTOMER' && !payload.recipientId){
-        receiver = this.agent.get('id') as string
+      if(payload.senderType === 'CUSTOMER'){
+        receiver = this.agent.get(payload.recipientId) as string
       }
       else{
         receiver = this.users.get(payload.recipientId) as string
       }
-      this.sendMessageAck(receiver,payload.msgId,'DELIVERED',10004)
+      this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004)
     })
   }
   public socketAgentOnline = ()=>{
     //客服连接
-    this.ws.on('agent',()=>{
-      this.agent.set('id',this.ws.id)
-      console.log('客服上线了')
+    this.ws.on('agent',(info)=>{
+      if(info){
+        this.agent.set(info.id,this.ws.id)
+        console.log(`客服${info.name}上线了`)
+      }
     })
   }
   public socketOnline = ()=>{
@@ -155,29 +157,33 @@ export class SocketUtils{
     //消息发送
     this.ws.on('sendMessage',async (data)=>{
       const payload = JSON.parse(data)
+      let recipient = undefined,sender = undefined
       try{
         //查看接收者在不在线，不在线则需要保存离线消息
         //判断消息体中的recipientType,若是AGENT，表示是发给客服的，CUSTOMER表示发给客户的
-        let recipient = undefined
+
         if(payload.recipientType === 'AGENT'){
-          recipient = this.agent.get('id')
+          recipient = this.agent.get(payload.recipientId)
+          sender = this.agent.get(payload.senderId)
         }
         else{
           recipient = this.users.get(payload.recipientId)
+          sender = this.users.get(payload.senderId)
         }
         //接收者不在线
         if(!recipient){
+          payload.timestamp = new Date(payload.timestamp).toISOString()
           const saveMessagePrisma = await this.config.prisma.message.create({
             data:{
               ...payload,
               msgStatus: "SENT"
             }
           })
-          const redis_key =  payload.recipientType === 'AGENT' ? 'AGENT' : payload.recipientId
+          const redis_key = payload.recipientId
           await this.config.redis.lpush(`offline_messages:${redis_key}`,JSON.stringify(saveMessagePrisma))
           await this.config.redis.expire(`offline_messages:${redis_key}`,this.config.redisExpired)
           //告诉发送者，服务器接收到消息，消息已发送，但用户不在线
-          this.sendMessageAck(this.users.get(payload.senderId) as string,payload.msgId,'SENT',10001)
+          this.sendMessageAck(sender as string,payload.msgId,'SENT',10001)
         }
         else{
           this.config.io.to(recipient).emit('message',payload)
@@ -186,7 +192,7 @@ export class SocketUtils{
       }
       catch (e) {
         //服务器出现错误，告诉发送者消息发送失败
-        this.sendMessageAck(this.users.get(payload.senderId) as string,payload.msgId,'FAILED',10003)
+        this.sendMessageAck(sender as string,payload.msgId,'FAILED',10003)
       }
     })
   }

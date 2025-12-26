@@ -2,7 +2,11 @@ import {create} from "zustand/react";
 import {deepCloneTS} from "@Utils/Utils.ts";
 import {MessageDataType} from "@Utils/socket.ts";
 import {CustomerDataType,CustomerStaffType} from "@/type.ts";
-import {insertMessageToIndexedDB, readMessagesFromIndexedDB} from "@Utils/zustandWithIndexedDB.ts";
+import {
+  insertMessageToIndexedDB,
+  readMessagesFromIndexedDB,
+  syncMessageToIndexedDB
+} from "@Utils/zustandWithIndexedDB.ts";
 const SESSION_STORAGE_CHAT_LIST_KEY = "zora_chat_list";
 const SESSION_STORAGE_ACTIVE_ITEM_KEY = "zora_active_item";
 const SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY = "zora_active_customer_info";
@@ -10,7 +14,11 @@ const SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY = "zora_active_customer_info";
 export const useMessageStore = create((set)=>{
     return {
       messages: [],
+      messageTimers:new Map() as Map<string,Map<string,ReturnType <typeof setTimeout>>>,
+      messageMaxWaitingTimers: new Map() as Map<string,Map<string,ReturnType<typeof setTimeout>>>,
       chatList: [],
+      SENDING_THRESHOLD:1000,
+      MAX_WAITING_THRESHOLD:10000,
       page: 1,
       pageSize: 20,
       customerStaff: null,
@@ -53,8 +61,8 @@ export const useMessageStore = create((set)=>{
             newMsg.push(message)
           }
           return {
-              messages:newMsg
-            }
+            messages:newMsg
+          }
         })
       },
       changeMessages:async ({conversationId, page, pageSize}:{ conversationId:string, page:number, pageSize:number })=>{
@@ -69,30 +77,54 @@ export const useMessageStore = create((set)=>{
           }
         })
       },
+      updateMessageStatus:(ack)=>{
+        set((state)=>{
+          const newMessages = deepCloneTS(state.messages)
+          newMessages.map((item:MessageDataType)=>{
+            if(item.msgId === ack.msgId){
+              item.msgStatus = ack.msgStatus
+              syncMessageToIndexedDB(item,item.msgId).then()
+            }
+          })
+          return {
+            messages:newMessages
+          }
+        })
+      },
       pushChatList:(payload:CustomerDataType)=>{
         set((state)=>{
           const newChatList = deepCloneTS(state.chatList);
-          newChatList.push({
-            id: payload.id,
-            firstName:payload.firstName,
-            lastName:payload.lastName,
-            avatar:payload.avatar,
-            conversationId:payload.conversationId,
-            isOnline:true,
-            lastMessage:payload.lastMessage,
-            lastTimestamp:payload.lastTimestamp,
-            hadRead:false,
-            isActive:false,
-            unreadMessageCount:1
-          })
-          const activeCustomerInfo = {
-            avatar:payload.avatar,
-            conversationId:payload.conversationId,
-            id:payload.id,
-            username:payload.firstName + payload.lastName,
+          let existCount = 0,activeCustomerInfo = {}
+          if(newChatList.length > 0){
+            newChatList.map((item:CustomerDataType)=>{
+              if(item.conversationId === payload.conversationId){
+                existCount ++
+              }
+            })
           }
-          //将更新后的列表保存至sessionStorage
-          somethingSaveToSessionStorage([SESSION_STORAGE_CHAT_LIST_KEY,SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY],[newChatList,activeCustomerInfo])
+          if(!existCount){
+            newChatList.push({
+              id: payload.id,
+              firstName:payload.firstName,
+              lastName:payload.lastName,
+              avatar:payload.avatar,
+              conversationId:payload.conversationId,
+              isOnline:true,
+              lastMessage:payload.lastMessage,
+              lastTimestamp:payload.lastTimestamp,
+              hadRead:false,
+              isActive:false,
+              unreadMessageCount:1
+            })
+            activeCustomerInfo = {
+              avatar:payload.avatar,
+              conversationId:payload.conversationId,
+              id:payload.id,
+              username:payload.firstName + payload.lastName,
+            }
+            //将更新后的列表保存至sessionStorage
+            somethingSaveToSessionStorage([SESSION_STORAGE_CHAT_LIST_KEY,SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY],[newChatList,activeCustomerInfo])
+          }
           return {
             chatList:newChatList,
             activeCustomerInfo
@@ -166,7 +198,27 @@ export const useMessageStore = create((set)=>{
           }
         })
       },
-
+      updateTimer:(payload)=>{
+        set((state)=>{
+          const cloneTimers = deepCloneTS(state.messageTimers)
+          const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
+          const conversation = cloneTimers.get(payload.conversationId);
+          if(!conversation){
+            cloneTimers.set(payload.conversationId,new Map());
+            cloneMaxWaitingTimers.set(payload.conversationId,new Map());
+          }
+          cloneTimers?.get(payload.conversationId).set(payload.msgId,payload.timer)
+          cloneMaxWaitingTimers?.get(payload.conversationId).set(payload.msgId,payload.maxTimer)
+          return {
+            messageTimers: cloneTimers,
+            messageMaxWaitingTimer: cloneMaxWaitingTimers,
+          }
+        })
+      },
+      clearUpTimer:(ack)=>{
+        //收到回执，需要清除发送中的定时器和兜底定时器
+        console.log(ack)
+      }
     }
   }
 )

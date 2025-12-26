@@ -13,7 +13,6 @@ import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
   const params = request.url.substring(request.url.indexOf('?'),request.url.length)
-  console.log(request.url)
   const shopOwnerName = await admin.graphql(
     `query shopOwnerName {
         shop {
@@ -38,11 +37,20 @@ function Index(){
   useEffect(() => {
     messageStore.initZustandState(customerStaff)
     messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+    socket.on('connect', () => {
+      console.log('✅ 已成功连接到服务器！');
+      socket.emit('agent',{
+        id:customerStaff.id,
+        name:customerStaff.name,
+      })
+    });
   }, []);
 
   useEffect(() => {
-    if(!messageAck){
-      console.log(messageAck,'我是消息回执')
+    if(messageAck){
+      //收到回执，更新消息状态
+      messageStore.updateMessageStatus(messageAck)
+      messageStore.clearUpTimer(messageAck)
     }
   }, [messageAck]);
 
@@ -81,7 +89,13 @@ function Index(){
         messageStore.updateChatList(message)
         messageStore.addMessage(message)
       }
-
+      socket.emit('message_delivered',{
+        type: 'ACK',
+        senderType: 'AGENT',
+        recipientId: message.senderId,
+        msgId: message.msgId,
+        msgStatus: messageStore.activeCustomerItem === message.conversationId ? 'READ' : 'DELIVERED'
+      })
     }
   }, [message]);
 
@@ -98,7 +112,7 @@ function Index(){
 
   const sendMsg = (msg:string)=>{
     const msgData = {
-      senderId: undefined,
+      senderId: messageStore.customerStaff.id,
       senderType: 'AGENT',
       contentType: 'TEXT',
       msgStatus: 'SENDING',
@@ -110,8 +124,33 @@ function Index(){
       timestamp: new Date().getTime(),
     }
     socket.emit('sendMessage',JSON.stringify(msgData))
+    let sendTimer = setTimeout(() => {
+     //显示消息发送中状态
+      messageStore.updateMessageStatus({
+        msgId: msgData.msgId,
+        msgStatus: 'SENDING',
+      })
+    },messageStore.SENDING_THRESHOLD)
+
+    const maxWaitingTimer = setTimeout(()=>{
+      //兜底，防止长时间没有收到消息回执，显示消息发送失败
+      messageStore.updateMessageStatus({
+        msgId: msgData.msgId,
+        msgStatus: 'FAILED',
+      })
+    },messageStore.MAX_WAITING_THRESHOLD)
+    messageStore.updateTimer({
+      conversationId: msgData.conversationId,
+      msgId: msgData.msgId,
+      msgStatus: msgData.msgStatus,
+      timer: sendTimer,
+      maxTimer: maxWaitingTimer
+    })
     messageStore.updateChatList(msgData,true)
+
+    msgData.msgStatus = ''
     messageStore.addMessage(msgData).then()
+
   }
 
   return <div className={indexStyle.container}>

@@ -71,8 +71,12 @@
   font-size: small;
 }
 .msgStatusSvgBox{
+  display: flex;
   text-align: center;
   font-size: 2rem;
+  .failedIcon{
+    transform: scale(.7);
+  }
 }
 .loadingIcon{
   transform: scale(.7)
