@@ -203,21 +203,41 @@ export const useMessageStore = create((set)=>{
           const cloneTimers = deepCloneTS(state.messageTimers)
           const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
           const conversation = cloneTimers.get(payload.conversationId);
+          const maxConversation = cloneMaxWaitingTimers.get(payload.conversationId);
           if(!conversation){
             cloneTimers.set(payload.conversationId,new Map());
+          }
+          if(!maxConversation){
             cloneMaxWaitingTimers.set(payload.conversationId,new Map());
           }
           cloneTimers?.get(payload.conversationId).set(payload.msgId,payload.timer)
-          cloneMaxWaitingTimers?.get(payload.conversationId).set(payload.msgId,payload.maxTimer)
+          cloneMaxWaitingTimers?.get(payload.conversationId)?.set(payload.msgId,payload.maxTimer)
+
           return {
             messageTimers: cloneTimers,
-            messageMaxWaitingTimer: cloneMaxWaitingTimers,
+            messageMaxWaitingTimers: cloneMaxWaitingTimers,
           }
         })
       },
       clearUpTimer:(ack)=>{
         //收到回执，需要清除发送中的定时器和兜底定时器
-        console.log(ack)
+        set((state)=>{
+          const cloneTimers = deepCloneTS(state.messageTimers)
+          const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
+          const timer = cloneTimers.get(ack.conversationId)?.get(ack.msgId)
+          const maxTimer = cloneMaxWaitingTimers.get(ack.conversationId)?.get(ack.msgId)
+          //清除定时器
+          clearTimeout(timer)
+          clearTimeout(maxTimer)
+          //删除记录的timer
+          cloneTimers.get(ack.conversationId)?.delete(ack.msgId)
+          cloneMaxWaitingTimers?.get(ack.conversationId)?.delete(ack.msgId)
+
+          return {
+            messageTimers: cloneTimers,
+            messageMaxWaitingTimers: cloneMaxWaitingTimers,
+          }
+        })
       }
     }
   }

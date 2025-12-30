@@ -36,6 +36,7 @@ socket.on('message', (data) => {
     senderType: 'CUSTOMER',
     recipientId: data.senderId,
     msgId: data.msgId,
+    conversationId: data.conversationId,
     msgStatus
   })
   renderMessage.addMessage(data,1);

@@ -8,10 +8,14 @@
     top: 50%;
     width: 90%;
     height: 2rem;
-    border-radius: 2rem;
     text-indent: 1rem;
     transform: translateY(-50%);
     transition: all 300ms ease-out;
+    background-color: var(--z-color-surface);
+    border: 1px solid var(--z-color-border);
+    border-radius: var(--z-primary_border_radius);
+    padding: var(--z-primary_padding);
+    color: var(--z-color-text);
   }
   .inputActive{
     position: relative;
@@ -50,11 +54,11 @@
     height: fit-content;
     min-height: 300%;
     max-height: 74dvh;
-    background: var(--z-secondary_background_color);
+    background: var(--z-color-surface);
     overflow-y: scroll;
     z-index: 9;
     .emptyBox{
-      color: var(--z-gray_color);
+      color: var(--z-color-surface);
     }
   }
 }

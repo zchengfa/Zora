@@ -1,5 +1,6 @@
+import ZoraEmpty from "@components/common/ZoraEmpty.tsx";
 export default function AppProperties(){
   return <div>
-    properties
+    <ZoraEmpty isEmptyMessage={true}></ZoraEmpty>
   </div>
 }

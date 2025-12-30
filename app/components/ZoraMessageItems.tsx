@@ -2,6 +2,7 @@ import React, {useEffect, useRef} from "react";
 import ZoraMessageItemsStyle from '@styles/componentStyles/ZoraMessageItems.module.scss'
 import ZoraMessageItem from "@components/ZoraMessageItem"
 import {MessageDataType} from "@Utils/socket.ts";
+import ZoraEmpty from "@components/common/ZoraEmpty.tsx";
 
 interface MessagePropsType{
   messageData: MessageDataType[];
@@ -12,7 +13,7 @@ const ZoraMessageItems:React.FC<MessagePropsType> = (
     messageData
   })=>{
 
-  const msgIntoRef = useRef(null);
+  const msgIntoRef = useRef<HTMLElement | null>(null);
 
   const scrollToBottom = ()=>{
     msgIntoRef?.current?.scrollIntoView({behavior: "smooth"});
@@ -34,7 +35,7 @@ const ZoraMessageItems:React.FC<MessagePropsType> = (
           }
           <div className="msg-into-ref" ref={msgIntoRef}></div>
         </div>
-        : <span>no message</span>
+        : null
     }
   </div>
 }

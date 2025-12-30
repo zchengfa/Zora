@@ -17,7 +17,7 @@
     left: 50%;
     width: 97%;
     height: 96%;
-    background-color: var(--z-primary_background_color);
+    background-color: var(--z-color-bg);
     border-radius: var(--z-primary_border_radius);
     transform: translate(-50%, -50%);
     .statusBox{
@@ -25,7 +25,7 @@
       width: 100%;
       text-align: right;
       .tipSpan,.status{
-        color: var(--z-text_color);
+        color: var(--z-color-text);
       }
     }
     .chatContent{
@@ -40,7 +40,7 @@
         font-size: 1.2rem;
         font-weight: bold;
         text-transform: capitalize;
-        color: var(--z-text_color);
+        color: var(--z-color-text);
       }
       .chatBox{
         flex: 1;
@@ -51,6 +51,7 @@
         }
         .chatLeft{
           @include flexLayout;
+          justify-content: flex-start;
           flex: 1;
           min-width: 250px;
         }
@@ -63,7 +64,7 @@
           align-items: center;
           justify-content: center;
           flex: 2.5;
-          background-color: var(--z-white);
+          background-color: var(--z-color-surface);
           border-radius: var(--z-primary_border_radius);
         }
       }

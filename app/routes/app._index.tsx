@@ -6,9 +6,10 @@ import ZoraCustomerList from '@components/ZoraCustomerList'
 import ZoraMessageItems from "@components/ZoraMessageItems";
 import ZoraChat from "@components/ZoraChat.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
-import {useEffect} from "react";
+import {useEffect, useState} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request.ts";
+import ZoraEmpty from "@components/common/ZoraEmpty.tsx";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
@@ -22,21 +23,36 @@ export const loader = async ({request}:LoaderFunctionArgs)=>{
     }`
   )
   const {data} = await shopOwnerName.json()
-  const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName)
+  let customerStaff;
+  try {
+    const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName)
+    customerStaff = result?.data
+  }
+  catch (e) {
+    customerStaff = null
+  }
+
   return {
     params,
-    customerStaff: result.data
+    customerStaff
   }
 }
 
 function Index(){
   const {params,customerStaff} = useLoaderData<typeof loader>();
   const {message,socket,messageAck} = useSocketService();
+
   const messageStore = useMessageStore();
 
   useEffect(() => {
     messageStore.initZustandState(customerStaff)
-    messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+    if(sessionStorage.getItem('zora_active_item')){
+      messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return ;
     socket.on('connect', () => {
       console.log('✅ 已成功连接到服务器！');
       socket.emit('agent',{
@@ -44,7 +60,7 @@ function Index(){
         name:customerStaff.name,
       })
     });
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     if(messageAck){
@@ -152,7 +168,6 @@ function Index(){
     messageStore.addMessage(msgData).then()
 
   }
-
   return <div className={indexStyle.container}>
     <div className={indexStyle.content}>
       <div className={indexStyle.statusBox}>
@@ -164,12 +179,10 @@ function Index(){
       <div className={indexStyle.chatContent}>
         <h3 className={indexStyle.chatTitle}>chat</h3>
         <div className={indexStyle.chatBox}>
-          {/*客户列表*/}
           <div className={indexStyle.chatLeft}>
             <ZoraSearch placeholder={'Search'}></ZoraSearch>
             <ZoraCustomerList customerData={messageStore.chatList} ItemClick={customerItemClick}></ZoraCustomerList>
           </div>
-          {/*聊天部分*/}
           <div className={indexStyle.chatMiddle}>
             <ZoraMessageItems messageData={messageStore.messages}></ZoraMessageItems>
             <ZoraChat sendMessage={sendMsg}></ZoraChat>
