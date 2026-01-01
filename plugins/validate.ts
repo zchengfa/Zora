@@ -129,7 +129,7 @@ function verifyShopDomain(shopParam:string) {
   return shopRegex.test(shopParam);
 }
 
-export function validateShopifyRequest(query:ShopifyUrlQueryType,validateTimestamp = false) {
+export function validateShopifyHmacRequest(query:ShopifyUrlQueryType,validateTimestamp = false) {
   const { shop, hmac, id_token, timestamp } = query;
   // 1. 验证必需参数存在
   if (!shop || !hmac || !id_token || !timestamp) {
@@ -176,4 +176,43 @@ export function validateShopifyRequest(query:ShopifyUrlQueryType,validateTimesta
     result:true,
     message: 'valid Shopify request'
   };
+}
+
+
+/**
+ * 验证基于密钥的请求（适用于服务端到服务端的通信）
+ * @param requestSecret 请求中提供的密钥
+ * @param expectedSecret 预期的正确密钥
+ * @returns 验证结果对象
+ */
+export function validateShopifySecretRequest(requestSecret: string, expectedSecret: string): { result: boolean; message?: string } {
+  // 检查请求密钥是否存在
+  if (!requestSecret) {
+    return { result: false, message: 'Missing request secret' };
+  }
+
+  // 直接比较提供的密钥与预期密钥是否匹配
+  const isSecretValid = requestSecret === expectedSecret;
+
+  return {
+    result: isSecretValid,
+    message: isSecretValid ? 'Secret validation successful' : 'Secret validation failed'
+  };
+}
+
+/**
+ * 统一的Shopify请求验证函数（根据参数自动选择验证方式）
+ */
+export function validateShopifyRequest(params: any): { result: boolean; message?: string } {
+  const { hmac, request_secret } = params;
+
+  if (hmac) {
+    return validateShopifyHmacRequest(params);
+  }
+
+  if (request_secret) {
+    return validateShopifySecretRequest(request_secret, process.env.SHOPIFY_API_SECRET as string);
+  }
+
+  return { result: false, message: 'No valid authentication method provided' };
 }

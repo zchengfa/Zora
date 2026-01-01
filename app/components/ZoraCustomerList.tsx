@@ -48,7 +48,7 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
             })
           }
         </div>
-        : null
+        : <ZoraEmpty isEmptyMessage={false}></ZoraEmpty>
     }
   </div>
 }

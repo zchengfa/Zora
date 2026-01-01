@@ -3,6 +3,7 @@ import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "@/shopify.server.ts";
+import ZoraModalProvider from "@/contexts/ZoraModalProvider.tsx";
 
 import  '@styles/_variables.scss'
 import  '@styles/base.scss'
@@ -39,7 +40,9 @@ function App() {
         <s-link href="/app/documents">Documents</s-link>
         <s-link href="/app/settings">Settings</s-link>
       </s-app-nav>
-      <Outlet/>
+      <ZoraModalProvider>
+        <Outlet/>
+      </ZoraModalProvider>
     </AppProvider>
   );
 }

@@ -1,11 +1,14 @@
 
 /* 聊天主区域占满剩余空间并居中 */
 .chatMainArea {
+  position: relative;
+  top: 50%;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--z-primary_padding);
+  transform: translateY(-50%);
 }
 
 /* 空状态通用卡片 */
@@ -38,14 +41,14 @@
 
 /* 图标 */
 .emptyStateIcon {
-  font-size: 3rem;
+  font-size: 2rem;
   color: var(--z-color-text-light);
   margin-bottom: var(--z-primary_padding);
 }
 
 /* 标题 */
 .emptyStateTitle {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--z-color-text);
   margin-bottom: 0.5rem;

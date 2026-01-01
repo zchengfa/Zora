@@ -16,7 +16,7 @@ export default function ZoraSearch(props:any){
 
   const {placeholder,searchResult} = props
   return <div className={ZoraSearchStyle.container}>
-    <input value={inputValue} onChange={inputChange} onMouseEnter={mouseEvent} onMouseLeave={mouseEvent} className={mouseEntered ? ZoraSearchStyle.inputActive : ZoraSearchStyle.input} placeholder={placeholder} />
+    <input name={'searchInput'} value={inputValue} onChange={inputChange} onMouseEnter={mouseEvent} onMouseLeave={mouseEvent} className={mouseEntered ? ZoraSearchStyle.inputActive : ZoraSearchStyle.input} placeholder={placeholder} />
     <div className={mouseEntered ? ZoraSearchStyle.searchIconActive : ZoraSearchStyle.searchIcon}>
       <s-icon type={'search'}></s-icon>
     </div>

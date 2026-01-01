@@ -1,4 +1,4 @@
-// AppSettings.tsx
+
 import { usePersistStorage } from '@hooks/usePersistStorage';
 
 export default function AppSettings() {
@@ -8,6 +8,8 @@ export default function AppSettings() {
   const changeSwitch = () => {
     const newState = theme === 'dark' ? 'light' : 'dark';
     setPersistTheme(newState);
+    const htmlEl = document.getElementsByTagName('html')[0]
+    htmlEl.setAttribute('data-theme',newState)
   };
 
   return (

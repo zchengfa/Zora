@@ -24,6 +24,7 @@ export const useMessageStore = create((set)=>{
       customerStaff: null,
       activeCustomerInfo:null,
       activeCustomerItem: undefined,
+      shopify_Shop_products:{},
       initMessages:async (target:string)=>{
         let messages = []
         if (target){
@@ -40,15 +41,24 @@ export const useMessageStore = create((set)=>{
           }
         })
       },
-      initZustandState:(customerStaff:CustomerStaffType)=>{
+      initZustandState:(customerStaff:CustomerStaffType,products)=>{
         set(()=>{
           const chatList = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_CHAT_LIST_KEY) as string) || []
           const activeCustomerItem = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) as string) || undefined
           const activeCustomerInfo = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) || null
+          if(!customerStaff){
+            return {
+              chatList,
+              activeCustomerItem,
+              activeCustomerInfo,
+              shopify_Shop_products:products
+            }
+          }
           return {
             chatList,
             activeCustomerItem,
             activeCustomerInfo,
+            shopify_Shop_products:products,
             customerStaff
           }
         })

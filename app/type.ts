@@ -64,3 +64,53 @@ interface ProductCardContent {
   "image_url": string
 }
 
+export interface GraphqlShopInfoType {
+  shop:{
+    email: string,
+    shopOwnerName:string
+  }
+}
+
+export interface GraphqlProductInfoType {
+  products:{
+    nodes:Array<{
+      id: string,
+      title: string,
+      description: string,
+      descriptionHtml: string,
+      tags: Array<string>,
+      vendor:string
+      variants:{
+        nodes:Array<{price:number}>
+      },
+      compareAtPriceRange:{
+        maxVariantCompareAtPrice:{
+          currencyCode:string
+          amount:number
+        },
+        minVariantCompareAtPrice:{
+          currencyCode:string
+          amount:number
+        }
+      },
+      featuredMedia:{
+        preview:{
+          image:{
+            url:string
+          }
+        }
+      },
+      media:{
+        nodes:Array<{preview:{image:{url:string}}}>
+      }
+    }>,
+    pageInfo: {
+      hasNextPage:boolean,
+      hasPreviousPage: boolean,
+      startCursor: string,
+      endCursor: string
+    }
+  }
+}
+
+

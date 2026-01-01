@@ -35,7 +35,7 @@ const ZoraMessageItems:React.FC<MessagePropsType> = (
           }
           <div className="msg-into-ref" ref={msgIntoRef}></div>
         </div>
-        : null
+        : <ZoraEmpty isEmptyMessage={true}></ZoraEmpty>
     }
   </div>
 }

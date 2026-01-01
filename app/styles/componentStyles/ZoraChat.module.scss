@@ -15,7 +15,8 @@
     border-radius: .5rem;
     box-shadow: #666666 1px 1px 4px;
     color: var(--z-color-text);
-    .zoraAudioBox,.zoraEmojiBox,.zoraAddBox{
+    .zoraRecBox,.zoraEmojiBox,.zoraAddBox{
+      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -35,6 +36,7 @@
         padding: var(--z-primary_padding);
         color: var(--z-color-text);
         transition: border-color 0.2s ease;
+        cursor: pointer;
       }
     }
   }
