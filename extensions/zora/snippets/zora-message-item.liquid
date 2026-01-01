@@ -1,0 +1,102 @@
+{% style %}
+  .zora-message-item{
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 1rem .5rem;
+  }
+  .zora-message-left{
+    flex-direction: row;
+  }
+  .zora-message-right{
+    flex-direction: row-reverse;
+  }
+  .zora-msg-box{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    color: #000;
+  }
+  .zora-user{
+    font-size: small;
+    color: rgb(133 137 140);
+  }
+  .zora-message-left .zora-msg-box{
+    align-items: flex-start;
+    margin-left: .5rem;
+  }
+  .zora-message-right .zora-msg-box{
+    align-items: flex-end;
+    margin-right: .5rem;
+  }
+  .zora-avatar{
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+  }
+  .zora-msg-content{
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    align-items: flex-end;
+    max-width: 80%;
+  }
+  .zora-msg{
+    flex: 1;
+    margin-top: .3rem;
+    padding: .5rem 1rem;
+    background-color: #8b2929ff;
+    border-radius: .5rem;
+  }
+  .zora-msg-read-state{
+    margin-right: .3rem;
+    color: rgba(235, 235, 235, 1);
+    font-size: small;
+  }
+  .msg-status-svg-box{
+    text-align: center;
+    font-size: 2rem;
+  }
+  .loading-icon{
+    transform: scale(.7)
+  }
+  .loading{
+    animation: loading 1.5s infinite linear;
+  }
+  .is-not-intersecting{
+    visibility: hidden;
+  }
+  @keyframes loading {
+    0%{
+      transform: scale(.7) rotate(0deg);
+    }
+    100%{
+      transform: scale(.7) rotate(360deg);
+    }
+  }
+{% endstyle %}
+
+<zora-message-item-component class="zora-message-item-component">
+  <div class="zora-message-item zora-message-left">
+    <div class="zora-message-avatar">
+      <img class="zora-avatar" width="32px" height="32px" src="{{ 'customer.jpeg' | asset_img_url }}" alt="zora_avatar" />
+    </div>
+    <div class="zora-msg-box">
+      <span class="zora-user">customer</span>
+      <div class="zora-msg">你好</div>
+    </div>
+  </div>
+  <div class="zora-message-item zora-message-right">
+    <div class="zora-message-avatar">
+      <img class="zora-avatar" width="32px" height="32px" src="{{ 'recipient.jpg' | asset_img_url }}" alt="zora_avatar" />
+    </div>
+    <div class="zora-msg-box">
+      <span class="zora-user">recipient</span>
+      <div class="zora-msg-content">
+        <span class="zora-msg">你好，有什么可以帮助你的吗？</span>
+        <span class="zora-msg-read-state">已读</span>
+      </div>
+    </div>
+  </div>
+</zora-message-item-component>

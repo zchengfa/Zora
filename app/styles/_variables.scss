@@ -1,0 +1,57 @@
+
+:root,[data-theme="light"] {
+  --z-color-shimmer-start: #8a94ff;
+  --z-color-shimmer-mid: #9635bc;
+  --z-color-shimmer-end: #3cac70;
+  --z-primary_border_radius: 1rem;
+  --z-primary_padding: 1rem;
+  /* 主色：Shopify 紫 */
+  --z-color-primary: #5c6ac4;
+  --z-color-primary-hover: #4b57a4;
+  --z-color-primary-light: #e3e7f2;
+  /* 背景与表面色 */
+  --z-color-bg: #f6f6f7;       /* 页面背景 */
+  --z-color-surface: #ffffff;   /* 卡片、弹窗背景 */
+  --z-color-border: #c6cbd4;    /* 边框、分割线 */
+  /* 文字颜色 */
+  --z-color-text: #212b36;      /* 主文字 */
+  --z-color-text-secondary: #637381; /* 次要文字 */
+  --z-color-text-light: #919eab;   /* 提示文字 */
+  /* 状态色 */
+  --z-color-success: #008060;   /* 成功 */
+  --z-color-warning: #9c6f19;   /* 警告 */
+  --z-color-error: #d82c0d;     /* 错误 */
+  --z-color-info: #006fbb;      /* 信息 */
+  /* 聊天专用色 */
+  --z-chat-bubble-me: #e3e7f2;     /* 自己消息气泡 */
+  --z-chat-bubble-other: #ffffff;  /* 对方消息气泡 */
+  --z-chat-bubble-text-me: #212b36;
+  --z-chat-bubble-text-other: #212b36;
+}
+
+[data-theme="dark"] {
+  --z-primary_border_radius: 1rem;
+  --z-primary_padding: 1rem;
+  /* 主色：保持紫色，但更暗 */
+  --z-color-primary: #7c84d8;
+  --z-color-primary-hover: #5c6ac4;
+  --z-color-primary-light: #2f2f3a;
+  /* 背景与表面色：深灰调 */
+  --z-color-bg: #1c1c1f;
+  --z-color-surface: #2f2f3a;
+  --z-color-border: #3c3c46;
+  /* 文字颜色：浅灰调 */
+  --z-color-text: #f6f6f7;
+  --z-color-text-secondary: #919eab;
+  --z-color-text-light: #637381;
+  /* 状态色：保持语义，微调亮度 */
+  --z-color-success: #00a67c;
+  --z-color-warning: #d4a000;
+  --z-color-error: #ff4b4b;
+  --z-color-info: #4fa3f7;
+  /* 聊天专用色 */
+  --z-chat-bubble-me: #3c3c46;
+  --z-chat-bubble-other: #2f2f3a;
+  --z-chat-bubble-text-me: #f6f6f7;
+  --z-chat-bubble-text-other: #f6f6f7;
+}

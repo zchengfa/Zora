@@ -1,0 +1,146 @@
+
+{% schema %}
+{
+  "name": "Zora",
+  "target": "body",
+  "settings": [
+    {
+      "type": "color",
+      "id": "zora_bg_color",
+      "label": "t:schema.zora.settings.zora_bg_color.label",
+      "info": "t:schema.zora.settings.zora_bg_color.info",
+      "default": "#6bb2deff"
+    },
+    {
+      "type": "color",
+      "id": "zora_success_color",
+      "label": "t:schema.zora.settings.zora_success_color.label",
+      "info": "t:schema.zora.settings.zora_success_color.info",
+      "default": "#6fde6bff"
+    },
+    {
+      "type": "color",
+      "id": "zora_info_color",
+      "label": "t:schema.zora.settings.zora_info_color.label",
+      "info": "t:schema.zora.settings.zora_info_color.info",
+      "default": "#eaeef1ff"
+    },
+    {
+      "type": "color",
+      "id": "zora_error_color",
+      "label": "t:schema.zora.settings.zora_error_color.label",
+      "info": "t:schema.zora.settings.zora_error_color.info",
+      "default": "#e64048ff"
+    },
+    {
+      "type": "color",
+      "id": "zora_warning_color",
+      "label": "t:schema.zora.settings.zora_warning_color.label",
+      "info": "t:schema.zora.settings.zora_warning_color.info",
+      "default": "#e9cb67ff"
+    },
+    {
+      "type": "range",
+      "id": "zora_size_position_x",
+      "label": "t:schema.zora.settings.zora_size_position_x.label",
+      "info": "t:schema.zora.settings.zora_size_position_x.info",
+      "min": 0,
+      "max": 5,
+      "unit": "rem",
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "zora_size_position_y",
+      "label": "t:schema.zora.settings.zora_size_position_y.label",
+      "info": "t:schema.zora.settings.zora_size_position_y.info",
+      "min": 0,
+      "max": 50,
+      "unit": "dvh",
+      "step": 1,
+      "default": 10
+    }
+  ]
+}
+{% endschema %}
+
+{% style %}
+:root{
+  --zora-error-color: {{ block.settings.zora_error_color }};
+  --zora-success-color: {{ block.settings.zora_success_color }};
+  --zora-info-color: {{ block.settings.zora_info_color }};
+  --zora-warning-color: {{ block.settings.zora_warning_color }};
+}
+  div,input,button{
+    box-sizing: border-box;
+  }
+.hidden-scroller::-webkit-scrollbar {
+  display: none;
+}
+  .zora-main{
+    position: fixed;
+    width: fit-content;
+    height: fit-content;
+    left: {{ block.settings.zora_size_position_x | append: 'rem' }};
+    bottom: {{ block.settings.zora_size_position_y | append: 'dvh' }};
+    z-index: 100000;
+  }
+  .zora-main-btn{
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: .5rem .8rem;
+    border-radius: .5rem;
+    font-size: 2rem;
+    background: {{block.settings.zora_bg_color }};
+  }
+  .zora-main-btn-active{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: .5rem;
+    border-radius: 50%;
+    font-size: 2rem;
+    background: {{ block.settings.zora_bg_color }};
+  }
+  .zora-btn{
+    display: flex;
+    font-size: 1.5rem;
+    color: #fff;
+  }
+  .btn-close{
+    width: 2rem;
+    height: 2rem;
+    font-size: 2rem;
+  }
+  .zora-default-btn-box,.zora-active-btn-box{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .zora-active-btn-box.btn-box-hidden,.zora-default-btn-box.btn-box-hidden{
+    display: none;
+  }
+{% endstyle %}
+
+<div class="zora-main" data-shop="{{ shop.domain }}" data-locale="{{ shop.locale }}">
+  <zora-button class="zora-main-btn" data-target-class="zora-container" data-active-class="zora-container-active">
+    <div class="zora-default-btn-box">
+      <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"><path d="M348 700.4c21.7 3.6 71.2 7.4 94.1 7.4 200.9 0 335.7-149.5 335.7-325.2 0-175.8-168.5-318.3-335.7-318.3C241 64.3 78.4 206.8 78.4 382.6c0 101.8 38.8 188.3 111.9 250.5v158.7L348 700.4z m246.9-355.7c23 0 41.6 18.6 41.6 41.6s-18.6 41.6-41.6 41.6-41.6-18.6-41.6-41.6 18.6-41.6 41.6-41.6z m-168.2 0c23 0 41.6 18.6 41.6 41.6s-18.6 41.6-41.6 41.6-41.6-18.6-41.6-41.6c0-11 4.4-21.6 12.2-29.4 7.8-7.8 18.4-12.2 29.4-12.2z m-166.7 0c23 0 41.6 18.6 41.6 41.6S283 427.9 260 427.9s-41.6-18.6-41.6-41.6c0.1-23 18.7-41.6 41.6-41.6z m0 0" fill="#ffffff"></path><path d="M832.3 319.9l1.4 24.1c0.2 22.9 0 20.8 0 42 0 223.1-175.8 377.7-419.7 377.7h-83.9c66.6 65.1 144.1 104.9 251.8 104.9 22.4-0.1 44.9-1.9 67-5.6l156.8 96.6V800.9c85-58.2 139.9-148.6 139.9-250.5 0-90.8-43.6-172.5-113.3-230.5z m0 0" fill="#ffffff"></path></svg>
+      <button class="zora-btn">Zora</button>
+    </div>
+    <div class="zora-active-btn-box btn-box-hidden ">
+      <button class="zora-btn btn-close">
+        <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"  width="1em" height="1em"><path d="M512 421.490332 331.092592 240.582924C306.351217 215.841549 265.464551 215.477441 240.470996 240.470996 215.303191 265.638801 215.527553 306.037221 240.582924 331.092592L421.490332 512 240.582925 692.907407C215.84155 717.648782 215.477441 758.535449 240.470996 783.529004 265.638801 808.696809 306.037222 808.472446 331.092593 783.417075L512 602.509668 692.907407 783.417075C717.648782 808.15845 758.535449 808.522559 783.529004 783.529004 808.696809 758.361199 808.472446 717.962778 783.417075 692.907407L602.509668 512 783.417076 331.092592C808.158451 306.351217 808.522559 265.464551 783.529004 240.470996 758.361199 215.303191 717.962779 215.527553 692.907408 240.582924L512 421.490332Z" fill="#ffffff"></path></svg>
+      </button>
+    </div>
+  </zora-button>
+  {% render 'zora' %}
+  {% render 'zora-toast' %}
+  <script defer src="{{ 'socket.io-client.min.js' | asset_url }}"></script>
+  <script defer src="{{ 'utils.js' | asset_url }}"></script>
+  <script defer src="{{ 'renderMessage.js' | asset_url }}"></script>
+  <script defer src="{{ 'websocket.js' | asset_url }}"></script>
+  <script defer src="{{ 'zora.js' | asset_url }}"></script>
+</div>

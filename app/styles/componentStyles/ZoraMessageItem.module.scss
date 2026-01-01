@@ -1,0 +1,96 @@
+.zoraMessageItem{
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 1rem .5rem;
+  width: 100%;
+  &.zoraMessageLeft{
+    flex-direction: row;
+    .zoraMsg{
+      background-color: var(--z-color-info);
+      color: var(--z-chat-bubble-text-other);
+    }
+  }
+  &.zoraMessageRight{
+    .zoraMsg{
+      background-color: var(--z-chat-bubble-me);
+      color: var(--z-chat-bubble-text-me);
+    }
+    flex-direction: row-reverse;
+    .zoraMsgContent{
+      flex-direction: row-reverse;
+    }
+  }
+}
+.zoraMsgBox{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  color: #000;
+  max-width: 80%;
+}
+.zoraUser{
+  font-size: small;
+  color: rgb(133 137 140);
+}
+.zoraMessageLeft .zoraMsgBox{
+  align-items: flex-start;
+  margin-left: .5rem;
+}
+.zoraMessageRight .zoraMsgBox{
+  align-items: flex-end;
+  margin-right: .5rem;
+}
+.zoraMessageAvatar{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: fit-content;
+  height: fit-content;
+}
+.zoraAvatar{
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+}
+.zoraMsgContent{
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+.zoraMsg{
+  flex: 1;
+  margin-top: .3rem;
+  padding: .5rem 1rem;
+  border-radius: .5rem;
+  color: var(--z-color-text);
+}
+.zoraMsgReadState{
+  margin-right: .3rem;
+  color: var(--z-color-success);
+  font-size: small;
+}
+.msgStatusSvgBox{
+  display: flex;
+  text-align: center;
+  font-size: 2rem;
+  .failedIcon{
+    transform: scale(.7);
+  }
+}
+.loadingIcon{
+  transform: scale(.7)
+}
+.loading{
+  animation: loading 1.5s infinite linear;
+}
+
+@keyframes loading {
+  0%{
+    transform: scale(.7) rotate(0deg);
+  }
+  100%{
+    transform: scale(.7) rotate(360deg);
+  }
+}

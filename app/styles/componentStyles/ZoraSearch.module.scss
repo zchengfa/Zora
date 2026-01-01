@@ -1,0 +1,64 @@
+.container{
+  position: relative;
+  width: 100%;
+  height: 3rem;
+  text-align: center;
+  .input{
+    position: relative;
+    top: 50%;
+    width: 90%;
+    height: 2rem;
+    text-indent: 1rem;
+    transform: translateY(-50%);
+    transition: all 300ms ease-out;
+    background-color: var(--z-color-surface);
+    border: 1px solid var(--z-color-border);
+    border-radius: var(--z-primary_border_radius);
+    padding: var(--z-primary_padding);
+    color: var(--z-color-text);
+  }
+  .inputActive{
+    position: relative;
+    top: 50%;
+    width: 96%;
+    height: 2rem;
+    border-radius: 2rem;
+    text-indent: 1rem;
+    transform: translateY(-50%);
+    transition: all 300ms ease-out;
+  }
+  .searchIcon{
+    width: fit-content;
+    position: absolute;
+    right: 10%;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 300ms ease-out;
+  }
+  .searchIconActive{
+    width: fit-content;
+    position: absolute;
+    right: 5%;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 300ms ease-out;
+  }
+  .searchResult{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 3rem;
+    width: 100%;
+    height: fit-content;
+    min-height: 300%;
+    max-height: 74dvh;
+    background: var(--z-color-surface);
+    overflow-y: scroll;
+    z-index: 9;
+    .emptyBox{
+      color: var(--z-color-surface);
+    }
+  }
+}

@@ -1,0 +1,294 @@
+{% style %}
+  .zora-container{
+    display: none;
+  }
+  .zora-container-active,.zora-auth-container{
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    width: fit-content;
+    height: fit-content;
+    left: 100%;
+    bottom: 100%;
+    border-radius: .5rem;
+    color: #fff;
+    background: {{ block.settings.zora_bg_color }};
+    z-index: 9999;
+  }
+  .zora-header{
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    width: 100%;
+    color: #fff;
+  }
+  .zora-title{
+    margin-bottom: .5rem;
+    text-transform: capitalize;
+    font-size: 1rem;
+    color: #fff;
+  }
+  .zora-description{
+    width: 20rem;
+    font-size: .9rem;
+    line-height: normal;
+  }
+  .zora-header-active-box{
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 20rem;
+  }
+  .zora-shop-name{
+    flex: 1;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #fff;
+    text-indent: -1.5rem;
+  }
+  .zora-content{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    width: 100%;
+    height: fit-content;
+    border-radius: .5rem;
+    background: #fff;
+  }
+  .zora-message-box{
+    width: 100%;
+    height: 0;
+    transition: height .3s ease-out;
+  }
+  .zora-message-box-active{
+    width: 100%;
+    height: 55dvh;
+    transition: height .3s ease-out;
+  }
+  .zora-input-box{
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 1rem 0;
+    height: fit-content;
+  }
+  .zora-emoji-component,.zora-send-component{
+    flex: 1;
+  }
+  .zora-input-component{
+    flex: 5;
+  }
+  .zora-input{
+    width: 100%;
+    height: 2.2rem;
+    border-radius: .5rem;
+    border: none;
+    text-indent: .8rem;
+    color: #fff;
+    background: {{ block.settings.zora_bg_color }};
+  }
+  .zora-input::placeholder{
+    color: #e8e0e0e4;
+  }
+  .zora-input:focus-visible{
+    outline: none;
+    border: none;
+    box-shadow: 4px 4px 4px #c4bebeff;
+  }
+  .zora-send-component,.zora-emoji-component{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .zora_icon_box{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 2.2rem;
+    font-size: 1.5rem;
+  }
+  .zora-chat-btn-component{
+    width: 90%;
+    padding: 1rem;
+    background: #fff;
+    text-align: center;
+    border-radius: .5rem;
+  }
+  .zora-chat-btn{
+    width: 90%;
+    height: 2.2rem;
+    color: #fff;
+    font-size: 1.2rem;
+    background: {{ block.settings.zora_bg_color }};
+    border-radius: .5rem;
+  }
+  .zora-auth-container{
+    width: fit-content;
+    height: fit-content;
+  }
+  .zora-form-email-box{
+    position: relative;
+    width: 100%;
+  }
+  .zora-form-input{
+    margin-top: 1rem;
+    color: #000;
+    background: #fff;
+  }
+  .zora-verify-box{
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    mix-blend-mode: difference;
+    background:{{ block.settings.zora_bg_color }};
+    border-top-right-radius: .5rem;
+    border-bottom-right-radius: .5rem;
+  }
+  .zora-code-send,.zora-ex,.zora-code-verify{
+    display: flex;
+    min-width: 3rem;
+    justify-content: center;
+    align-items: center;
+    height: 2.2rem;
+    color: #000;
+  }
+  .zora-form-input::placeholder{
+    color: #aaa3a3ff;
+    text-transform: capitalize;
+  }
+  #zora-verify-code{
+    margin-top: 0;
+    max-width: 5rem;
+    text-indent: 0;
+    text-align: center;
+    border-radius: 0;
+    border-left: 1px solid #d5cccc;
+    border-right: 1px solid #d5cccc;
+    background: transparent;
+  }
+  #zora-verify-code:focus-visible{
+    box-shadow: none;
+  }
+  #zora-verify-code::placeholder{
+    color: #000;
+  }
+  .zora-check-item{
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-top: .5rem;
+    font-size: .8rem;
+  }
+
+  .zora-auth-btn,.zora-disabled-btn{
+    margin: 1rem auto;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 2.2rem;
+    border-radius: .5rem;
+    font-size: 1.2rem;
+  }
+  #zora-market-email, #zora-market-sms{
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .zora-policy-box{
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: .5rem;
+    font-size: .8rem;
+    line-height: 1.5;
+    background: rgba(0,0,0,.1);
+  }
+  .zora-disabled-btn{
+    color: #fff;
+    background: rgba(0,0,0,.1);
+    cursor: not-allowed;
+  }
+  .zora-auth-btn{
+    color: {{ block.settings.zora_bg_color }};
+    background: #fff;
+    cursor: pointer;
+  }
+  .zora-err-box{
+    width: 100%;
+    max-height: 10dvh;
+    margin-top: 1rem;
+    background: #fff;
+    border-radius: .5rem;
+    text-align: left;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+  }
+  .zora-err-item{
+    display: block;
+    padding: .5rem 1rem;
+    color: #e89f29ff;
+    font-size: .8rem;
+    line-height: 1.5;
+  }
+  .zora-err-item:last-child{
+    padding-bottom: .5rem;
+  }
+  .zora-disabled{
+    cursor: not-allowed;
+  }
+  .hidden{
+    display: none;
+  }
+
+{% endstyle %}
+
+<div class="zora-container">
+  <div class="zora-header">
+    <h3 class="zora-title">{{ 'zora.title' | t }}</h3>
+    <p class="zora-description">{{ 'zora.description' | t }}</p>
+  </div>
+  <div class="zora-header-active-box hidden">
+    <zora-back-component class="zora-back-component" data-header="zora-header" data-header-active="zora-header-active-box" data-input="zora-input-box" data-target-msg="zora-message-box" data-target-msg-active="zora-message-box-active">
+      <div class="zora_icon_box">
+        <svg class="icon" viewBox="0 0 1025 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"><path d="M533.353412 682.285176c0-0.030118 0.060235-0.060235 0.060235-0.090353C533.172706 682.194824 533.142588 682.224941 533.353412 682.285176zM40.176941 555.008l314.398118 314.398118c27.045647 27.045647 70.927059 27.045647 97.942588 0 27.045647-26.985412 27.045647-70.866824 0-97.912471l-196.186353-196.216471 665.630118 0c38.249412 0 69.240471-31.021176 69.240471-69.240471 0-38.279529-31.021176-69.270588-69.240471-69.270588L256.361412 436.766118l196.186353-196.186353c27.045647-27.015529 27.045647-70.927059 0-97.942588C439.024941 129.114353 421.285647 122.337882 403.546353 122.337882c-17.709176 0-35.448471 6.776471-48.941176 20.299294L40.176941 457.065412C13.101176 484.111059 13.101176 527.932235 40.176941 555.008z" fill="#ffffff"></path></svg>
+      </div>
+    </zora-back-component>
+    <h3 class="zora-shop-name">{{ shop.name }}</h3>
+  </div>
+  <div class="zora-content">
+    <div class="zora-message-box">
+      {% render 'zora-message' %}
+    </div>
+    <div class="zora-input-box hidden">
+      <zora-emoji-component class="zora-emoji-component">
+        <div class="zora_icon_box">
+          <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"><path d="M512 511m-388 0a388 388 0 1 0 776 0 388 388 0 1 0-776 0Z" fill="#FF314A"></path><path d="M271.29 646.27l-90.34 221.3 236.81-32.41-146.47-188.89z" fill="#FF314A" ></path><path d="M503.389466 529.827389a101.36 152.03 3 1 0 15.913271-303.643296 101.36 152.03 3 1 0-15.913271 303.643296Z" fill="#FFFFFF" ></path><path d="M578.97 315.09c11.54 0.61 22.06 6.05 30.77 14.98 3.23 16.71 4.54 34.68 3.56 53.32-2.38 45.41-17.82 85.46-40.34 112.17-1.15 0.04-2.3 0.03-3.46-0.03-33.22-1.74-58.03-43.55-55.41-93.38 2.62-49.83 31.66-88.81 64.88-87.06z" ></path><path d="M731.704208 534.032046a86.14 129.21 3 1 0 13.524658-258.065844 86.14 129.21 3 1 0-13.524658 258.065844Z" fill="#FFFFFF"></path><path d="M795.97 351.53c9.81 0.51 18.75 5.14 26.15 12.73 2.75 14.2 3.86 29.48 3.03 45.32-2.03 38.59-15.14 72.63-34.29 95.34-0.98 0.03-1.96 0.03-2.94-0.03-28.23-1.48-49.32-37.01-47.1-79.36 2.22-42.35 26.91-75.48 55.15-74zM186.54 879.5c-6.18 0-11.55-4.58-12.38-10.87-0.9-6.84 3.92-13.12 10.76-14.02l144.44-19c6.84-0.9 13.12 3.92 14.02 10.76s-3.92 13.12-10.76 14.02l-144.44 19c-0.55 0.07-1.1 0.11-1.65 0.11zM511.01 561.51c-3.77 0-7.49-1.7-9.95-4.93-50.16-65.87-119.75-30.2-122.69-28.65-6.09 3.22-13.65 0.91-16.89-5.18s-0.96-13.63 5.12-16.88c0.93-0.5 23.06-12.19 52.95-13.72 28.04-1.44 68.39 5.94 101.4 49.29 4.18 5.49 3.12 13.34-2.37 17.52a12.452 12.452 0 0 1-7.56 2.56zM643.39 674.98c-1.07 0-2.13-0.03-3.21-0.11-14.71-0.96-27.99-8.46-37.38-21.1-8.94-12.03-13.29-27.4-12.25-43.29 0.45-6.89 6.4-12.11 13.29-11.66 6.89 0.45 12.11 6.4 11.66 13.29-0.65 9.97 1.96 19.46 7.37 26.74 4.95 6.66 11.68 10.59 18.96 11.07 7.27 0.48 14.46-2.54 20.24-8.5 6.31-6.5 10.14-15.58 10.8-25.55 0.45-6.89 6.4-12.11 13.29-11.66 6.89 0.45 12.11 6.4 11.66 13.29-1.04 15.88-7.36 30.56-17.8 41.32-10.17 10.48-23.07 16.14-36.62 16.14z"></path></svg>
+        </div>
+      </zora-emoji-component>
+      <zora-input-component class="zora-input-component" data-target="normal-send" data-target-active="active-send">
+        <input id="zora-input"  class="zora-input zora-message-input" placeholder={{ 'zora.placeholder' | t }} />
+      </zora-input-component>
+      <zora-send-component class="zora-send-component" data-input="zora-input" >
+        <div class="zora_icon_box normal-send">
+          <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"  width="1em" height="1em"><path d="M1024 10.24l-251.619556 271.928889a8.021333 8.021333 0 0 0-1.991111 7.082667 49.208889 49.208889 0 0 1-83.655111 44.145777l-200.533333 200.476445 19.768889 264.96L731.136 1024 1024 10.24z" fill="#cdcdcd"></path><path d="M1021.240889 17.066667l-248.917333 269.084444a8.021333 8.021333 0 0 0-1.991112 7.111111 48.526222 48.526222 0 0 1-82.773333 43.576889l-197.12 197.12a3.982222 3.982222 0 0 0-1.137778 3.043556l19.456 260.209777L1010.744889 39.936l10.780444-22.755556-0.284444-0.085333z" fill="#cdcdcd" p-id="19679"></path><path d="M1013.816889 0.056889l-271.928889 251.591111a8.049778 8.049778 0 0 1-7.139556 2.048 49.208889 49.208889 0 0 0-44.088888 83.626667l-200.533334 200.533333-264.846222-19.911111L0 292.835556 1013.816889 0.056889z" fill="#cdcdcd"></path><path d="M1006.961778 3.072L737.848889 252.017778a8.021333 8.021333 0 0 1-6.997333 1.991111 48.497778 48.497778 0 0 0-43.605334 82.773333l-197.148444 197.12a3.953778 3.953778 0 0 1-3.128889 1.109334l-260.209778-19.456L984.064 13.568l22.755556-10.752 0.142222 0.256z" fill="#cdcdcd"></path></svg>
+        </div>
+        <div class="zora_icon_box active-send hidden">
+          <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"  width="1em" height="1em"><path d="M1024 10.24l-251.619556 271.928889a8.021333 8.021333 0 0 0-1.991111 7.082667 49.208889 49.208889 0 0 1-83.655111 44.145777l-200.533333 200.476445 19.768889 264.96L731.136 1024 1024 10.24z" fill="#007FFF"></path><path d="M1021.240889 17.066667l-248.917333 269.084444a8.021333 8.021333 0 0 0-1.991112 7.111111 48.526222 48.526222 0 0 1-82.773333 43.576889l-197.12 197.12a3.982222 3.982222 0 0 0-1.137778 3.043556l19.456 260.209777L1010.744889 39.936l10.780444-22.755556-0.284444-0.085333z" fill="#0069FF"></path><path d="M1013.816889 0.056889l-271.928889 251.591111a8.049778 8.049778 0 0 1-7.139556 2.048 49.208889 49.208889 0 0 0-44.088888 83.626667l-200.533334 200.533333-264.846222-19.911111L0 292.835556 1013.816889 0.056889z" fill="#00EED4"></path><path d="M1006.961778 3.072L737.848889 252.017778a8.021333 8.021333 0 0 1-6.997333 1.991111 48.497778 48.497778 0 0 0-43.605334 82.773333l-197.148444 197.12a3.953778 3.953778 0 0 1-3.128889 1.109334l-260.209778-19.456L984.064 13.568l22.755556-10.752 0.142222 0.256z" fill="#00D3B4"></path></svg>
+        </div>
+      </zora-send-component>
+    </div>
+    <zora-chat-btn-component class="zora-chat-btn-component" data-container="zora-container-active" data-auth-container="zora-auth-container" data-header="zora-header" data-header-active="zora-header-active-box" data-input="zora-input-box" data-target-msg="zora-message-box" data-target-msg-active="zora-message-box-active">
+      <button class="zora-chat-btn">{{ 'zora.chat_btn' | t }}</button>
+    </zora-chat-btn-component>
+  </div>
+</div>
+{% render 'zora-auth-container' %}

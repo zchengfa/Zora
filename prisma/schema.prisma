@@ -1,32 +1,174 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = "postgresql://postgres:19961212@localhost:5432/mall"
 }
 
-model Session {
-  id            String    @id
-  shop          String
-  state         String
+model customer_addresses {
+  id           BigInt   @id @default(autoincrement())
+  customer_id  BigInt
+  address_type String   @default("shipping")
+  address1     String?
+  address2     String?
+  city         String?
+  province     String?
+  country      String?
+  postal_code  String?
+  phone        String?
+  is_default   Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+
+  @@index([customer_id], map: "customer_addresses_customer_id_fkey")
+}
+
+model customer_tag_relations {
+  id          BigInt   @id @default(autoincrement())
+  customer_id BigInt
+  tag_id      Int
+  created_at  DateTime @default(now())
+
+  @@unique([customer_id, tag_id])
+  @@index([tag_id], map: "customer_tag_relations_tag_id_fkey")
+}
+
+model customer_tags {
+  id         Int      @id @default(autoincrement())
+  tag_name   String   @unique
+  created_at DateTime @default(now())
+}
+
+model customers {
+  id                  BigInt    @id @default(autoincrement())
+  shopify_customer_id String    @unique
+  email               String    @unique
+  password            String
+  first_name          String?
+  last_name           String?
+  phone               String?
+  number_of_orders    Int       @default(0)
+  total_amount_spent  Float     @default(0)
+  currency_code       String    @default("USD")
+  verified_email      Boolean   @default(false)
+  valid_email_address Boolean   @default(true)
+  lifetime_duration   String?
+  note                String?
+  can_delete          Boolean   @default(true)
+  image_url           String?
+  created_at          DateTime? @default(now())
+  updated_at          DateTime?
+  market_email        Boolean   @default(false)
+  market_sms          Boolean   @default(false)
+
+  customer_service_staff CustomerServiceStaff[]
+}
+
+model CustomerServiceStaff {
+  id         String    @id @unique @default(uuid())
+  name       String
+  email      String?   @unique
+  phone      String?
+  avatarUrl  String?
+  department String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  userId   BigInt?    @unique
+  customer customers? @relation(fields: [userId], references: [id])
+
+  @@map("customer_service_staff")
+}
+
+model session {
+  id            String    @id @default(uuid())
+  sessionId     String?   @map("session_id")
+  shop          String?
+  state         String?
   isOnline      Boolean   @default(false)
   scope         String?
   expires       DateTime?
-  accessToken   String
-  userId        BigInt?
+  accessToken   String?
+  userId        BigInt?   @unique
   firstName     String?
   lastName      String?
-  email         String?
+  email         String?   @unique
   accountOwner  Boolean   @default(false)
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
+}
+
+model Conversation {
+  id        String             @id @default(uuid())
+  shop      String             @db.VarChar(100)
+  customer  String?            @db.VarChar(100)
+  status    ConversationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  messages Message[]
+
+  @@index([shop, status])
+  @@index([shop, customer])
+  @@map("conversations")
+}
+
+model Message {
+  id             String         @id @default(uuid())
+  conversationId String         @db.VarChar(191)
+  owner          String?        @db.VarChar(100)
+  msgStatus      MsgStatus?
+  senderId       String         @db.VarChar(191)
+  senderType     SenderType
+  recipientId    String?        @db.VarChar(191)
+  recipientType  RecipientType?
+  contentType    ContentType    @default(TEXT)
+  contentBody    String         @db.Text
+  metadata       Json?
+  msgId          String?        @db.VarChar(100)
+
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, timestamp])
+  @@index([senderId, timestamp])
+  @@map("messages")
+}
+
+enum ConversationStatus {
+  ACTIVE
+  RESOLVED
+  ARCHIVED
+}
+
+enum SenderType {
+  CUSTOMER
+  AGENT
+  SYSTEM
+}
+
+enum RecipientType {
+  CUSTOMER
+  AGENT
+}
+
+enum ContentType {
+  TEXT
+  IMAGE
+  PRODUCT
+  ORDER
+  SYSTEM
+}
+
+enum MsgStatus {
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }

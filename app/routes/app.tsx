@@ -2,8 +2,13 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
+import { authenticate } from "@/shopify.server.ts";
+import ZoraModalProvider from "@/contexts/ZoraModalProvider.tsx";
 
-import { authenticate } from "../shopify.server";
+import  '@styles/_variables.scss'
+import  '@styles/base.scss'
+
+import {useEffect} from "react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -12,16 +17,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
-export default function App() {
+function App() {
   const { apiKey } = useLoaderData<typeof loader>();
+
+  useEffect(() => {
+    //设置主题
+    const setTheme = ()=>{
+      const theme = localStorage.getItem('YCChat_application_theme') || 'light'
+      document.getElementsByTagName('html')[0].setAttribute('data-theme',theme)
+    }
+    setTheme()
+  },[])
 
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Home</s-link>
+        <s-link href="/app">Chat</s-link>
         <s-link href="/app/additional">Additional page</s-link>
+        <s-link href="/app/properties">Properties</s-link>
+        <s-link href="/app/calendar">Calendar</s-link>
+        <s-link href="/app/offer">Offer</s-link>
+        <s-link href="/app/documents">Documents</s-link>
+        <s-link href="/app/settings">Settings</s-link>
       </s-app-nav>
-      <Outlet />
+      <ZoraModalProvider>
+        <Outlet/>
+      </ZoraModalProvider>
     </AppProvider>
   );
 }
@@ -34,3 +55,5 @@ export function ErrorBoundary() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+export default App
