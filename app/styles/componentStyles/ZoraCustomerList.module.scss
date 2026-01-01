@@ -9,11 +9,13 @@
   flex: 1;
   max-height: 74dvh;
   text-align: center;
-  .emptyData{
-    position: relative;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--z-deep_gray_color);
+  .emptyCustomer{
+    //position: relative;
+    //top: 50%;
+    //transform: translateY(-50%);
+    //color: var(--z-color-primary-light);
+    width: 100%;
+    height: 100%;
   }
   .customerList{
     @include flexLayout(column,flex-start);
@@ -23,7 +25,7 @@
     .customerItem:hover{
       width: 95%;
       padding: calc(var(--z-primary_padding)/2) calc(var(--z-primary_padding));
-      box-shadow:4px 4px 4px  var(--z-deep_gray_color) ;
+      box-shadow:4px 4px 4px  var(--z-color-bg) ;
       transition: all 300ms ease-out;
     }
     .customerItem{
@@ -31,7 +33,7 @@
       margin-top: var(--z-primary_padding);
       width: 90%;
       padding: calc(var(--z-primary_padding)/3) calc(var(--z-primary_padding)/2);
-      background-color: var(--z-white);
+      background-color: var(--z-color-surface);
       border-radius: calc(var(--z-primary_border_radius)/2);
       transition: all 300ms ease-out;
       cursor: pointer;
@@ -44,6 +46,9 @@
         height: 2.5rem;
         border-radius: 50%;
       }
+      .username{
+        color: var(--z-color-text);
+      }
       .middleBox{
         flex: 3;
         @include flexLayout(column,space-between,flex-start);
@@ -53,7 +58,7 @@
         .message{
           max-width: 6rem;
           font-size: .8rem;
-          color: var(--z-deep_gray_color);
+          color: var(--z-color-text-secondary);
           white-space: nowrap;
           text-overflow: ellipsis;
           overflow: hidden;
@@ -79,7 +84,7 @@
       }
     }
     .customerItem.active{
-      background-color: var(--z-active-color);
+      background-color: var(--z-color-surface);
     }
   }
 }

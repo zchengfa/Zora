@@ -1,0 +1,9 @@
+.container{
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  padding: var(--z-primary_padding);
+  background-color: var(--z-color-surface);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  border-radius: calc(var(--z-primary_border_radius) /2);
+}

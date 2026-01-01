@@ -24,6 +24,7 @@ export const useMessageStore = create((set)=>{
       customerStaff: null,
       activeCustomerInfo:null,
       activeCustomerItem: undefined,
+      shopify_Shop_products:{},
       initMessages:async (target:string)=>{
         let messages = []
         if (target){
@@ -40,15 +41,24 @@ export const useMessageStore = create((set)=>{
           }
         })
       },
-      initZustandState:(customerStaff:CustomerStaffType)=>{
+      initZustandState:(customerStaff:CustomerStaffType,products)=>{
         set(()=>{
           const chatList = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_CHAT_LIST_KEY) as string) || []
           const activeCustomerItem = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) as string) || undefined
           const activeCustomerInfo = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) || null
+          if(!customerStaff){
+            return {
+              chatList,
+              activeCustomerItem,
+              activeCustomerInfo,
+              shopify_Shop_products:products
+            }
+          }
           return {
             chatList,
             activeCustomerItem,
             activeCustomerInfo,
+            shopify_Shop_products:products,
             customerStaff
           }
         })
@@ -203,21 +213,41 @@ export const useMessageStore = create((set)=>{
           const cloneTimers = deepCloneTS(state.messageTimers)
           const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
           const conversation = cloneTimers.get(payload.conversationId);
+          const maxConversation = cloneMaxWaitingTimers.get(payload.conversationId);
           if(!conversation){
             cloneTimers.set(payload.conversationId,new Map());
+          }
+          if(!maxConversation){
             cloneMaxWaitingTimers.set(payload.conversationId,new Map());
           }
           cloneTimers?.get(payload.conversationId).set(payload.msgId,payload.timer)
-          cloneMaxWaitingTimers?.get(payload.conversationId).set(payload.msgId,payload.maxTimer)
+          cloneMaxWaitingTimers?.get(payload.conversationId)?.set(payload.msgId,payload.maxTimer)
+
           return {
             messageTimers: cloneTimers,
-            messageMaxWaitingTimer: cloneMaxWaitingTimers,
+            messageMaxWaitingTimers: cloneMaxWaitingTimers,
           }
         })
       },
       clearUpTimer:(ack)=>{
         //收到回执，需要清除发送中的定时器和兜底定时器
-        console.log(ack)
+        set((state)=>{
+          const cloneTimers = deepCloneTS(state.messageTimers)
+          const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
+          const timer = cloneTimers.get(ack.conversationId)?.get(ack.msgId)
+          const maxTimer = cloneMaxWaitingTimers.get(ack.conversationId)?.get(ack.msgId)
+          //清除定时器
+          clearTimeout(timer)
+          clearTimeout(maxTimer)
+          //删除记录的timer
+          cloneTimers.get(ack.conversationId)?.delete(ack.msgId)
+          cloneMaxWaitingTimers?.get(ack.conversationId)?.delete(ack.msgId)
+
+          return {
+            messageTimers: cloneTimers,
+            messageMaxWaitingTimers: cloneMaxWaitingTimers,
+          }
+        })
       }
     }
   }

@@ -1,0 +1,78 @@
+
+/* 聊天主区域占满剩余空间并居中 */
+.chatMainArea {
+  position: relative;
+  top: 50%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--z-primary_padding);
+  transform: translateY(-50%);
+}
+
+/* 空状态通用卡片 */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--z-color-surface);
+  border-radius: var(--z-primary_border_radius);
+  padding: calc(var(--z-primary_padding) * 2);
+  color: var(--z-color-text-secondary);
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* 中间大块空状态 */
+.emptyStateCenter {
+  min-width: 300px;
+  max-width: 400px;
+  margin: var(--z-primary_padding);
+}
+
+/* 左侧空状态（no customers） */
+.emptyStateSide {
+  margin: var(--z-primary_padding);
+  width: 100%;
+}
+
+/* 图标 */
+.emptyStateIcon {
+  font-size: 2rem;
+  color: var(--z-color-text-light);
+  margin-bottom: var(--z-primary_padding);
+}
+
+/* 标题 */
+.emptyStateTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--z-color-text);
+  margin-bottom: 0.5rem;
+}
+
+/* 描述 */
+.emptyStateDesc {
+  font-size: 0.875rem;
+  color: var(--z-color-text-secondary);
+  margin-bottom: var(--z-primary_padding);
+}
+
+/* 引导按钮 */
+.btnPrimary {
+  background: var(--z-color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--z-primary_border_radius);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.btnPrimary:hover {
+  background: var(--z-color-primary-hover);
+}

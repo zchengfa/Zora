@@ -69,13 +69,14 @@ export class SocketUtils{
         break;
     }
   }
-  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD',codeType:number)=>{
+  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD',codeType:number,conversationId:string | undefined = undefined)=>{
     this.config.io.to(sender).emit('message_ack',{
       type: 'ACK',
       msgId,
       msgStatus:status,
       code: this.getAckCode(codeType),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      conversationId
     })
   }
   private repostMessageAck = ()=>{
@@ -88,7 +89,7 @@ export class SocketUtils{
       else{
         receiver = this.users.get(payload.recipientId) as string
       }
-      this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004)
+      this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004,payload.conversationId)
     })
   }
   public socketAgentOnline = ()=>{

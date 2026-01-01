@@ -3,6 +3,7 @@ import React, {useEffect, useRef, useState} from "react";
 import {MessageDataType} from "@Utils/socket.ts";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {useInViewport} from "@hooks/useInViewport.ts";
+import ZoraLoading from "@components/common/ZoraLoading.tsx";
 
 interface ZoraMsgItemPropsType {
   itemData: MessageDataType
@@ -13,7 +14,7 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
     itemData
   }
 )=>{
-  const {activeCustomerInfo,customerStaff,messageTimers} = useMessageStore()
+  const {activeCustomerInfo,customerStaff} = useMessageStore()
   const msgRef = useRef<HTMLDivElement>(null);
   const isVisible = useInViewport(msgRef)
   const [avatar,setAvatar] = useState('')
@@ -21,12 +22,12 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
   const [msgReadStatus,setMsgReadStatus] = useState<string>('')
   useEffect(() => {
     if(itemData.senderType === 'CUSTOMER'){
-      setAvatar(activeCustomerInfo.avatar)
-      setUsername(activeCustomerInfo.username)
+      setAvatar(activeCustomerInfo?.avatar)
+      setUsername(activeCustomerInfo?.username)
     }
     else{
-      setAvatar(customerStaff.avatarUrl)
-      setUsername(customerStaff.name)
+      setAvatar(customerStaff?.avatarUrl)
+      setUsername(customerStaff?.name)
     }
   }, []);
 
@@ -41,23 +42,20 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
 
   return <div ref={msgRef} style={{visibility: isVisible ? "visible" : "hidden"}}
     className={itemData.senderType === 'CUSTOMER' ? ZoraMessageItemStyle.zoraMessageItem + ' ' + ZoraMessageItemStyle.zoraMessageLeft : ZoraMessageItemStyle.zoraMessageItem + ' ' + ZoraMessageItemStyle.zoraMessageRight}>
-    <div className={ZoraMessageItemStyle.zoraMessageAvatar}>
-      <img className={ZoraMessageItemStyle.zoraAvatar} width="32px" height="32px"
-           src={avatar} alt="zora_avatar"/>
-    </div>
+    {
+      avatar ? <div className={ZoraMessageItemStyle.zoraMessageAvatar}>
+        <img className={ZoraMessageItemStyle.zoraAvatar} width="32px" height="32px"
+             src={avatar} alt="zora_avatar"/>
+      </div> : null
+    }
     <div className={ZoraMessageItemStyle.zoraMsgBox}>
       <span className={ZoraMessageItemStyle.zoraUser}>{username}</span>
       <div className={ZoraMessageItemStyle.zoraMsgContent}>
-        <span className={ZoraMessageItemStyle.zoraMsg}>{itemData.contentBody}</span>
+      <span className={ZoraMessageItemStyle.zoraMsg}>{itemData.contentBody}</span>
         {
           itemData.msgStatus === 'SENDING' && itemData.senderType === 'AGENT' ?
             <div className={ZoraMessageItemStyle.msgStatusSvgBox}>
-              <svg className={'icon' + ' ' + ZoraMessageItemStyle.loadingIcon + ' ' + ZoraMessageItemStyle.loading} viewBox="0 0 1024 1024" version="1.1"
-                   xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-                <path
-                  d="M512 0a512.170667 512.170667 0 0 1 504.917333 426.666667H930.133333A426.837333 426.837333 0 0 0 85.333333 512a426.666667 426.666667 0 0 0 844.8 85.418667h86.784A512.170667 512.170667 0 0 1 0 512a512 512 0 0 1 512-512z"
-                  fill="#bfbfbf" ></path>
-              </svg>
+              <ZoraLoading></ZoraLoading>
             </div> : null
         }
         {

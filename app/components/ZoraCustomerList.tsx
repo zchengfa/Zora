@@ -3,6 +3,7 @@ import type {CustomerDataType} from '@/type'
 import Badge from "@components/common/Badge";
 import React from "react";
 import ZoraTimestamp from "@components/common/ZoraTimestamp";
+import ZoraEmpty from "@components/common/ZoraEmpty.tsx";
 
 interface ZoraCustomerListProps {
   customerData: CustomerDataType[],
@@ -47,7 +48,7 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
             })
           }
         </div>
-        : <span className={ZoraCustomerListStyle.emptyData}>no customers</span>
+        : <ZoraEmpty isEmptyMessage={false}></ZoraEmpty>
     }
   </div>
 }
