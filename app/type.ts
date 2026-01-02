@@ -4,13 +4,13 @@ export interface CustomerDataType {
   firstName:string,
   lastName:string,
   avatar:string | null,
-  isOnline:boolean,
+  isOnline?:boolean,
   lastMessage:string,
-  lastTimestamp:string,
-  hadRead:boolean,
-  isActive:boolean,
-  unreadMessageCount:number,
-  conversationId:string,
+  lastTimestamp:string | number,
+  hadRead?:boolean,
+  isActive?:boolean,
+  unreadMessageCount?:number,
+  conversationId?:string,
 }
 
 export interface CustomerStaffType {
@@ -113,4 +113,15 @@ export interface GraphqlProductInfoType {
   }
 }
 
+export type MessageAckType = {
+  code?:string
+  conversationId?:string,
+  msgId:string,
+  msgStatus:string
+  timestamp?:string
+  type?:'ACK',
+}
+
+
+export type ZoraProductType = GraphqlProductInfoType["products"]["nodes"][0]
 

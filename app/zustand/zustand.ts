@@ -1,17 +1,43 @@
 import {create} from "zustand/react";
 import {deepCloneTS} from "@Utils/Utils.ts";
 import {MessageDataType} from "@Utils/socket.ts";
-import {CustomerDataType,CustomerStaffType} from "@/type.ts";
+import {CustomerDataType, CustomerStaffType, GraphqlProductInfoType, MessageAckType} from "@/type.ts";
 import {
   insertMessageToIndexedDB,
   readMessagesFromIndexedDB,
   syncMessageToIndexedDB
 } from "@Utils/zustandWithIndexedDB.ts";
+
 const SESSION_STORAGE_CHAT_LIST_KEY = "zora_chat_list";
 const SESSION_STORAGE_ACTIVE_ITEM_KEY = "zora_active_item";
 const SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY = "zora_active_customer_info";
 
-export const useMessageStore = create((set)=>{
+export interface UseMessageStoreType {
+  messages: MessageDataType[];
+  messageTimers: Map<string, Map<string, ReturnType<typeof setTimeout>>>;
+  messageMaxWaitingTimers: Map<string, Map<string, ReturnType<typeof setTimeout>>>;
+  chatList: CustomerDataType[];
+  SENDING_THRESHOLD: number;
+  MAX_WAITING_THRESHOLD: number;
+  page: number;
+  pageSize: number;
+  customerStaff: any;
+  activeCustomerInfo: any;
+  activeCustomerItem: string;
+  shopify_Shop_products: GraphqlProductInfoType;
+  initMessages: (target: string) => Promise<void>;
+  initZustandState: (customerStaff: any, products: GraphqlProductInfoType) => void;
+  addMessage: (message: MessageDataType) => Promise<void>;
+  changeMessages: (params: { conversationId: string; page: number; pageSize: number }) => Promise<void>;
+  updateMessageStatus: (ack: MessageAckType) => void;
+  pushChatList: (payload: CustomerDataType) => void;
+  updateChatList: (payload: MessageDataType, fromAgent?: boolean) => void;
+  readChatList: (conversationId: string) => void;
+  updateTimer: (payload: {timer:ReturnType<typeof setTimeout>,maxTimer:ReturnType<typeof setTimeout>} & MessageAckType) => void;
+  clearUpTimer: (ack: MessageAckType) => void;
+}
+
+export const useMessageStore = create<UseMessageStoreType>((set)=>{
     return {
       messages: [],
       messageTimers:new Map() as Map<string,Map<string,ReturnType <typeof setTimeout>>>,
@@ -93,7 +119,7 @@ export const useMessageStore = create((set)=>{
           newMessages.map((item:MessageDataType)=>{
             if(item.msgId === ack.msgId){
               item.msgStatus = ack.msgStatus
-              syncMessageToIndexedDB(item,item.msgId).then()
+              syncMessageToIndexedDB(item).then()
             }
           })
           return {
@@ -163,7 +189,19 @@ export const useMessageStore = create((set)=>{
             }
             else{
               if(item.conversationId === state.activeCustomerItem){
-                item.lastMessage = payload.contentBody
+                switch (payload.contentType) {
+                  case "TEXT":
+                    item.lastMessage = payload.contentBody
+                    break;
+                  case "IMAGE":
+                    item.lastMessage = '[图片]'
+                    break;
+                  case "PRODUCT_CARD":
+                    item.lastMessage = `[产品] ${JSON.parse(payload.contentBody)?.title}`
+                    break;
+                  default:
+                    break;
+                }
                 item.lastTimestamp = payload.timestamp
               }
             }
@@ -212,16 +250,16 @@ export const useMessageStore = create((set)=>{
         set((state)=>{
           const cloneTimers = deepCloneTS(state.messageTimers)
           const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
-          const conversation = cloneTimers.get(payload.conversationId);
-          const maxConversation = cloneMaxWaitingTimers.get(payload.conversationId);
+          const conversation = cloneTimers.get(payload.conversationId as string);
+          const maxConversation = cloneMaxWaitingTimers.get(payload.conversationId as string);
           if(!conversation){
-            cloneTimers.set(payload.conversationId,new Map());
+            cloneTimers.set(payload.conversationId as string,new Map());
           }
           if(!maxConversation){
-            cloneMaxWaitingTimers.set(payload.conversationId,new Map());
+            cloneMaxWaitingTimers.set(payload.conversationId as string,new Map());
           }
-          cloneTimers?.get(payload.conversationId).set(payload.msgId,payload.timer)
-          cloneMaxWaitingTimers?.get(payload.conversationId)?.set(payload.msgId,payload.maxTimer)
+          cloneTimers?.get(payload.conversationId as string)?.set(payload.msgId,payload.timer)
+          cloneMaxWaitingTimers?.get(payload.conversationId as string)?.set(payload.msgId,payload.maxTimer)
 
           return {
             messageTimers: cloneTimers,
@@ -234,14 +272,14 @@ export const useMessageStore = create((set)=>{
         set((state)=>{
           const cloneTimers = deepCloneTS(state.messageTimers)
           const cloneMaxWaitingTimers = deepCloneTS(state.messageMaxWaitingTimers)
-          const timer = cloneTimers.get(ack.conversationId)?.get(ack.msgId)
-          const maxTimer = cloneMaxWaitingTimers.get(ack.conversationId)?.get(ack.msgId)
+          const timer = cloneTimers.get(ack.conversationId as string)?.get(ack.msgId)
+          const maxTimer = cloneMaxWaitingTimers.get(ack.conversationId as string)?.get(ack.msgId)
           //清除定时器
           clearTimeout(timer)
           clearTimeout(maxTimer)
           //删除记录的timer
-          cloneTimers.get(ack.conversationId)?.delete(ack.msgId)
-          cloneMaxWaitingTimers?.get(ack.conversationId)?.delete(ack.msgId)
+          cloneTimers.get(ack.conversationId as string)?.delete(ack.msgId)
+          cloneMaxWaitingTimers?.get(ack.conversationId as string)?.delete(ack.msgId)
 
           return {
             messageTimers: cloneTimers,

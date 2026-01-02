@@ -4,6 +4,7 @@ import {MessageDataType} from "@Utils/socket.ts";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {useInViewport} from "@hooks/useInViewport.ts";
 import ZoraLoading from "@components/common/ZoraLoading.tsx";
+import ZoraProductCard from "@components/common/ZoraProductCard.tsx";
 
 interface ZoraMsgItemPropsType {
   itemData: MessageDataType
@@ -40,6 +41,19 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
     }
   }, [itemData.msgStatus]);
 
+  const renderMessageBody = ()=>{
+    switch (itemData.contentType) {
+      case 'TEXT':
+        return itemData.contentBody
+      case 'PRODUCT_CARD':
+        return <ZoraProductCard width={'20rem'} display={'row'} product={JSON.parse(itemData.contentBody)}></ZoraProductCard>
+      case "IMAGE":
+        return <img className={ZoraMessageItemStyle.imageMsg} alt={'zora_msg_image'}/>
+      default:
+        return null
+    }
+  }
+
   return <div ref={msgRef} style={{visibility: isVisible ? "visible" : "hidden"}}
     className={itemData.senderType === 'CUSTOMER' ? ZoraMessageItemStyle.zoraMessageItem + ' ' + ZoraMessageItemStyle.zoraMessageLeft : ZoraMessageItemStyle.zoraMessageItem + ' ' + ZoraMessageItemStyle.zoraMessageRight}>
     {
@@ -51,7 +65,7 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
     <div className={ZoraMessageItemStyle.zoraMsgBox}>
       <span className={ZoraMessageItemStyle.zoraUser}>{username}</span>
       <div className={ZoraMessageItemStyle.zoraMsgContent}>
-      <span className={ZoraMessageItemStyle.zoraMsg}>{itemData.contentBody}</span>
+      <div className={ZoraMessageItemStyle.zoraMsg}>{renderMessageBody()}</div>
         {
           itemData.msgStatus === 'SENDING' && itemData.senderType === 'AGENT' ?
             <div className={ZoraMessageItemStyle.msgStatusSvgBox}>

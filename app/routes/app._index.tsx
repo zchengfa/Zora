@@ -10,6 +10,8 @@ import {useEffect} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request.ts";
 import {SHOP_INFO_QUERY_GQL,PRODUCTS_QUERY_GQL} from "@Utils/graphql.ts";
+import {MessageDataType} from "@Utils/socket.ts";
+import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
@@ -122,7 +124,7 @@ function Index(){
   }
 
   const sendMsg = (msg:string)=>{
-    const msgData = {
+    const msgData:MessageDataType = {
       senderId: messageStore.customerStaff?.id,
       senderType: 'AGENT',
       contentType: 'TEXT',
@@ -134,34 +136,11 @@ function Index(){
       conversationId: messageStore.activeCustomerItem,
       timestamp: new Date().getTime(),
     }
-    socket.emit('sendMessage',JSON.stringify(msgData))
-    let sendTimer = setTimeout(() => {
-     //显示消息发送中状态
-      messageStore.updateMessageStatus({
-        msgId: msgData.msgId,
-        msgStatus: 'SENDING',
-      })
-    },messageStore.SENDING_THRESHOLD)
-
-    const maxWaitingTimer = setTimeout(()=>{
-      //兜底，防止长时间没有收到消息回执，显示消息发送失败
-      messageStore.updateMessageStatus({
-        msgId: msgData.msgId,
-        msgStatus: 'FAILED',
-      })
-    },messageStore.MAX_WAITING_THRESHOLD)
-    messageStore.updateTimer({
-      conversationId: msgData.conversationId,
-      msgId: msgData.msgId,
-      msgStatus: msgData.msgStatus,
-      timer: sendTimer,
-      maxTimer: maxWaitingTimer
+    MessageServiceSendMessage({
+      message:msgData,
+      socket,
+      messageStore
     })
-    messageStore.updateChatList(msgData,true)
-
-    msgData.msgStatus = ''
-    messageStore.addMessage(msgData).then()
-
   }
   return <div className={indexStyle.container}>
     <div className={indexStyle.content}>

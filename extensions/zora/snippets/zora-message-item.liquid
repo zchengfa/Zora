@@ -67,6 +67,61 @@
   .is-not-intersecting{
     visibility: hidden;
   }
+  .zora-message-product-container{
+    display: flex;
+  }
+  .zora-message-product-image-box{
+    display: flex;
+  }
+  .zora-message-product-img{
+    width: 5rem;
+    object-fit: cover;
+    border-radius: .5rem;
+  }
+  .zora-message-product-info{
+    padding-left: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .zora-message-product-title{
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+  }
+  .zora-message-product-desc{
+    margin-top: .2rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.3;
+    font-size: .9rem;
+    overflow: hidden;
+  }
+  .zora-message-product-tag-box{
+    display: flex;
+    margin-top: .2rem;
+  }
+  .zora-message-product-vendor{
+    margin-top: .2rem;
+    font-size: .7rem;
+  }
+  .zora-message-product-price-box{
+    display: flex;
+    flex-direction: column;
+    margin-top: .2rem;
+  }
+  .zora-message-product-price-line{
+    width: 100%;
+    text-decoration: line-through;
+    font-size: .7rem;
+
+  }
+  .zora-message-product-price{
+    width: 100%;
+    font-size: .9rem;
+  }
   @keyframes loading {
     0%{
       transform: scale(.7) rotate(0deg);
