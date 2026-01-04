@@ -1,4 +1,20 @@
+{% style %}
+.zora-auth-form-component{
+  max-height: 65dvh;
+  overflow-y: scroll
+  }
+  .zora-auth-form-component::-webkit-scrollbar{
+    display: none;
+  }
+  @media screen and (max-width: 767px){
+    .zora-auth-form-component{
+      max-height: 55dvh;
+    }
+  }
+{%endstyle%}
+
 <zora-auth-form-component
+  class="zora-auth-form-component"
   data-first-name="zora-firstName"
   data-last-name="zora-lastName"
   data-pwd="zora-password"

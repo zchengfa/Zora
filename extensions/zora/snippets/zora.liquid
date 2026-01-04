@@ -206,7 +206,7 @@
 
   /* 认证容器 */
   .zora-auth-container {
-  width: 20rem;
+  width: 24rem;
   background: var(--zora-surface);
   }
 
@@ -254,7 +254,9 @@
   }
 
   #zora-verify-code {
-  width: 6rem;
+  margin-top: 0;
+  padding: 0;
+  width: 5rem;
   height: 2.5rem;
   border: 1px solid var(--zora-border);
   border-left: none;
@@ -262,6 +264,7 @@
   text-align: center;
   color: var(--zora-text-primary);
   background: var(--zora-background);
+  border-radius: unset;
   }
 
   /* 复选框 */
@@ -373,11 +376,10 @@
   }
 
   @media (max-width: 768px) {
-    .zora-container-active{
+    .zora-container-active,.zora-auth-container{
       left: 0;
       width: 90dvw;
     }
-  }
 {% endstyle %}
 
 <div class="zora-container">
