@@ -2,20 +2,23 @@ import dotenv from 'dotenv'
 import express from "express"
 import cors from 'cors'
 import bodyParser from "body-parser"
-import {PrismaClient} from "@prisma/client"
-import Redis from 'ioredis'
+import {redisClient} from "../plugins/redisClient.ts";
+import {prismaClient} from "../plugins/prismaClient.ts";
 import {startSocketServer} from "./socketServer.ts"
 import {zoraApi} from "./zoraApi.ts";
 import {syncRedis} from "../plugins/sync.ts";
+import {webhooks} from './webhooks.ts';
 import interceptors from "../plugins/interceptors.ts";
-import PrismaSeed from "../prisma/prismaSeed.ts";
-import {ShopifyApiClient} from "../plugins/shopifyUtils.ts";
+import {ShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
+import {logger} from "../plugins/logger.ts";
+import {currentFileName} from "../plugins/handleZoraError.ts";
 
 dotenv.config({ path: '.env' })
 
-const redis = new Redis(process.env.REDIS_URL as string)
-const prisma = new PrismaClient()
-const shopifyApiClients = new Map()
+const redis = redisClient
+const prisma = prismaClient
+const shopifyApiClientsManager = new ShopifyApiClientsManager({redis,prisma})
+const router = express.Router();
 
 const app = express()
 app.use(cors({
@@ -27,44 +30,45 @@ app.use(cors({
 //信任代理
 app.set("trust proxy", 1);
 
+
+//监听Shopify Webhooks(需要在使用bodyParser之前执行，因为需要验证hmac，必须将原始body计算hmac)
+webhooks({app,redis,prisma,router})
+
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
 app.use((req,res,next)=> interceptors({res,req,next}))
 
 const server = app.listen(3001,()=>{
-  console.log("zora服务启动成功，端口：3001")
+  logger.info(`${currentFileName(import.meta.url,true)}zora服务启动成功，端口：3001`)
 })
 
-app.post('/shopifyApiClientInit',(req, res)=>{
-  const {shop,accessToken} = req.body
-  const shopifyApiClient = new ShopifyApiClient({shop,accessToken})
-  shopifyApiClients.set(shop,shopifyApiClient)
-  res.send({result:true,message:`${shop}的shopifyApiClient初始化完成`})
-  console.log(`${shop}的shopifyApiClient初始化完成`)
-})
 //接口
-zoraApi({app,redis,prisma,shopifyApiClients})
+zoraApi({app,redis,prisma,shopifyApiClientsManager})
+
 
 //启动socket服务
 startSocketServer({redis,prisma,server}).then(res=>{
-  console.log(res)
+  logger.info(res)
 })
   .catch(e=>{
-    console.log(e)
+    logger.error(e)
   })
-
-// PrismaSeed(prisma).then(res=>{
-//   console.log(res)
-// })
-//   .catch(e=>{
-//     console.log(e)
-//   })
 
 syncRedis({prisma,redis}).then(res=>{
-  console.log(res)
+  logger.info(res)
 })
   .catch(e=>{
-    console.log(e)
+    logger.error(e)
   })
+
+// 全局捕获未处理的 Promise 异常
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('检测到未处理的 Promise 异常', { reason, promise });
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('检测到未捕获的异常', { error });
+  process.exit(1);
+});
 

@@ -1,4 +1,5 @@
 import path from "path";
+import {logger} from "./logger.ts";
 
 export const handlePrismaError = (e:any)=>{
   const err = e.toString()
@@ -21,7 +22,7 @@ export const handlePrismaError = (e:any)=>{
   else if(err.indexOf('TypeError') !== -1){
     errMsg = 'Prisma客户端查询的 Model 属性错误，请确认是否有该 Model 属性！'
   }
-  console.log(`Prisma出错了：❌ ${errMsg}`)
+  logger.error(errMsg)
 }
 
 export const currentFileName = (target = import.meta.url,state = false)=>{

@@ -4,16 +4,18 @@ import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
 import bcrypt from 'bcrypt';
-import {handlePrismaError} from "../plugins/handleZoraError.ts";
+import {currentFileName, handlePrismaError} from "../plugins/handleZoraError.ts";
 import {v4 as uuidv4} from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
-import {ShopifyApiClient} from "../plugins/shopifyUtils.ts";
+import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
+import {addShopifySyncDataJob} from "../plugins/bullMaskQueue.ts";
+import {logger} from "../plugins/logger.ts";
 
 interface ZoraApiType {
   app:Express,
   redis: Redis,
   prisma: PrismaClient,
-  shopifyApiClients: Map<string,any>
+  shopifyApiClientsManager: IShopifyApiClientsManager,
 }
 
 interface FormDataType {
@@ -50,7 +52,7 @@ const RATE_LIMITS = {
   LOOSE: createRateLimiter(300),
 }
 
-const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response,redis:Redis,prisma:PrismaClient,shopifyApiClients:any)=>{
+const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response,redis:Redis,prisma:PrismaClient,shopifyApiClientsManager:IShopifyApiClientsManager)=>{
   try{
     const result = await bcrypt.compare(paramsObj.password,databasePwd)
     if(result){
@@ -76,32 +78,8 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
       //获取客服数据给客户
       let agentInfo = undefined
       //获取商店对应的shopify api请求客户端
-      let shopifyApiClient = shopifyApiClients.get(paramsObj.shopDomain)
-      //若之前没有shopify api 请求客户端就需要重新实例化一个
-      if(!shopifyApiClient){
-        //redis获取商店的认证所需数据
-        const redisSession = await redis.hget(`session:${paramsObj.shopDomain}`,'accessToken')
-        if(!redisSession){
-          //redis中没获取到，就从数据库中获取
-          const prismaSession = await prisma.session.findFirst({
-            where:{
-              shop: paramsObj.shopDomain
-            }
-          })
-          if(prismaSession){
-            //将获取到的更新到redis
-            await redis.hset(`session:${paramsObj.shopDomain}`,{...prismaSession})
-            await redis.expire(`session:${paramsObj.shopDomain}`,SESSION_EXPIRED_DURATION / 7)
-            //使用认证数据实例化shopify api client
-            shopifyApiClient = new ShopifyApiClient({shop:paramsObj.shopDomain as string,accessToken:prismaSession.accessToken as string})
-          }
-        }
-        else{
-          shopifyApiClient = new ShopifyApiClient({shop:paramsObj.shopDomain as string,accessToken:redisSession as string})
-        }
-        //保存shopify api client到shopifyApiClients
-        shopifyApiClients.set(paramsObj.shopDomain,shopifyApiClient)
-      }
+      const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(paramsObj.shopDomain as string)
+
       try{
         const {shop} = await shopifyApiClient.shopOwner()
         agentInfo = await prisma.customerServiceStaff.findUnique({
@@ -134,13 +112,13 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
   }
 }
 
-const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClients}:{redis:Redis,prisma:PrismaClient,paramsObj:FormDataType,res:Response,shopifyApiClients:any})=>{
+const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClientsManager}:{redis:Redis,prisma:PrismaClient,paramsObj:FormDataType,res:Response,shopifyApiClientsManager:IShopifyApiClientsManager})=>{
   try{
     //查询该用户的密码进行比对
     const redisPwdQuery = await redis.hget(`customer:${paramsObj.email}`,'password')
     //是否命中
     if(redisPwdQuery){
-      await pwdCompare(paramsObj,redisPwdQuery,res,redis,prisma,shopifyApiClients)
+      await pwdCompare(paramsObj,redisPwdQuery,res,redis,prisma,shopifyApiClientsManager)
     }
     else{
       const prismaPwdQuery = await prisma.customers.findUnique({
@@ -151,7 +129,7 @@ const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClients}:{red
 
       await redis.hset(`customer:${paramsObj.email}`, {...prismaPwdQuery})
       await redis.expire(`customer:${paramsObj.email}`,24 * 60 * 60)
-      await pwdCompare(paramsObj,prismaPwdQuery.password,res,redis,prisma,shopifyApiClients)
+      await pwdCompare(paramsObj,prismaPwdQuery.password,res,redis,prisma,shopifyApiClientsManager)
     }
   }
   catch (e) {
@@ -159,7 +137,35 @@ const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClients}:{red
   }
 }
 
-export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
+export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType) {
+
+  app.post('/shopifyApiClientInit',async (req, res)=>{
+    try {
+      const paramsObj = req.body
+      if(!paramsObj?.shop){
+        return res.status(400).send({result:false,message:"request invalid"})
+      }
+      const {shop} = paramsObj
+
+      res.send({result:true,message:`${shop}的shopifyApiClient初始化完成，数据同步已在后台开启`})
+      logger.info(`${shop}的shopifyApiClient初始化完成`)
+
+      // //使用商店所属shopifyApiClient获取数据并同步到数据库中
+      // const data = await shopifyApiClient.query_customers()
+      // console.log(data)
+      //将数据获取与同步任务交给bull进行后台处理，不阻塞主线程
+      const maskTypeArr = ['customers','orders']
+      for (const mask of maskTypeArr) {
+        await addShopifySyncDataJob(mask,shop)
+      }
+    }
+    catch (e) {
+      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+      res.status(500).send({result:false,message:"Server Error"})
+    }
+
+  })
+
   app.post('/authenticator', RATE_LIMITS.STRICT,async (req, res) => {
     const paramsObj = req.body
     paramsObj.shopDomain = req.headers?.origin?.split('//')[1]
@@ -173,7 +179,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
         paramsObj.firstName = redisQuery.first_name
         paramsObj.lastName = redisQuery.last_name
         paramsObj.image_url = redisQuery.image_url
-        await loginFunction({redis,prisma,paramsObj,res,shopifyApiClients})
+        await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
       }
       else{
         //未命中
@@ -191,7 +197,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
           paramsObj.firstName = prismaQuery.first_name
           paramsObj.lastName = prismaQuery.last_name
           paramsObj.image_url = prismaQuery.image_url
-          await loginFunction({redis,prisma,paramsObj,res,shopifyApiClients})
+          await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
         }
         else{
           //都未命中，执行注册后再执行登录
@@ -215,12 +221,13 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
             //执行登录
             paramsObj.id = newCustomer.id
             paramsObj.image_url = newCustomer.image_url
-            await loginFunction({redis,prisma,paramsObj,res,shopifyApiClients})
+            await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
           }
         }
       }
     }
     catch (e){
+      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
       handlePrismaError(e)
       res.status(500).send({result:false,message:"Server Error"})
     }
@@ -235,6 +242,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
       res.status(200).send({result:true,message:'logged in'})
     }
     catch (err){
+      logger.error(`${currentFileName(import.meta.url)},错误信息：${err}`)
       return res.status(401).send({result:false,message: 'Token expired or invalid'})
     }
   })
@@ -266,6 +274,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
       }
     }
     catch (e){
+      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
       res.status(500).send({result:false,message:"Server Error"})
     }
   })
@@ -281,7 +290,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
            .exec()
        res.status(200).send({success:true,code_expired:EXPIRED,message:'code send successfully'})
      }
-     catch (error) {
+     catch (e) {
+       logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
        res.status(500).send({server_error: true,message:'server error'})
      }
 
@@ -334,7 +344,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
                 res.status(200).send({result:false,message:'code expired'})
             }
         }
-        catch (error) {
+        catch (e) {
+          logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
            res.status(500).send({server_error: true,message:'server error'})
         }
     })
@@ -371,6 +382,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
         res.status(200).send({result:true,userInfo})
       }
       catch (e){
+        logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
         res.status(500).send({server_error: true,message:'server error'})
       }
 
@@ -408,6 +420,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
       res.json(prismaQuery)
     }
     catch (e) {
+      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
       res.status(500).json({errMsg:'server error'})
     }
 

@@ -1,6 +1,8 @@
 import type {Redis} from "ioredis";
 import {$Enums, PrismaClient} from "@prisma/client";
 import {Server, Socket} from "socket.io";
+import {currentFileName} from "./handleZoraError.ts";
+import {logger} from "./logger.ts";
 
 interface SocketUtilConfigType {
   redis: Redis;
@@ -97,7 +99,7 @@ export class SocketUtils{
     this.ws.on('agent',(info)=>{
       if(info){
         this.agent.set(info.id,this.ws.id)
-        console.log(`客服${info.name}上线了`)
+        logger.info(`客服${info.name}上线了`)
       }
     })
   }
@@ -114,15 +116,15 @@ export class SocketUtils{
             }
           })
           this.users.set(String(prismaQuery.userId),this.ws.id)
-          console.log(prismaQuery.email + '上线了')
+          logger.info(`${currentFileName(import.meta.url,true)}${prismaQuery.email}上线了`)
         }
         else{
           this.users.set(user.userId,this.ws.id)
-          console.log(redisQuery+'上线了')
+          logger.info(`${currentFileName(import.meta.url,true)}${redisQuery}上线了`)
         }
       }
       catch (e) {
-        console.log('出错了：socketServer.ts')
+        logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
       }
 
       //建立会话
@@ -150,7 +152,7 @@ export class SocketUtils{
         }
       }
       catch (e) {
-        console.log('出错了：socketServer.ts')
+        logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
       }
     })
   }
@@ -192,6 +194,7 @@ export class SocketUtils{
 
       }
       catch (e) {
+        logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
         //服务器出现错误，告诉发送者消息发送失败
         this.sendMessageAck(sender as string,payload.msgId,'FAILED',10003)
       }

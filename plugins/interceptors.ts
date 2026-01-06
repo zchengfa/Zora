@@ -2,6 +2,7 @@ import type {NextFunction, Request, Response} from "express";
 import {verifyTokenAsync} from "./token.ts";
 import {validateShopifyHmacRequest, validateShopifySecretRequest} from "./validate.ts";
 import type {ShopifyUrlQueryType} from './validate.ts'
+import {logger} from "./logger.ts";
 
 //Shopify请求验证中间件
 const shopifyAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
@@ -32,8 +33,8 @@ const interceptors = async ({req,res,next}:{req: Request, res: Response, next: N
   const path = req.path;
   const publicRoutes = ['/app', '/shopifyApiClientInit', '/validateToken', '/checkEmail', '/sendVerifyCodeToEmail', '/verifyCode', '/authenticator'];
 
-  // 放行公共路由
-  if (publicRoutes.includes(path)) {
+  // 放行公共路由和webhooks路由
+  if (publicRoutes.includes(path) || req.path.startsWith('/webhooks')) {
     return next();
   }
 
@@ -50,9 +51,8 @@ const interceptors = async ({req,res,next}:{req: Request, res: Response, next: N
     shopifyAuthMiddleware(req, res, next);
 
   } catch (error) {
-    console.log(error)
     // 统一错误处理
-    console.error(`Auth error for path ${path}:`, error); // 添加日志
+    logger.error(`Auth error for path ${path}:`, error); // 添加日志
     if (error.name === 'TokenExpiredError') {
       return res.status(401).send({result: false, message: 'Token expired'});
     }

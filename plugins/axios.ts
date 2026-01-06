@@ -1,6 +1,8 @@
 import axios, { AxiosError } from 'axios';
 type AxiosRequestConfig = axios.AxiosRequestConfig
 type AxiosResponse = axios.AxiosResponse;
+import {logger} from "./logger.ts";
+
 // Shopify 专用配置接口
 interface ShopifyRequestConfig extends AxiosRequestConfig {
   shopDomain: string; // 商店域名，如 'your-store.myshopify.com'
@@ -90,10 +92,10 @@ export class ShopifyAPI {
   private async request<T = any>(config: ShopifyRequestConfig): Promise<T> {
     try {
       const requestConfig = this.buildRequestConfig(config);
-      console.log(`🛍️ Shopify请求: ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`);
+      logger.info(`🛍️ Shopify请求: ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`);
 
       if (config.query) {
-        console.log(`📊 GraphQL查询: ${config}...`);
+        logger.info(`📊 GraphQL查询: ${config}...`);
       }
 
       const response = await instance(requestConfig);
@@ -112,22 +114,22 @@ export class ShopifyAPI {
     // 检查 GraphQL 错误
     if (shopifyResponse.errors && shopifyResponse.errors.length > 0) {
       if(shopifyResponse.errors[0].extensions?.code === 'ACCESS_DENIED'){
-        console.log (`Shopify API权限不足,需要商店升级Shopify套餐：${shopifyResponse.errors[0].message}`)
+        logger.error(`😒Shopify API权限不足,需要商店升级Shopify套餐：${shopifyResponse.errors[0].message}`)
       }
       else{
         const errorMessage = shopifyResponse.errors.map(err => err.message).join('; ');
-        console.log(`Shopify API错误: ${errorMessage}`);
+        logger.error(`😒Shopify API错误: ${errorMessage}`);
       }
     }
 
     // 检查 API 限制
     if (shopifyResponse.extensions?.cost) {
       const cost = shopifyResponse.extensions.cost;
-      console.log(`📈 API成本: ${cost.actualQueryCost}/${cost.throttleStatus.maximumAvailable}`);
+      logger.warn(`📈 API成本: ${cost.actualQueryCost}/${cost.throttleStatus.maximumAvailable}`);
 
       // 如果剩余配额较少，给出警告
       if (cost.throttleStatus.currentlyAvailable < cost.throttleStatus.maximumAvailable * 0.1) {
-        console.warn('⚠️ Shopify API 配额即将用尽，请优化查询');
+        logger.warn('⚠️ Shopify API 配额即将用尽，请优化查询');
       }
     }
 
@@ -170,11 +172,13 @@ export class ShopifyAPI {
       if (shopifyError) {
         errorMessage += ` - ${JSON.stringify(shopifyError)}`;
       }
-
+      logger.error(errorMessage);
       throw new Error(errorMessage);
     } else if (error.request) {
+      logger.error('网络错误，无法连接到Shopify');
       throw new Error('网络错误，无法连接到Shopify');
     } else {
+      logger.error(`请求配置错误: ${error.message}`)
       throw new Error(`请求配置错误: ${error.message}`);
     }
   }
@@ -215,17 +219,17 @@ const instance = axios.create({
 
 // 请求拦截器
 instance.interceptors.request.use(function (config: AxiosRequestConfig) {
-  console.log(`🛍️ 发送Shopify请求: ${config.method?.toUpperCase()} ${config.url}`);
+  logger.info(`🛍️ 发送Shopify请求: ${config.method?.toUpperCase()} ${config.url}`);
   return config;
 }, (err: AxiosError) => {
-  console.error('❌ Shopify请求错误:', err);
+  logger.error('❌ Shopify请求错误:', err);
   return Promise.reject(err);
 });
 
 // 响应拦截器 - 简化版本，主要错误处理在 ShopifyAPI 类中
 instance.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log(`✅ Shopify请求成功: ${response.config.url}`);
+    logger.info(`✅ Shopify请求成功: ${response.config.url}`);
     return response;
   },
   async (err: AxiosError) => {
