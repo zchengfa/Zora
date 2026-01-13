@@ -13,7 +13,7 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
    const conversations = await prisma.conversation.findMany()
    const customers = await prisma.customers.findMany()
    const customerTag = await prisma.customer_tags.findMany()
-   const customerAddress = await prisma.customer_addresses.findMany()
+   const customerAddress = await prisma.address.findMany()
    const customerTagRelation = await prisma.customer_tag_relations.findMany()
    const session = await prisma.session.findMany()
    const customerStaff = await prisma.customerServiceStaff.findMany()
@@ -74,10 +74,14 @@ export const syncRedis = async ({prisma,redis}:SyncRedisType)=>{
 
      // 执行管道中的命令
      await pipeline.exec();
-     return "zora提示✅：redis数据同步成功"
+     return {
+       result: true,
+       message: "zora提示✅：redis数据同步成功"
+     }
    }
-   else {
-     return "zora提示😢：没有可同步的数据"
+   return {
+     result: true,
+     message: "zora提示😢：没有可同步的数据"
    }
 
  }

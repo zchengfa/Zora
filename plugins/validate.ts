@@ -1,8 +1,8 @@
 import nodemailer from 'nodemailer'
 import type SMTPPool from "nodemailer/lib/smtp-pool/index.d.ts";
-import * as process from "node:process";
-import {generateEmailHtml} from "../plugins/emailHtml.ts";
+import {generateEmailHtml} from "./emailHtml.ts";
 import {createHmac, timingSafeEqual} from "node:crypto";
+import type {Request} from "express";
 
 export interface ValidateConfigType {
   email:string,
@@ -215,4 +215,15 @@ export function validateShopifyRequest(params: any): { result: boolean; message?
   }
 
   return { result: false, message: 'No valid authentication method provided' };
+}
+
+
+export function validateWebhookHmac (req:Request){
+  const HMAC = req.headers['x-shopify-hmac-sha256']
+  const calculateHmac = createHmac('sha256', process.env.SHOPIFY_API_SECRET as string)
+    .update(req.body,'utf-8')
+    .digest('base64');
+
+  return timingSafeEqual(Buffer.from(HMAC as string),Buffer.from(calculateHmac))
+
 }

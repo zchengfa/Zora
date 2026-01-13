@@ -1,15 +1,16 @@
 import {io, ManagerOptions, SocketOptions,Socket} from "socket.io-client";
 
 export type MessageDataType = {
-  contentBody: string
-  contentType:string
-  conversationId:string
-  msgId:string
-  msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED' | 'READ'
-  recipientType: 'CUSTOMER' | 'AGENT' | 'SYSTEM'
+  contentBody: string ,
+  contentType: 'TEXT' | 'PRODUCT_CARD' | 'IMAGE',
+  conversationId:string,
+  msgId:string,
+  msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED' | 'READ' | "",
+  recipientType: 'CUSTOMER' | 'AGENT' ,
+  recipientId: string,
   senderId:string
   senderType: 'CUSTOMER' | 'SYSTEM' | 'AGENT',
-  timestamp: string,
+  timestamp: string | number,
   timer?: number | undefined
 }
 

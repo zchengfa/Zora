@@ -1,84 +1,133 @@
 {% style %}
   #zora-toast {
-    display: flex;
-    justify-content: space-between;
-    flex-direction: column;
-    align-items: center;
-    position: absolute;
-    width: max-content;
-    max-width: 200px;
-    height: fit-content;
-    background: #fff;
-    border-radius: .5rem;
-    overflow: hidden;
-    box-shadow: 0 0 4px 4px rgba(0, 0, 0, 0.1);
-    transition: opacity 1s ease-in-out;
-  }
-  .zora-toast-hidden{
-    opacity: 0;
-    z-index: -1;
-  }
-  .zora-toast-show{
-    opacity: 1;
-    z-index: 9999;
-  }
-  .zora-toast-title{
-    width:-webkit-fill-available;
-    padding: .5rem 1rem;
-    color: #fff;
-  }
-  .zora-title-success{
-    background: {{block.settings.zora_success_color}};
-  }
-  .zora-title-info{
-    background: {{block.settings.zora_info_color}};
-  }
-  .zora-title-error{
-    background: {{block.settings.zora_error_color}};
-  }
-  .zora-title-warning{
-    background: {{block.settings.zora_warning_color}};
-  }
-  .zora-message-success{
-    color: {{block.settings.zora_success_color}};
-  }
-  .zora-message-info{
-    color: {{block.settings.zora_info_color}};
-  }
-  .zora-message-error{
-    color: {{block.settings.zora_error_color}};
-  }
-  .zora-message-warning{
-    color: {{block.settings.zora_warning_color}};
-  }
-  .zora-toast-message{
-    padding: 1rem;
-    font-size: small;
-    line-height: 1.5;
-  }
-  .zora-success{
-    border: 1px solid {{block.settings.zora_success_color}};
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  width: max-content;
+  max-width: 260px;
+  background: var(--zora-surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(20px);
+  z-index: 9999;
   }
 
-  .zora-error{
-    border: 1px solid {{block.settings.zora_error_color}};
-  }
-  .zora-info{
-    border: 1px solid {{block.settings.zora_info_color}};
-  }
-  .zora-warning{
-    border: 1px solid {{block.settings.zora_warning_color}};
+  #zora-toast.zora-toast-show {
+  opacity: 1;
+  transform: translateY(0);
   }
 
-  @media (max-width: 420px) {
-    #zora-toast {
-      max-width: 300px;
-    }
+  #zora-toast.zora-toast-hidden {
+  opacity: 0;
+  transform: translateY(-20px);
+  pointer-events: none;
+  }
+
+  /* 标题区域样式优化 */
+  .zora-toast-title {
+  width: 100%;
+  padding: 16px 20px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  }
+
+  /* 消息内容区域样式优化 */
+  .zora-toast-message {
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--zora-text-primary);
+  background: var(--zora-surface);
+  }
+
+  /* 成功状态样式 */
+  .zora-title-success {
+  background: var(--zora-success-color);
+  }
+  .zora-message-success {
+  border-left: 4px solid var(--zora-success-color);
+  }
+
+  /* 信息状态样式 */
+  .zora-title-info {
+  background: var(--zora-info-color);
+  }
+  .zora-message-info {
+  border-left: 4px solid var(--zora-info-color);
+  }
+
+  /* 错误状态样式 */
+  .zora-title-error {
+  background: var(--zora-error-color);
+  }
+  .zora-message-error {
+  border-left: 4px solid var(--zora-error-color);
+  }
+
+  /* 警告状态样式 */
+  .zora-title-warning {
+  background: var(--zora-warning-color);
+  }
+  .zora-message-warning {
+  border-left: 4px solid var(--zora-warning-color);
+  }
+
+  /* 添加图标支持（可选） */
+  .zora-toast-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  }
+
+  /* 响应式设计优化 */
+  @media (max-width: 480px) {
+  #zora-toast {
+  width: 90vw;
+  max-width: 300px;
+  margin: 0 auto;
+  left: 5vw;
+  right: 5vw;
+  }
+  }
+
+  /* 添加关闭按钮样式 */
+  .zora-toast-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  backdrop-filter: blur(10px);
   }
 {% endstyle %}
 
+<div id="zora-toast" class="zora-toast-container zora-toast-show">
+  <div class="zora-toast-header">
+    <h5 class="zora-toast-title"></h5>
+    <button class="zora-toast-close">&times;</button>
+  </div>
+  <p class="zora-toast-message"></p>
+</div>
 
 <div id="zora-toast" class="zora-toast-container zora-toast-show">
-  <h5 class="zora-toast-title"></h5>
+  <div class="zora-toast-header">
+    <h5 class="zora-toast-title"></h5>
+    <button class="zora-toast-close">&times;</button>
+  </div>
   <p class="zora-toast-message"></p>
 </div>

@@ -33,6 +33,48 @@ class RenderMessage {
     //监听父容器中的子节点变化
     this.mutationObserver.observe(this.zoraMessageContainer , { childList: true, subtree: true })
   }
+  renderMessageContent = (payload)=>{
+    let product = ''
+    if(payload.contentType === 'PRODUCT_CARD'){
+      product = JSON.parse(payload.contentBody)
+    }
+    switch (payload.contentType) {
+      case 'TEXT':
+        return payload.contentBody;
+      case 'IMAGE':
+        return `<img src={JSON.parse(payload.contentBody)?.featuredMedia?.preview?.image?.url} alt={'img_message'}/>`
+      case 'PRODUCT_CARD':
+        return `<div class='zora-message-product-container'>
+            <div class="zora-message-product-image-box">
+              <img class="zora-message-product-img" src=${product?.featuredMedia?.preview?.image?.url} alt="zora_message_product_img" />
+            </div>
+            <div class="zora-message-product-info">
+               <h5 class="zora-message-product-title">${product?.title}</h5>
+               <p class="zora-message-product-desc">${product?.description}</p>
+               <div class="zora-message-product-tag-box">
+                  ${product?.tags.map(tag=>{
+                    return `
+                      <span class="zora-message-product-tag">${tag}</span>
+                    `
+                  })}
+               </div>
+               <span class="zora-message-product-vendor">${product.vendor}</span>
+              ${
+                product.variants?.nodes ? `<div class="zora-message-product-price-box">
+                      <span class="zora-message-product-price-line">${
+                        product?.compareAtPriceRange?.maxVariantCompareAtPrice?.currencyCode + ' ' + product?.compareAtPriceRange?.maxVariantCompareAtPrice?.amount
+                      }</span>
+                  <span class="zora-message-product-price">${
+                    product?.compareAtPriceRange?.maxVariantCompareAtPrice?.currencyCode + ' ' + product?.variants?.nodes[0]?.price
+                  }</span>
+                </div>` : ''
+              }
+            </div>
+        </div>`
+      default:
+        break;
+    }
+  }
   addMessage = (payload)=>{
     const elData = this.getElData(payload.senderType,payload.msgStatus)
     const messageHtml = `
@@ -43,7 +85,7 @@ class RenderMessage {
         <div class="zora-msg-box">
           <span class="zora-user">${elData.username}</span>
           <div class="zora-msg-content">
-              <span class="zora-msg">${payload.contentBody}</span>
+              <div class="zora-msg">${this.renderMessageContent(payload)}</div>
               ${elData.statusSvg}
               ${elData.stateEl}
           </div>

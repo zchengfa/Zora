@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "https://5f8aa807b821.ngrok-free.app";
+const FETCH_BASE_URL = "https://f609bba39115.ngrok-free.app";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {
@@ -120,25 +120,35 @@ class ZoraToast {
     this.titleEl.className = `zora-toast-title ${zoraTitleClassName}`
     this.msgEl.className = `zora-toast-message ${zoraMessageClassName}`
   }
-  setToast = (options)=>{
-    this.setTypeStyle(options.type)
-    this.titleEl.innerHTML = options.title
-    this.msgEl.innerHTML = options.message
-    const targetEl = document.querySelector(options.positionComputedTarget)
-    //获取目标元素的计算样式
-    const boundingRect = targetEl.getBoundingClientRect()
-    const targetWidth = parseInt(boundingRect.width)
-    const targetHeight = parseInt(boundingRect.height)
+  setToast = (options) => {
+    this.setTypeStyle(options.type);
+    this.titleEl.innerHTML = options.title;
+    this.msgEl.innerHTML = options.message;
 
-    //获取弹框的计算样式
-    const toastRect = this.zoraToastEl.getBoundingClientRect()
-    const toastWidth = parseFloat(toastRect.width)
-    const toastHeight = parseFloat(toastRect.height)
+    const targetEl = document.querySelector(options.positionComputedTarget);
+    if (!targetEl) {
+      return;
+    }
 
-    //获取顶层元素的位置
-    const zoraRect = this.zoraEl.getBoundingClientRect()
-    this.zoraToastEl.style.left = `${boundingRect.x - zoraRect.left  + ((targetWidth - toastWidth) / 2)}px`
-    this.zoraToastEl.style.bottom = `${boundingRect.y - zoraRect.height + ((targetHeight - toastHeight) / 2)}px`
+    // 1. 获取目标元素相对于视口的位置
+    const targetRect = targetEl.getBoundingClientRect();
+
+    // 2. 获取弹窗自身的尺寸
+    const toastRect = this.zoraToastEl.getBoundingClientRect();
+
+    // 3. 计算目标元素的中心点坐标
+    const targetCenterX = targetRect.left + targetRect.width / 2 ;
+    const targetCenterY = targetRect.top + targetRect.height / 2 ;
+
+    // 4. 计算弹窗的左上角位置，使其中心点与目标中心点重合
+    const toastLeft = targetCenterX - toastRect.width / 2;
+    const toastTop = targetCenterY - toastRect.height / 2;
+
+    // 5. 应用计算后的位置，改用 top/left 定位
+    this.zoraToastEl.style.position = 'fixed'; // 确保定位基准是视口
+    this.zoraToastEl.style.left = toastLeft + 'px';
+    this.zoraToastEl.style.top = toastTop + 'px';
+
   }
   triggerToast = (state = false)=>{
     if(state){
