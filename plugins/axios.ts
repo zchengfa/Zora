@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 type AxiosRequestConfig = axios.AxiosRequestConfig
 type AxiosResponse = axios.AxiosResponse;
-import {logger} from "./logger.ts";
+import {beginLogger} from "./bullTaskQueue.ts";
 
 // Shopify 专用配置接口
 interface ShopifyRequestConfig extends AxiosRequestConfig {
@@ -92,10 +92,21 @@ export class ShopifyAPI {
   private async request<T = any>(config: ShopifyRequestConfig): Promise<T> {
     try {
       const requestConfig = this.buildRequestConfig(config);
-      logger.info(`🛍️ Shopify请求: ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`);
-
+      await beginLogger({
+        level: 'info',
+        message: `🛍️ Shopify请求: ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`,
+        meta:{
+          taskType: `shopify_${requestConfig.method?.toUpperCase()}`,
+        }
+      })
       if (config.query) {
-        logger.info(`📊 GraphQL查询: ${config}...`);
+        await beginLogger({
+          level: 'info',
+          message: `📊 GraphQL查询: ${config}...`,
+          meta:{
+            taskType: `shopify_${requestConfig.method?.toUpperCase()}`,
+          }
+        })
       }
 
       const response = await instance(requestConfig);
@@ -114,22 +125,50 @@ export class ShopifyAPI {
     // 检查 GraphQL 错误
     if (shopifyResponse.errors && shopifyResponse.errors.length > 0) {
       if(shopifyResponse.errors[0].extensions?.code === 'ACCESS_DENIED'){
-        logger.error(`😒Shopify API权限不足,需要商店升级Shopify套餐：${shopifyResponse.errors[0].message}`)
+        beginLogger({
+          level: 'error',
+          message: `😒Shopify API权限不足,需要商店升级Shopify套餐：${shopifyResponse.errors[0].message}`,
+          meta:{
+            taskType: 'shopify_response'
+          }
+        }).then()
       }
       else{
         const errorMessage = shopifyResponse.errors.map(err => err.message).join('; ');
-        logger.error(`😒Shopify API错误: ${errorMessage}`);
+        beginLogger({
+          level: 'error',
+          message: `😒Shopify API错误: ${errorMessage}`,
+          meta:{
+            taskType: 'shopify_response'
+          }
+        }).then()
       }
     }
 
     // 检查 API 限制
     if (shopifyResponse.extensions?.cost) {
       const cost = shopifyResponse.extensions.cost;
-      logger.warn(`📈 API成本: ${cost.actualQueryCost}/${cost.throttleStatus.maximumAvailable}`);
+      beginLogger({
+        level: 'warn',
+        message: `📈 API成本: ${cost.actualQueryCost}/${cost.throttleStatus.maximumAvailable}`,
+        meta:{
+          taskType: 'shopify_response_cost',
+          cost: cost.actualQueryCost,
+          maximumAvailable: cost.throttleStatus.maximumAvailable
+        }
+      }).then()
 
       // 如果剩余配额较少，给出警告
       if (cost.throttleStatus.currentlyAvailable < cost.throttleStatus.maximumAvailable * 0.1) {
-        logger.warn('⚠️ Shopify API 配额即将用尽，请优化查询');
+        beginLogger({
+          level: 'warn',
+          message: '⚠️ Shopify API 配额即将用尽，请优化查询',
+          meta:{
+            taskType: 'shopify_response_cost',
+            cost: cost.actualQueryCost,
+            maximumAvailable: cost.throttleStatus.maximumAvailable
+          }
+        }).then()
       }
     }
 
@@ -172,13 +211,31 @@ export class ShopifyAPI {
       if (shopifyError) {
         errorMessage += ` - ${JSON.stringify(shopifyError)}`;
       }
-      logger.error(errorMessage);
+      beginLogger({
+        level: 'error',
+        message: `😒${errorMessage}`,
+        meta:{
+          taskType: 'shopify_response_error'
+        }
+      }).then()
       throw new Error(errorMessage);
     } else if (error.request) {
-      logger.error('网络错误，无法连接到Shopify');
+      beginLogger({
+        level: 'error',
+        message: `😒网络错误，无法连接到Shopify`,
+        meta:{
+          taskType: 'shopify_request_error'
+        }
+      }).then()
       throw new Error('网络错误，无法连接到Shopify');
     } else {
-      logger.error(`请求配置错误: ${error.message}`)
+      beginLogger({
+        level: 'error',
+        message: `😒请求配置错误: ${error.message}`,
+        meta:{
+          taskType: 'shopify_request_config_error'
+        }
+      }).then()
       throw new Error(`请求配置错误: ${error.message}`);
     }
   }
@@ -219,17 +276,40 @@ const instance = axios.create({
 
 // 请求拦截器
 instance.interceptors.request.use(function (config: AxiosRequestConfig) {
-  logger.info(`🛍️ 发送Shopify请求: ${config.method?.toUpperCase()} ${config.url}`);
+  beginLogger({
+    level: 'info',
+    message: `🛍️ 发送Shopify请求: ${config.method?.toUpperCase()} ${config.url}`,
+    meta:{
+      taskType: 'shopify_interceptor_request'
+    }
+  }).then()
   return config;
 }, (err: AxiosError) => {
-  logger.error('❌ Shopify请求错误:', err);
+  beginLogger({
+    level: 'error',
+    message: `❌ Shopify请求错误`,
+    meta:{
+      taskType: 'shopify_interceptor_request_error',
+      error:{
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+      }
+    }
+  }).then()
   return Promise.reject(err);
 });
 
-// 响应拦截器 - 简化版本，主要错误处理在 ShopifyAPI 类中
+// 响应拦截器 主要错误处理在 ShopifyAPI 类中
 instance.interceptors.response.use(
   (response: AxiosResponse) => {
-    logger.info(`✅ Shopify请求成功: ${response.config.url}`);
+    beginLogger({
+      level: 'info',
+      message: `✅ Shopify请求成功: ${response.config.url}`,
+      meta:{
+        taskType: 'shopify_interceptor_response'
+      }
+    }).then()
     return response;
   },
   async (err: AxiosError) => {
@@ -246,6 +326,16 @@ instance.interceptors.response.use(
 
     if ((err.code === 'ECONNABORTED' || !err.response) && config.retryCount! < maxRetry) {
       config.retryCount!++;
+      await  beginLogger({
+        level: 'error',
+        message: `shopify api 响应出现错误，正在重试中,次数：${config.retryCount}`,
+        meta:{
+          taskType: 'shopify_interceptor_response_error',
+          retryDelay,
+          maxRetry,
+          retryCount: config.retryCount
+        }
+      })
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       return instance(config);
     }

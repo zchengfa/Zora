@@ -10,8 +10,8 @@ import {syncRedis} from "../plugins/sync.ts";
 import {webhooks} from './webhooks.ts';
 import interceptors from "../plugins/interceptors.ts";
 import {ShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
-import {logger} from "../plugins/logger.ts";
-import {currentFileName} from "../plugins/handleZoraError.ts";
+import {beginLogger} from "../plugins/bullTaskQueue.ts";
+import {WorkerHealth} from "../plugins/workerHealth.ts";
 
 dotenv.config({ path: '.env' })
 
@@ -32,15 +32,24 @@ app.set("trust proxy", 1);
 
 
 //监听Shopify Webhooks(需要在使用bodyParser之前执行，因为需要验证hmac，必须将原始body计算hmac)
-webhooks({app,redis,prisma,router})
+webhooks({app,redis,prisma,router,shopifyApiClientsManager})
 
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
-app.use((req,res,next)=> interceptors({res,req,next}))
+app.use(async (req,res,next)=> {
+  await interceptors({res,req,next})
+})
 
-const server = app.listen(3001,()=>{
-  logger.info(`${currentFileName(import.meta.url,true)}zora服务启动成功，端口：3001`)
+const server = app.listen(3001,async ()=>{
+  await beginLogger({
+    level: 'info',
+    message: 'zora server 服务启动成功',
+    meta:{
+      taskType: 'zora_server_listen',
+      port: 3001
+    }
+  })
 })
 
 //接口
@@ -48,27 +57,56 @@ zoraApi({app,redis,prisma,shopifyApiClientsManager})
 
 
 //启动socket服务
-startSocketServer({redis,prisma,server}).then(res=>{
-  logger.info(res)
+startSocketServer({redis,prisma,server}).then(async (res)=>{
+  await beginLogger({
+    level:'info',
+    message:res.message,
+    meta:{
+      taskType: 'socket_server_listen'
+    }
+  })
 })
-  .catch(e=>{
-    logger.error(e)
+  .catch(async (e)=>{
+    await beginLogger({
+      level:'error',
+      message:e.message,
+      meta:{
+        taskType: 'socket_server_listen',
+        error:{
+          name: e.error.name,
+          message: e.error.message,
+          stack: e.error.stack,
+        }
+      }
+    })
   })
 
-syncRedis({prisma,redis}).then(res=>{
-  logger.info(res)
-})
-  .catch(e=>{
-    logger.error(e)
+syncRedis({prisma,redis}).then(async (res)=>{
+  await beginLogger({
+    level:'info',
+    message:res?.message || '',
+    meta:{
+      taskType: 'sync_redis'
+    }
   })
+})
 
-// 全局捕获未处理的 Promise 异常
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('检测到未处理的 Promise 异常', { reason, promise });
-});
 
-process.on('uncaughtException', (error) => {
-  logger.error('检测到未捕获的异常', { error });
-  process.exit(1);
-});
+const checkWorkerHealth = ()=>{
+  const loggerWorkerHealth = new WorkerHealth({
+    connection: redis,
+    workerName: process.env.LOGGER_WORKER_HEALTH_KEY || 'logger'
+  })
+  //logger worker检测
+  loggerWorkerHealth.checkWorkerHealthStatus()
 
+  const shopifyWorkerHealth = new WorkerHealth({
+    connection: redis,
+    workerName: process.env.SHOPIFY_WORKER_HEALTH_KEY || 'shopify'
+  })
+  //shopify worker检测
+  shopifyWorkerHealth.checkWorkerHealthStatus()
+
+}
+//检测worker是否开启
+checkWorkerHealth()

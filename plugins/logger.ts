@@ -2,37 +2,60 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 
 export const logger = winston.createLogger({
-  level: 'info', // 设置最低日志级别，'debug', 'info', 'warn', 'error'
+  level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
-    winston.format.timestamp({format:'YYYY-MM-DD hh:mm:ss'}), // 添加时间戳（2026年01月06日 11时34分50秒）
-    winston.format.errors({ stack: true }), // 捕获错误堆栈
-    winston.format.json(), // 输出为 JSON 格式，便于分析
-    winston.format.colorize({
-      all:true,
-      colors:{
-        info: 'green',
-        warning: 'yellow',
-        error: 'red',
-        debug: 'blue',
-      }
-    })
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
   ),
   transports: [
     new DailyRotateFile({
       filename: 'logs/zora-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
-      zippedArchive: true, // 压缩旧日志
-      maxSize: '20m',     // 单个文件最大 20MB
-      maxFiles: '1d'     // 保留最近 30 天的日志
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '15d'
+    })
+  ],
+  // 捕获并记录未处理的异常
+  exceptionHandlers: [
+    new DailyRotateFile({
+      filename: 'logs/exceptions-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '15d'
+    })
+  ],
+  // 捕获并记录未处理的 Promise
+  rejectionHandlers: [
+    new DailyRotateFile({
+      filename: 'logs/rejections-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '15d'
     })
   ]
 });
 
-// 如果不是生产环境，则同时输出到控制台，方便开发调试
+
+
+// 非生产环境，添加控制台传输器并单独配置颜色
 if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
-    format: winston.format.simple() // 控制台使用更易读的格式
+    // 为控制台单独设置格式，包含颜色且更易读
+    format: winston.format.combine(
+      winston.format.colorize({
+        all: true,
+        colors: {
+          info: 'green',
+          warn: 'yellow',
+          error: 'red',
+          debug: 'blue',
+        }
+      }),
+      winston.format.printf(({level,message,timestamp,meta})=>{
+        return `${timestamp}(❤️) From：[${meta?.taskType}] [${level}] : ${message}`;
+      })
+    )
   }));
 }
-
-

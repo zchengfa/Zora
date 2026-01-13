@@ -32,9 +32,16 @@ export async function startSocketServer({server,redis,prisma}:{server:Server,red
         socketUtils.socketOnSendMessage()
 
       })
-      return '✅ zora socket服务启动成功'
+      return {
+        result: true,
+        message:'✅ zora socket服务启动成功'
+      }
     }
     catch (e){
-      return '❌ zora socket服务启动失败：' + e
+      return {
+        result: false,
+        message: '❌ zora socket服务启动失败',
+        error: e
+      }
     }
 }

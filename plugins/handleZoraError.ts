@@ -1,5 +1,5 @@
 import path from "path";
-import {logger} from "./logger.ts";
+import {beginLogger} from "./bullTaskQueue.ts";
 
 export const handlePrismaError = (e:any)=>{
   const err = e.toString()
@@ -22,7 +22,32 @@ export const handlePrismaError = (e:any)=>{
   else if(err.indexOf('TypeError') !== -1){
     errMsg = 'Prisma客户端查询的 Model 属性错误，请确认是否有该 Model 属性！'
   }
-  logger.error(errMsg)
+  else if(err.indexOf('PrismaClientValidationError') !== -1){
+    errMsg = `检测到您提供的数据中，有不符合model设置的字段类型`
+  }
+  beginLogger({
+    level: "error",
+    message: errMsg,
+    meta:{
+      taskType: 'prisma_error',
+    }
+  }).then()
+}
+
+export const handleApiError = (req:Request,e:any)=>{
+  beginLogger({
+    level: 'error',
+    message: `${req.path}请求出现错误`,
+    meta:{
+      taskType: `zora_api`,
+      requestUrl: req.url,
+      error:{
+        name: e?.name,
+        message: e?.message,
+        stack: e?.stack,
+      }
+    }
+  }).then()
 }
 
 export const currentFileName = (target = import.meta.url,state = false)=>{

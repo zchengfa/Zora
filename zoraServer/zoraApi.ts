@@ -4,12 +4,11 @@ import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
 import bcrypt from 'bcrypt';
-import {currentFileName, handlePrismaError} from "../plugins/handleZoraError.ts";
+import {handleApiError, handlePrismaError} from "../plugins/handleZoraError.ts";
 import {v4 as uuidv4} from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
 import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
-import {addShopifySyncDataJob} from "../plugins/bullMaskQueue.ts";
-import {logger} from "../plugins/logger.ts";
+import {addShopifySyncDataJob, beginLogger} from "../plugins/bullTaskQueue.ts";
 
 interface ZoraApiType {
   app:Express,
@@ -51,6 +50,8 @@ const RATE_LIMITS = {
   NORMAL: createRateLimiter(60),
   LOOSE: createRateLimiter(300),
 }
+
+
 
 const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response,redis:Redis,prisma:PrismaClient,shopifyApiClientsManager:IShopifyApiClientsManager)=>{
   try{
@@ -148,19 +149,23 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       const {shop} = paramsObj
 
       res.send({result:true,message:`${shop}的shopifyApiClient初始化完成，数据同步已在后台开启`})
-      logger.info(`${shop}的shopifyApiClient初始化完成`)
+      await beginLogger({
+        level: 'info',
+        message: `${shop}的shopifyApiClient初始化完成`,
+        meta:{
+          taskType: `zora_api`,
+          shop
+        }
+      })
 
-      // //使用商店所属shopifyApiClient获取数据并同步到数据库中
-      // const data = await shopifyApiClient.query_customers()
-      // console.log(data)
       //将数据获取与同步任务交给bull进行后台处理，不阻塞主线程
-      const maskTypeArr = ['customers','orders']
+      const maskTypeArr = ['customers','orders','products']
       for (const mask of maskTypeArr) {
         await addShopifySyncDataJob(mask,shop)
       }
     }
     catch (e) {
-      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+      handleApiError(req,e)
       res.status(500).send({result:false,message:"Server Error"})
     }
 
@@ -227,7 +232,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       }
     }
     catch (e){
-      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+      handleApiError(req,e)
       handlePrismaError(e)
       res.status(500).send({result:false,message:"Server Error"})
     }
@@ -241,8 +246,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       await verifyTokenAsync(token)
       res.status(200).send({result:true,message:'logged in'})
     }
-    catch (err){
-      logger.error(`${currentFileName(import.meta.url)},错误信息：${err}`)
+    catch (e){
+      handleApiError(req,e)
       return res.status(401).send({result:false,message: 'Token expired or invalid'})
     }
   })
@@ -274,7 +279,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       }
     }
     catch (e){
-      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+      handleApiError(req,e)
       res.status(500).send({result:false,message:"Server Error"})
     }
   })
@@ -291,7 +296,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
        res.status(200).send({success:true,code_expired:EXPIRED,message:'code send successfully'})
      }
      catch (e) {
-       logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+       handleApiError(req,e)
        res.status(500).send({server_error: true,message:'server error'})
      }
 
@@ -345,7 +350,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
             }
         }
         catch (e) {
-          logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+          handleApiError(req,e)
            res.status(500).send({server_error: true,message:'server error'})
         }
     })
@@ -382,7 +387,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
         res.status(200).send({result:true,userInfo})
       }
       catch (e){
-        logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+        handleApiError(req,e)
         res.status(500).send({server_error: true,message:'server error'})
       }
 
@@ -420,7 +425,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       res.json(prismaQuery)
     }
     catch (e) {
-      logger.error(`${currentFileName(import.meta.url)},错误信息：${e}`)
+      handleApiError(req,e)
       res.status(500).json({errMsg:'server error'})
     }
 
