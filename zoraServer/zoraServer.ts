@@ -84,9 +84,9 @@ startSocketServer({redis,prisma,server}).then(async (res)=>{
 syncRedis({prisma,redis}).then(async (res)=>{
   await beginLogger({
     level:'info',
-    message:res?.message || '',
+    message:res.message,
     meta:{
-      taskType: 'sync_redis'
+      ...res.meta
     }
   })
 })

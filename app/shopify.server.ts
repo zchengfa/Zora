@@ -7,7 +7,7 @@ import {shopifyApiClientInit} from "@/network/request.ts";
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: ApiVersion.October25,
+  apiVersion: ApiVersion.January26,
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
@@ -20,7 +20,16 @@ const shopify = shopifyApp({
     ORDERS_CREATE:{
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: `${process.env.VITE_BASE_URL}/webhooks/orders/create`
+    },
+    CUSTOMERS_CREATE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/customers/create`
+    },
+    CUSTOMERS_DELETE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/customers/delete`
     }
+
   },
   hooks:{
     //应用安装完成，会触发该钩子

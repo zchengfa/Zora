@@ -1,5 +1,6 @@
 import path from "path";
 import {beginLogger} from "./bullTaskQueue.ts";
+import express from "express";
 
 export const handlePrismaError = (e:any)=>{
   const err = e.toString()
@@ -30,11 +31,16 @@ export const handlePrismaError = (e:any)=>{
     message: errMsg,
     meta:{
       taskType: 'prisma_error',
+      error:{
+        name: e.name,
+        message: e.message,
+        stack: e.stack,
+      }
     }
   }).then()
 }
 
-export const handleApiError = (req:Request,e:any)=>{
+export const handleApiError = (req: express.Request, e: any)=>{
   beginLogger({
     level: 'error',
     message: `${req.path}请求出现错误`,

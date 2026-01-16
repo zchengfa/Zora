@@ -14,13 +14,16 @@ await workerHealth.registerWorker()
 
 const shopifyApiClientManager = new ShopifyApiClientsManager({redis:redisClient,prisma:prismaClient});
 
-const getShopifyData = async (shop:string,type:'customers' | 'orders' | 'products',totalCount:number,limit:number,afterCursor?:string,maxChunks = 50)=>{
+const getShopifyData = async ({shop,limit,afterCursor,maxChunks = 50,type,totalCount,shopId = null}:{shop:string,type:'customers' | 'orders' | 'products' | 'shop',totalCount:number,limit:number,afterCursor?:string,maxChunks?:number,shopId?:string | null})=>{
   const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
   let hasMore = false;
   let chunks:any[] = []
   if(type === 'customers'){
     const customersResult = await shopifyApiClient.customers(limit,afterCursor)
     chunks = customersResult.customers.nodes
+    chunks.map((chunk)=>{
+      chunk.shop_id = shopId
+    })
     const {hasNextPage,endCursor} = customersResult.customers.pageInfo
     afterCursor = endCursor
     hasMore = hasNextPage
@@ -49,7 +52,7 @@ const getShopifyData = async (shop:string,type:'customers' | 'orders' | 'product
    await insertMultiData(chunks,type,totalCount)
   }
   if(hasMore && afterCursor){
-    await getShopifyData(shop,type,limit,afterCursor)
+    await getShopifyData({shop,type,limit,afterCursor,totalCount,shopId})
     await new Promise(resolve=>{setTimeout(resolve,200)})
   }
 }
@@ -57,10 +60,19 @@ const getShopifyData = async (shop:string,type:'customers' | 'orders' | 'product
 const  worker = new Worker('shopifySyncDataQueue',async (job)=>{
   const {jobType,shop} = job.data
   const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop)
+  let shopId = null
   let jobTypeDataCount = 0
   if(jobType === 'customers'){
     const {customersCount} = await shopifyApiClient.customerCount();
     jobTypeDataCount = customersCount.count;
+    shopId = await prismaClient.shop.findUnique({
+      where:{
+        shopify_domain: shop
+      },
+      select:{
+        id: true
+      }
+    })
   }
   else if(jobType === 'orders'){
     const {ordersCount} = await shopifyApiClient.ordersCount()
@@ -80,7 +92,7 @@ const  worker = new Worker('shopifySyncDataQueue',async (job)=>{
       count: jobTypeDataCount
     }
   })
-  await getShopifyData(shop,jobType,jobTypeDataCount,limit)
+  await getShopifyData({shop,type:jobType,totalCount:jobTypeDataCount,limit,shopId:shopId?.id})
 },{
   connection: redisClient,
   concurrency: 3
@@ -152,6 +164,6 @@ process.on('SIGTERM', async () => {
 });
 
 
-async function insertMultiData(data:any[],type:'customers' | 'orders' | 'products',totalCount:number){
+async function insertMultiData(data:any[],type:'customers' | 'orders' | 'products' | 'shop',totalCount:number){
   await shopifyHandleResponseData(data,type,prismaClient,totalCount)
 }

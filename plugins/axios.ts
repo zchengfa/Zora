@@ -38,7 +38,7 @@ interface ShopifyResponse<T = any> {
 }
 
 export class ShopifyAPI {
-  private defaultApiVersion = '2025-10';
+  private defaultApiVersion = '2026-01';
 
   /**
    * 构建 Shopify API URL

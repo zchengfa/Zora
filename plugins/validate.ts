@@ -3,6 +3,9 @@ import type SMTPPool from "nodemailer/lib/smtp-pool/index.d.ts";
 import {generateEmailHtml} from "./emailHtml.ts";
 import {createHmac, timingSafeEqual} from "node:crypto";
 import type {Request} from "express";
+import {redisClient} from "./redisClient.ts";
+import {prismaClient} from "./prismaClient.ts";
+import {returnStatement} from "@babel/types";
 
 export interface ValidateConfigType {
   email:string,
@@ -15,6 +18,18 @@ export interface ValidateConfigType {
 export interface MailResultType {
   result: SMTPPool.SentMessageInfo
   code: string
+}
+
+/**
+ * 正则校验邮箱
+ * @param email {string} 需要校验的邮箱
+ * @return {boolean} true || false
+ * @example 使用示例：
+ * RegexEmail("xxxxx@qq.com")
+ */
+export const RegexEmail = (email:string):boolean=> {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(email);
 }
 
 /**
@@ -226,4 +241,14 @@ export function validateWebhookHmac (req:Request){
 
   return timingSafeEqual(Buffer.from(HMAC as string),Buffer.from(calculateHmac))
 
+}
+
+export async function validateRequestSender(req:Request){
+  const requestSender = req.headers?.origin || req.headers?.referer
+  if(!requestSender) return false
+  const domain = requestSender.split('//')[1]
+  const redisShopDomain = await redisClient.hget(`shop:installed:${domain}`,'id')
+  if(redisShopDomain) return redisShopDomain
+  const prismaShopDomain = await prismaClient.shop.findUnique({where:{shopify_domain: domain}, select:{id: true}})
+  return prismaShopDomain?.id;
 }

@@ -63,8 +63,25 @@ CREATE TABLE "customers" (
     "updated_at" TIMESTAMP(3),
     "market_email" BOOLEAN NOT NULL DEFAULT false,
     "market_sms" BOOLEAN NOT NULL DEFAULT false,
+    "shop_id" TEXT,
 
     CONSTRAINT "customers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "shop" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "shop_owner_name" TEXT NOT NULL,
+    "shopify_plus" BOOLEAN NOT NULL DEFAULT false,
+    "partner_development" BOOLEAN NOT NULL DEFAULT true,
+    "public_display_name" TEXT NOT NULL,
+    "shopify_domain" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3),
+
+    CONSTRAINT "shop_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -336,6 +353,15 @@ CREATE UNIQUE INDEX "customers_shopify_customer_id_key" ON "customers"("shopify_
 CREATE UNIQUE INDEX "customers_email_key" ON "customers"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "shop_id_key" ON "shop"("id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "shop_email_key" ON "shop"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "shop_shopify_domain_key" ON "shop"("shopify_domain");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "customer_service_staff_id_key" ON "customer_service_staff"("id");
 
 -- CreateIndex
@@ -451,6 +477,9 @@ CREATE UNIQUE INDEX "product_media_productId_mediaId_key" ON "product_media"("pr
 
 -- CreateIndex
 CREATE INDEX "_ProductMedia_B_index" ON "_ProductMedia"("B");
+
+-- AddForeignKey
+ALTER TABLE "customers" ADD CONSTRAINT "customers_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shop"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "customer_service_staff" ADD CONSTRAINT "customer_service_staff_userId_fkey" FOREIGN KEY ("userId") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;

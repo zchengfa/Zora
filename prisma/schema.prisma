@@ -44,10 +44,27 @@ model customers {
   updated_at          DateTime?
   market_email        Boolean   @default(false)
   market_sms          Boolean   @default(false)
+  shop_id             String?
 
+  shop                   shop?                  @relation(fields: [shop_id], references: [id])
   customer_service_staff CustomerServiceStaff[]
   address                address[]
   Order                  Order[]
+}
+
+model shop {
+  id                  String    @id @unique
+  name                String
+  email               String    @unique
+  shop_owner_name     String
+  shopify_plus        Boolean   @default(false)
+  partner_development Boolean   @default(true)
+  public_display_name String
+  shopify_domain      String    @unique
+  createdAt           DateTime? @default(now())
+  updatedAt           DateTime?
+
+  customers customers[]
 }
 
 model CustomerServiceStaff {

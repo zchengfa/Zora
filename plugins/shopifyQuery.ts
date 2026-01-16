@@ -1,8 +1,18 @@
 
 export interface GraphqlShopResponse {
   shop:{
-    email:string,
+    id: string,
+    name: string,
+    email: string,
     shopOwnerName:string,
+    updatedAt: string,
+    createdAt: string,
+    plan:{
+      shopifyPlus: boolean,
+      partnerDevelopment: boolean,
+      publicDisplayName: string,
+    },
+    myshopifyDomain:string
   }
 }
 
@@ -18,7 +28,11 @@ export interface GraphqlOrdersCountResponse {
   }
 }
 
-export interface GraphqlCustomerResponse {
+export interface GraphqlCustomerByIdentifierResponse {
+  customerByIdentifier: GraphqlCustomersResponse['customers']['nodes'][0]
+}
+
+export interface GraphqlCustomersResponse {
   customers:{
     nodes:Array<{
       id: string,
@@ -213,7 +227,17 @@ export interface GraphqlOrdersResponse {
 export interface GraphqlQueryVariables {
   limit?: number;
   afterCursor?: string | null;
-  orderId?:string
+  orderId?:string,
+  identifier?:{
+    customId?:{
+      namespace?: string,
+      key:string,
+      value:string
+    },
+    emailAddress?: string;
+    id?:string;
+    phoneNumber?:string;
+  }
 }
 
 type MoneyDetailSet = {
@@ -292,6 +316,61 @@ export interface GraphqlProductsCountResponse {
 export interface GraphqlOrderResponse {
   order: GraphqlOrdersResponse['orders']["nodes"][0]
 }
+
+export const CUSTOMER_QUERY_BY_identifier = `
+query getCustomerByEmail($identifier:CustomerIdentifierInput!){
+  customerByIdentifier(identifier:$identifier){
+        id
+        firstName
+        lastName
+        displayName
+        defaultEmailAddress {
+          emailAddress
+          marketingState
+        }
+        defaultPhoneNumber {
+          phoneNumber
+          marketingState
+          marketingCollectedFrom
+        }
+        createdAt
+        updatedAt
+        numberOfOrders
+        state
+        amountSpent {
+          amount
+          currencyCode
+        }
+        verifiedEmail
+        taxExempt
+        tags
+        addresses {
+          id
+          firstName
+          lastName
+          address1
+          city
+          province
+          country
+          zip
+          phone
+          name
+          provinceCode
+          countryCodeV2
+        }
+        defaultAddress {
+          id
+          address1
+          city
+          province
+          country
+          zip
+          phone
+          provinceCode
+          countryCodeV2
+        }
+  }
+}`
 
 export const CUSTOMERS_QUERY = `
   query customersList($limit: Int,$afterCursor:String) {
@@ -373,12 +452,22 @@ export const ORDERS_COUNT_QUERY = `
   }
  `
 
-export const SHOP_OWNER_NAME_QUERY = `
-  query shopOwnerNameQuery {
-    shop {
-      email
-      shopOwnerName
+export const SHOP_QUERY = `
+  query shopQuery {
+    shop{
+    id
+    name
+    email
+    shopOwnerName
+    updatedAt
+    createdAt
+    plan{
+      shopifyPlus
+      partnerDevelopment
+      publicDisplayName
     }
+    myshopifyDomain
+  }
   }
 `
 

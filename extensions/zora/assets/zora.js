@@ -176,18 +176,25 @@ if(!customElements.get('zora-auth-form-component')){
           lastName: '',
           email: '',
           password: '',
+          authCode: '',
           marketEmail: false,
           marketSms: false,
+          isLogin: false
         }
         this.verifyCode = ''
         this.endTime = undefined
         this.zoraTimer = null
         this.validateStatus = false
+        this.switchAuth = false
         this.form = this.querySelector('#zora-auth-form')
         //阻止表单的默认行为
         this.form.addEventListener('submit', function (e) {
           e.preventDefault();
         })
+
+        this.switchCode = this.querySelector(`${'.'+this.dataset['switchCode']}`)
+        this.switchPwd = this.querySelector(`${'.'+this.dataset['switchPwd']}`)
+        this.authSend = this.querySelector('.auth-send')
         //监听input的输入事件
         this.listenInput()
 
@@ -202,6 +209,57 @@ if(!customElements.get('zora-auth-form-component')){
 
         //监听验证按钮
         this.querySelector('.zora-code-verify').addEventListener('click', this.verifyCodeBtn)
+
+        //监听验证方式按钮
+        this.switchCode.addEventListener('click',this.changeAuth)
+        this.switchPwd.addEventListener('click',this.changeAuth)
+        this.authSend.addEventListener('click', this.sendAuthCode)
+      }
+
+      /**
+       * @description 发送验证码用于登录验证
+       */
+      sendAuthCode = ()=>{
+        if(!this.formData.email.length){
+          zoraToast.showZoraToast({
+            message:zoraResponse.responseMessage('error','params'),
+            type:'error',
+            title:zoraResponse.responseTitle('error')
+          })
+          return;
+        }
+        this.authSend.setAttribute('disabled','disabled')
+        this.authSend.classList.add('zora-disabled-btn')
+        this.sendVerifyCode()
+      }
+      /**
+       * @description 改变验证方式（验证码\密码）
+       */
+      changeAuth = () => {
+        const pwdEl = this.querySelector('#zora-password')
+        const codeEl = this.querySelector('#zora-verify-auth')
+        const authSendEl = this.querySelector('.auth-send')
+        //切换验证方式时需要将输入框恢复到空状态
+        pwdEl.value = '';
+        codeEl.value = '';
+        this.formData.password = ''
+        this.formData.authCode = ''
+        this.switchAuth = !this.switchAuth
+        this.checkAllInputValue()
+        if(this.switchAuth){
+          pwdEl.classList.add('hidden')
+          codeEl.classList.remove('hidden')
+          authSendEl.classList.remove('hidden')
+          this.switchCode.classList.remove('hidden')
+          this.switchPwd.classList.add('hidden')
+          this.triggerErrPwdEl(true) //密码框已隐藏，无需显示密码校验错误
+          return;
+        }
+        pwdEl.classList.remove('hidden')
+        codeEl.classList.add('hidden')
+        authSendEl.classList.add('hidden')
+        this.switchCode.classList.add('hidden')
+        this.switchPwd.classList.remove('hidden')
       }
 
       /**
@@ -209,6 +267,11 @@ if(!customElements.get('zora-auth-form-component')){
        * @returns {Promise<void>}
        */
       btnSubmit = async () => {
+        //禁用表单按钮，防止重复提交
+        const submitBtn = this.querySelector('#' + this.dataset.submit)
+        submitBtn.setAttribute('disabled','disabled')
+        submitBtn.classList.add('zora-disabled-btn')
+        submitBtn.classList.remove('zora-auth-btn')
         const hashPwd = await this.hashPassword(this.formData.password)
         const submitData = {
           ...this.formData,
@@ -216,9 +279,9 @@ if(!customElements.get('zora-auth-form-component')){
         }
 
         fetch(FETCH_BASE_URL + '/authenticator', {
-            method: 'POST',
-            headers: setHeaders(),
-            body: JSON.stringify(submitData)
+          method: 'POST',
+          headers: setHeaders(),
+          body: JSON.stringify(submitData)
         }).then(response=>{
           if(response.status === 500){
             zoraToast.showZoraToast({
@@ -265,7 +328,7 @@ if(!customElements.get('zora-auth-form-component')){
        * @description 监听输入框
        */
       listenInput = () => {
-        const targets = this.validateStatus ? [this.dataset.email,this.dataset.pwd] : [this.dataset.email, this.dataset.firstName, this.dataset.lastName, this.dataset.pwd, this.dataset.marketEmail, this.dataset.marketSms]
+        const targets = [this.dataset.email, this.dataset.firstName, this.dataset.lastName, this.dataset.pwd,this.dataset.authCode, this.dataset.marketEmail, this.dataset.marketSms]
         targets.forEach(target => {
           this.querySelector('#' + target).addEventListener('input', (e) => {
             switch (target) {
@@ -289,6 +352,9 @@ if(!customElements.get('zora-auth-form-component')){
               case this.dataset.marketSms:
                 this.formData.marketSms = e.target.checked
                 break;
+              case this.dataset.authCode:
+                this.formData.authCode = e.target.value.trim()
+                break;
               default:
                 break;
             }
@@ -304,7 +370,13 @@ if(!customElements.get('zora-auth-form-component')){
        */
       checkAllFilled() {
         //检查所有输入框都是否有值
-        const targets = this.validateStatus ? ['email','password'] : ['email', 'firstName', 'lastName','password']
+        let targets = []
+        if(this.validateStatus){
+          targets = this.switchAuth ? ['email','authCode'] : ['email','password']
+        }
+        else{
+          targets = ['email', 'firstName', 'lastName','password']
+        }
         return targets.every(target => this.formData[target])
       }
 
@@ -313,6 +385,10 @@ if(!customElements.get('zora-auth-form-component')){
        */
       checkAllInputValue = () => {
         this.triggerErrInfoEl(this.checkAllFilled())
+        if(this.switchAuth){
+         return this.triggerSubmit(this.checkAllFilled() && this.formData.authCode.length >= 6 && this.validateEmail(this.formData.email) && this.validateStatus)
+
+        }
         this.triggerSubmit(this.checkAllFilled() && this.checkPasswordStrength(this.formData.password) && this.validateEmail(this.formData.email) && this.validateStatus)
       }
       /**
@@ -352,6 +428,8 @@ if(!customElements.get('zora-auth-form-component')){
               })
              }).then(res=>res.json())
           this.validateStatus = emailValidate.result
+          this.formData.isLogin = emailValidate.result
+
           this.checkAllInputValue()
           this.triggerRegisterElements(emailValidate.result)
       }
@@ -390,7 +468,8 @@ if(!customElements.get('zora-auth-form-component')){
           method:'POST',
           headers: setHeaders(),
           body: JSON.stringify({
-            email:this.formData.email
+            email:this.formData.email,
+            isAuth: this.validateStatus
           })
         }).then(response => response.json()).then(res => {
           //收到验证码发送成功的响应
@@ -413,9 +492,9 @@ if(!customElements.get('zora-auth-form-component')){
           }
           else{
             zoraToast.showZoraToast({
-              message:zoraTranslator.translateMessage('error','server'),
+              message:zoraResponse.responseMessage('error','server'),
               type: 'error',
-              title:zoraTranslator.translateTitle('error')
+              title:zoraResponse.responseTitle('error')
             })
           }
         })
@@ -459,7 +538,6 @@ if(!customElements.get('zora-auth-form-component')){
           headers: setHeaders(),
           body: JSON.stringify({code:this.verifyCode,email: this.formData.email})
         }).then(response => response.json()).then(res=>{
-
           if(res.result){
             zoraToast.showZoraToast({
               message:zoraResponse.responseMessage('success','validate_email'),
@@ -497,7 +575,6 @@ if(!customElements.get('zora-auth-form-component')){
         }).catch(err=>{
           console.log(err)
         })
-
       }
       /**
        * @description 显示特定元素、其它元素隐藏（发送按钮、倒计时元素、验证按钮）
@@ -590,10 +667,13 @@ if(!customElements.get('zora-auth-form-component')){
         const lastNameEl = this.querySelector('#zora-lastName')
         const checkBoxEl = this.querySelector('.zora-check-box')
         const verifyEl = this.querySelector('.zora-verify-box')
+        //若是邮箱已存在，说明需要登录，需要隐藏注册时需要的验证码相关元素，反之则隐藏登录时的验证码登录相关元素
+        const pwdCodeEl = this.querySelector('.zora-form-pwd-box .zora-auth-way-box')
         state ? firstNameEl.classList.add('hidden') : firstNameEl.classList.remove('hidden')
         state ? lastNameEl.classList.add('hidden') : lastNameEl.classList.remove('hidden')
         state ? checkBoxEl.classList.add('hidden') : checkBoxEl.classList.remove('hidden')
         state ? verifyEl.classList.add('hidden') : verifyEl.classList.remove('hidden')
+        state ? pwdCodeEl.classList.remove('hidden') : pwdCodeEl.classList.add('hidden')
       }
       /**
        * @description 验证码相关元素状态初始化（验证码倒计时隐藏、验证码验证按钮禁用与隐藏、验证码发送按钮显示）

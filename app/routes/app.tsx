@@ -33,11 +33,6 @@ function App() {
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
         <s-link href="/app">Chat</s-link>
-        <s-link href="/app/additional">Additional page</s-link>
-        <s-link href="/app/properties">Properties</s-link>
-        <s-link href="/app/calendar">Calendar</s-link>
-        <s-link href="/app/offer">Offer</s-link>
-        <s-link href="/app/documents">Documents</s-link>
         <s-link href="/app/settings">Settings</s-link>
       </s-app-nav>
       <ZoraModalProvider>
