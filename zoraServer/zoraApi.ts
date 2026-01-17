@@ -1,34 +1,41 @@
 import type {Express, Response} from "express-serve-static-core"
-import {validate} from "../plugins/validate.ts";
+import {RegexEmail, validate, validateRequestSender} from "../plugins/validate.ts";
 import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
 import bcrypt from 'bcrypt';
-import {handlePrismaError} from "../plugins/handleZoraError.ts";
+import {handleApiError, handlePrismaError} from "../plugins/handleZoraError.ts";
 import {v4 as uuidv4} from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
-import {ShopifyApiClient} from "../plugins/shopifyUtils.ts";
+import {executeShopifyId, shopifyHandleResponseData} from "../plugins/shopifyUtils.ts";
+import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
+import {addShopifySyncDataJob, beginLogger} from "../plugins/bullTaskQueue.ts";
+import type {GraphqlCustomerCreateMutationResponse, GraphqlMutationVariables} from "../plugins/shopifyMutation.ts";
 
 interface ZoraApiType {
   app:Express,
   redis: Redis,
   prisma: PrismaClient,
-  shopifyApiClients: Map<string,any>
+  shopifyApiClientsManager: IShopifyApiClientsManager,
 }
 
 interface FormDataType {
   email: string,
-  password: string,
+  password?: string,
   firstName: string,
   lastName: string,
   marketEmail: boolean,
   marketSMS: boolean,
   id?: bigint,
-  shopDomain?:string
+  shopDomain?:string,
+  authPwd: boolean,
+  authCode?: string,
 }
 
 const REDIS_EMAIL_APPEND = '_verify_code'
+const REDIS_AUTH_CODE_APPEND = '_verify_auth_code'
 const REDIS_ATTEMPT_KEY = '_attempt_count'
+const REDIS_AUTH_ATTEMPT_KEY = '_auth_attempt_count'
 const EXPIRED = 300
 const SESSION_EXPIRED_DURATION = 7 * 24 * 60 * 60 * 1000
 
@@ -50,7 +57,9 @@ const RATE_LIMITS = {
   LOOSE: createRateLimiter(300),
 }
 
-const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response,redis:Redis,prisma:PrismaClient,shopifyApiClients:any)=>{
+
+
+const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response,redis:Redis,prisma:PrismaClient,shopifyApiClientsManager:IShopifyApiClientsManager)=>{
   try{
     const result = await bcrypt.compare(paramsObj.password,databasePwd)
     if(result){
@@ -76,34 +85,10 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
       //获取客服数据给客户
       let agentInfo = undefined
       //获取商店对应的shopify api请求客户端
-      let shopifyApiClient = shopifyApiClients.get(paramsObj.shopDomain)
-      //若之前没有shopify api 请求客户端就需要重新实例化一个
-      if(!shopifyApiClient){
-        //redis获取商店的认证所需数据
-        const redisSession = await redis.hget(`session:${paramsObj.shopDomain}`,'accessToken')
-        if(!redisSession){
-          //redis中没获取到，就从数据库中获取
-          const prismaSession = await prisma.session.findFirst({
-            where:{
-              shop: paramsObj.shopDomain
-            }
-          })
-          if(prismaSession){
-            //将获取到的更新到redis
-            await redis.hset(`session:${paramsObj.shopDomain}`,{...prismaSession})
-            await redis.expire(`session:${paramsObj.shopDomain}`,SESSION_EXPIRED_DURATION / 7)
-            //使用认证数据实例化shopify api client
-            shopifyApiClient = new ShopifyApiClient({shop:paramsObj.shopDomain as string,accessToken:prismaSession.accessToken as string})
-          }
-        }
-        else{
-          shopifyApiClient = new ShopifyApiClient({shop:paramsObj.shopDomain as string,accessToken:redisSession as string})
-        }
-        //保存shopify api client到shopifyApiClients
-        shopifyApiClients.set(paramsObj.shopDomain,shopifyApiClient)
-      }
+      const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(paramsObj.shopDomain as string)
+
       try{
-        const {shop} = await shopifyApiClient.shopOwner()
+        const {shop} = await shopifyApiClient.shop()
         agentInfo = await prisma.customerServiceStaff.findUnique({
           where: {
             email: shop.email
@@ -117,7 +102,7 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
         })
       }
       catch (e) {
-        console.log(e)
+        handlePrismaError(e)
       }
 
       const token = createToken({session_id},'1d')
@@ -134,24 +119,64 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
   }
 }
 
-const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClients}:{redis:Redis,prisma:PrismaClient,paramsObj:FormDataType,res:Response,shopifyApiClients:any})=>{
+const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClientsManager}:{redis:Redis,prisma:PrismaClient,paramsObj:FormDataType,res:Response,shopifyApiClientsManager:IShopifyApiClientsManager})=>{
   try{
-    //查询该用户的密码进行比对
-    const redisPwdQuery = await redis.hget(`customer:${paramsObj.email}`,'password')
-    //是否命中
-    if(redisPwdQuery){
-      await pwdCompare(paramsObj,redisPwdQuery,res,redis,prisma,shopifyApiClients)
+    //判断是否是以密码验证方式进行登录
+    if(paramsObj.authPwd){
+      if(!paramsObj.password) return res.status(400).send({result:false,message:"invalid credentials"})
+      //查询该用户的密码进行比对
+      const redisPwdQuery = await redis.hget(`customer:${paramsObj.email}`,'password')
+      //是否命中
+      if(redisPwdQuery){
+        await pwdCompare(paramsObj,redisPwdQuery,res,redis,prisma,shopifyApiClientsManager)
+      }
+      else{
+        const prismaPwdQuery = await prisma.customers.findUnique({
+          where:{
+            email:paramsObj.email
+          }
+        })
+
+        await redis.hset(`customer:${paramsObj.email}`, {...prismaPwdQuery})
+        await redis.expire(`customer:${paramsObj.email}`,24 * 60 * 60)
+        await pwdCompare(paramsObj,prismaPwdQuery.password,res,redis,prisma,shopifyApiClientsManager)
+      }
     }
     else{
-      const prismaPwdQuery = await prisma.customers.findUnique({
-        where:{
-          email:paramsObj.email
-        }
-      })
+      if(!paramsObj.authCode) return res.status(400).send({result:false,message:"invalid credentials"})
+      try{
+        const attempt = await redis.get(getRedisStorageKey(paramsObj.email,REDIS_AUTH_ATTEMPT_KEY)) || 0
+        const attemptKey = getRedisStorageKey(paramsObj.email,REDIS_AUTH_ATTEMPT_KEY)
 
-      await redis.hset(`customer:${paramsObj.email}`, {...prismaPwdQuery})
-      await redis.expire(`customer:${paramsObj.email}`,24 * 60 * 60)
-      await pwdCompare(paramsObj,prismaPwdQuery.password,res,redis,prisma,shopifyApiClients)
+        if(parseInt(String(attempt)) >= 5){
+          return res.status(429).send({
+            result:false,
+            message: 'Too many attempts, please obtain the verification code again'
+          })
+        }
+
+        const redisEx = await redis.get(paramsObj.email+REDIS_AUTH_CODE_APPEND)
+        if(redisEx){
+          if(redisEx === paramsObj.authCode){
+            //验证码正确，结果反馈，删除redis中存储的对应验证码和验证次数
+            await redis.del(attemptKey)
+            await redis.del(getRedisStorageKey(paramsObj.email))
+            res.status(200).send({result: true,message:'login success'})
+          }
+          else{
+            //验证码错误，增加验证次数
+            await redis.incr(attemptKey)
+            await redis.expire(attemptKey,EXPIRED)
+            res.status(200).send({result:false ,left_attempt:5 - Number(attempt) -1, message:`Auth code error, you still have ${5 - Number(attempt)-1} chances to try`})
+          }
+        }
+        else{
+          res.status(200).send({result:false,message:'code expired'})
+        }
+      }
+      catch (e) {
+        res.status(500).send({server_error: true,message:'server error'})
+      }
     }
   }
   catch (e) {
@@ -159,9 +184,101 @@ const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClients}:{red
   }
 }
 
-export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
+export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType) {
+
+  app.post('/shopifyApiClientInit',async (req, res)=>{
+    try {
+      const paramsObj = req.body
+      if(!paramsObj?.shop){
+        return res.status(400).send({result:false,message:"request invalid"})
+      }
+      const {shop} = paramsObj
+      res.send({result:true,message:`${shop}的shopifyApiClient初始化完成，数据同步已在后台开启`})
+
+      //增加session同步到redis操作，以防应用安装后，redis中的session未更新，导致shopify api请求所需的令牌失效
+      const prismaSession = await prisma.session.findFirst({
+        where:{
+          shop
+        }
+      })
+
+      await redis.hset(`session:${shop}`,{...prismaSession})
+      await redis.expire(`session:${shop}`, SESSION_EXPIRED_DURATION / 7)
+
+      await beginLogger({
+        level: 'info',
+        message: `${shop}的shopifyApiClient初始化完成`,
+        meta:{
+          taskType: `zora_api`,
+          shop
+        }
+      })
+
+      //获取商店数据
+      const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
+      const shopResult = await shopifyApiClient.shop()
+
+      try{
+        const data = {
+          id: executeShopifyId(shopResult.shop.id),
+          name: shopResult.shop.name,
+          email: shopResult.shop.email,
+          shop_owner_name: shopResult.shop.shopOwnerName,
+          shopify_plus: shopResult.shop.plan.shopifyPlus,
+          shopify_domain: shopResult.shop.myshopifyDomain,
+          partner_development: shopResult.shop.plan.partnerDevelopment,
+          public_display_name: shopResult.shop.plan.publicDisplayName,
+          createdAt: shopResult.shop.createdAt,
+          updatedAt: shopResult.shop.updatedAt,
+        }
+        const prismaShop = await prisma.shop.upsert({
+          where:{
+            shopify_domain: shop
+          },
+          update:data,
+          create:data
+        })
+
+        if(prismaShop){
+          await beginLogger({
+            level: "info",
+            message:`${shop}数据同步完成`,
+            meta:{
+              taskType: `sync_shopify_shop_data_prisma`,
+              shop
+            }
+          })
+        }
+      }
+      catch (e) {
+        console.log(e)
+        handlePrismaError(e)
+      }
+
+      //将数据获取与同步任务交给bull进行后台处理，不阻塞主线程
+      const maskTypeArr = ['customers','orders','products']
+      for (const mask of maskTypeArr) {
+        await addShopifySyncDataJob(mask,shop)
+      }
+    }
+    catch (e) {
+      handleApiError(req, e)
+    }
+
+  })
+
   app.post('/authenticator', RATE_LIMITS.STRICT,async (req, res) => {
     const paramsObj = req.body
+    if(!paramsObj || !paramsObj?.email || (!paramsObj?.password.length && !paramsObj?.authCode.length)){
+      return res.status(400).send({result:false,message:"invalid request"})
+    }
+
+    //邮箱不合规或者请求发送者不是来自应用安装者的商店，拦截
+    const requestSenderResult = await validateRequestSender(req)
+    if(!RegexEmail(paramsObj.email) || !requestSenderResult){
+      return res.status(400).send({result:false,message:"invalid request"})
+    }
+
     paramsObj.shopDomain = req.headers?.origin?.split('//')[1]
     //先判断之前是否已经注册过了
     try{
@@ -173,7 +290,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
         paramsObj.firstName = redisQuery.first_name
         paramsObj.lastName = redisQuery.last_name
         paramsObj.image_url = redisQuery.image_url
-        await loginFunction({redis,prisma,paramsObj,res,shopifyApiClients})
+        await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
       }
       else{
         //未命中
@@ -191,61 +308,87 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
           paramsObj.firstName = prismaQuery.first_name
           paramsObj.lastName = prismaQuery.last_name
           paramsObj.image_url = prismaQuery.image_url
-          await loginFunction({redis,prisma,paramsObj,res,shopifyApiClients})
+          await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
         }
         else{
-          //都未命中，执行注册后再执行登录
-          const newCustomer = await prisma.customers.create({
-            data:{
-              shopify_customer_id:new Date().getTime().toString(),
-              email: paramsObj.email,
-              first_name: paramsObj.firstName,
-              last_name: paramsObj.lastName,
-              password: await bcrypt.hash(paramsObj.password, 10),
-              market_email: paramsObj.marketEmail,
-              market_sms: paramsObj.marketSMS,
-              verified_email: true,
-              image_url: process.env.USER_DEFAULT_AVATAR
-            }
+          if(!paramsObj.password.length) return res.status(400).send({result:false,message:"invalid request: pwd is required"})
+          /**需要注册，执行在shopify商店执行客户写入
+           * 1、shopify api先通过邮箱执行获取客户操作，判断shopify商店是否有该客户，有就同步到数据库中，没有再使用shopify api执行客户注册操作
+           * */
+          const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(paramsObj.shopDomain)
+          const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
+            emailAddress: paramsObj.email,
           })
-          //数据写入成功，执行一次redis写入
-          if(newCustomer){
-            await redis.hset(`customer:${newCustomer.id}`, {...newCustomer})
-            await redis.expire(`customer:${newCustomer.id}`,24 * 60 * 60)
-            //执行登录
-            paramsObj.id = newCustomer.id
-            paramsObj.image_url = newCustomer.image_url
-            await loginFunction({redis,prisma,paramsObj,res,shopifyApiClients})
+          //查询结果为null，表示shopify商店没有该客户，需要执行添加客户请求
+          if(!customerByIdentifier){
+            const customerCreateMutationVariable:GraphqlMutationVariables["input"] = {
+              email: paramsObj.email,
+              lastName: paramsObj.lastName,
+              firstName: paramsObj.firstName,
+              emailMarketingConsent: {
+                marketingState: paramsObj.marketEmail ? 'SUBSCRIBED' : 'NOT_SUBSCRIBED',
+                marketingOptInLevel: 'SINGLE_OPT_IN'
+              }
+            }
+            const {customerCreate} = await shopifyApiClient.customerCreate(customerCreateMutationVariable)
+            if(customerCreate.customer){
+              const data:Array<GraphqlCustomerCreateMutationResponse["customerCreate"]['customer'] | {shop_id:string}> = []
+              const deepCloneCustomer = JSON.parse(JSON.stringify(customerCreate.customer))
+              deepCloneCustomer.shop_id = requestSenderResult
+              data.push(deepCloneCustomer)
+              await shopifyHandleResponseData(data,'customers',prisma)
+              //客户写入默认是没有密码的，为了嵌入块能以密码方式登录，需要在客户写入数据库后设置密码
+              const bcryptHashPwd = await bcrypt.hash(paramsObj.password,10)
+              const newCustomer = await prisma.customers.update({
+                where:{
+                  shopify_customer_id: deepCloneCustomer.id
+                },
+                data:{
+                  password: bcryptHashPwd
+                }
+              })
+
+              if(newCustomer){
+                await redis.hset(`customer:${newCustomer.id}`, {...newCustomer})
+                await redis.expire(`customer:${newCustomer.id}`,24 * 60 * 60)
+                //执行登录
+                paramsObj.id = newCustomer.id
+                paramsObj.image_url = newCustomer.image_url
+                await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
+              }
+            }
           }
         }
       }
     }
     catch (e){
+      handleApiError(req,e)
       handlePrismaError(e)
       res.status(500).send({result:false,message:"Server Error"})
     }
   })
-  app.post('/validateToken',async (req, res)=>{
+  app.post('/validateToken',RATE_LIMITS.NORMAL,async (req, res)=>{
     const token = req.headers.authorization?.split(' ')[1]
     if (!token) {
       return res.status(401).send({result:false,message: 'Authentication token missing'})
     }
     try{
       await verifyTokenAsync(token)
-      res.status(200).send({result:true,message:'logged in'})
-    }
-    catch (err){
+      res.status(200).send({result:true,message:'logged in'})}
+    catch (e){
+      handleApiError(req, e)
       return res.status(401).send({result:false,message: 'Token expired or invalid'})
     }
   })
   app.post('/checkEmail',RATE_LIMITS.NORMAL,async (req,res)=>{
     const {email} = req.body
+
     //检查数据库是否有该邮箱
     try{
-      const redisEmailQuery = await redis.hexists(`customer:${email}`,'email')
+      const redisEmailQuery = await redis.hexists(`customer:${email}`,'shop_id')
       //是否命中
       if(redisEmailQuery){
-        res.status(200).send({result:true,message:"Email already exists"})
+        res.status(200).send({result:true,message:"Email already exists",isBelongShop:!!redisEmailQuery})
       }
       else{
         const prismaEmailQuery = await prisma.customers.findUnique({
@@ -258,30 +401,43 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
           //将读取到的信息同步到 redis
           await redis.hset(`customer:${email}`,{...prismaEmailQuery})
           await redis.expire(`customer:${email}`, 3600)
-          res.status(200).send({result:true,message:"Email already exists"})
+          res.status(200).send({result:true,message:"Email already exists",isBelongShop:!!prismaEmailQuery.shop_id})
         }
         else{
-          res.status(200).send({result:false,message:"Email available"})
+          res.status(200).send({result:false,message:"Email not available"})
         }
       }
     }
     catch (e){
+      handleApiError(req, e)
       res.status(500).send({result:false,message:"Server Error"})
     }
   })
 
   app.post('/sendVerifyCodeToEmail',RATE_LIMITS.STRICT,async (req,res)=>{
-     const {email} = req.body
+     const {email,isAuth} = req.body
+     if(!email || isAuth === undefined){
+       return res.status(400).send({result:false,message: 'Invalid request'})
+     }
      try {
        const data = await validate({email,expired:EXPIRED})
        //发送成功保存验证码到redis中，并设置过期时间，并清除之前验证的次数，防止用户在验证次数时间未过期时重新获取验证码却还是提示验证次数过多
-       await redis.multi()
+       if(!isAuth){
+         await redis.multi()
            .setex(getRedisStorageKey(email),EXPIRED,data.code)
            .setex(getRedisStorageKey(email,REDIS_ATTEMPT_KEY),EXPIRED,0)
            .exec()
+       }
+       else{
+         await redis.multi()
+           .setex(getRedisStorageKey(email,REDIS_AUTH_CODE_APPEND),EXPIRED,data.code)
+           .setex(getRedisStorageKey(email,REDIS_AUTH_ATTEMPT_KEY),EXPIRED,0)
+           .exec()
+       }
        res.status(200).send({success:true,code_expired:EXPIRED,message:'code send successfully'})
      }
-     catch (error) {
+     catch (e) {
+       handleApiError(req, e)
        res.status(500).send({server_error: true,message:'server error'})
      }
 
@@ -334,8 +490,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
                 res.status(200).send({result:false,message:'code expired'})
             }
         }
-        catch (error) {
-           res.status(500).send({server_error: true,message:'server error'})
+        catch (e) {
+          handleApiError(req, e)
+          res.status(500).send({server_error: true,message:'server error'})
         }
     })
 
@@ -371,6 +528,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
         res.status(200).send({result:true,userInfo})
       }
       catch (e){
+        handleApiError(req, e)
         res.status(500).send({server_error: true,message:'server error'})
       }
 
@@ -408,6 +566,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClients}:ZoraApiType) {
       res.json(prismaQuery)
     }
     catch (e) {
+      handleApiError(req, e)
       res.status(500).json({errMsg:'server error'})
     }
 

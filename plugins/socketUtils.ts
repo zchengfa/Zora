@@ -1,6 +1,7 @@
 import type {Redis} from "ioredis";
 import {$Enums, PrismaClient} from "@prisma/client";
 import {Server, Socket} from "socket.io";
+import {beginLogger} from "./bullTaskQueue.ts";
 
 interface SocketUtilConfigType {
   redis: Redis;
@@ -97,7 +98,13 @@ export class SocketUtils{
     this.ws.on('agent',(info)=>{
       if(info){
         this.agent.set(info.id,this.ws.id)
-        console.log(`客服${info.name}上线了`)
+        beginLogger({
+          level: 'info',
+          message: `客服${info.name}上线了`,
+          meta:{
+            taskType: 'socket_util_agent'
+          }
+        }).then()
       }
     })
   }
@@ -114,15 +121,38 @@ export class SocketUtils{
             }
           })
           this.users.set(String(prismaQuery.userId),this.ws.id)
-          console.log(prismaQuery.email + '上线了')
+          await beginLogger({
+            level: 'info',
+            message: `客户${prismaQuery.email}上线了`,
+            meta:{
+              taskType: 'socket_util_online'
+            }
+          })
         }
         else{
           this.users.set(user.userId,this.ws.id)
-          console.log(redisQuery+'上线了')
+          await beginLogger({
+            level: 'info',
+            message: `客户${redisQuery}上线了`,
+            meta:{
+              taskType: 'socket_util_online'
+            }
+          })
         }
       }
       catch (e) {
-        console.log('出错了：socketServer.ts')
+        await beginLogger({
+          level: 'error',
+          message: `客户上线处理出错`,
+          meta:{
+            taskType: 'socket_util_error',
+            error:{
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack,
+            }
+          }
+        })
       }
 
       //建立会话
@@ -150,7 +180,18 @@ export class SocketUtils{
         }
       }
       catch (e) {
-        console.log('出错了：socketServer.ts')
+        await beginLogger({
+          level: 'error',
+          message: `会话建立出错`,
+          meta:{
+            taskType: 'socket_util_error',
+            error:{
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack,
+            }
+          }
+        })
       }
     })
   }
@@ -192,6 +233,18 @@ export class SocketUtils{
 
       }
       catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `消息处理出错`,
+          meta:{
+            taskType: 'socket_util_error',
+            error:{
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack,
+            }
+          }
+        })
         //服务器出现错误，告诉发送者消息发送失败
         this.sendMessageAck(sender as string,payload.msgId,'FAILED',10003)
       }

@@ -19,5 +19,6 @@
         "verify_code": "verify code",
         "send": "send",
         "verify": "verify",
+        "verify_auth": "verify code"
     }
 }

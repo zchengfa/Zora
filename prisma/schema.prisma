@@ -7,24 +7,6 @@ datasource db {
   url      = "postgresql://postgres:19961212@localhost:5432/mall"
 }
 
-model customer_addresses {
-  id           BigInt   @id @default(autoincrement())
-  customer_id  BigInt
-  address_type String   @default("shipping")
-  address1     String?
-  address2     String?
-  city         String?
-  province     String?
-  country      String?
-  postal_code  String?
-  phone        String?
-  is_default   Boolean  @default(false)
-  created_at   DateTime @default(now())
-  updated_at   DateTime
-
-  @@index([customer_id], map: "customer_addresses_customer_id_fkey")
-}
-
 model customer_tag_relations {
   id          BigInt   @id @default(autoincrement())
   customer_id BigInt
@@ -45,12 +27,12 @@ model customers {
   id                  BigInt    @id @default(autoincrement())
   shopify_customer_id String    @unique
   email               String    @unique
-  password            String
+  password            String?
   first_name          String?
   last_name           String?
   phone               String?
-  number_of_orders    Int       @default(0)
-  total_amount_spent  Float     @default(0)
+  number_of_orders    String    @default("0")
+  total_amount_spent  String    @default("0.0")
   currency_code       String    @default("USD")
   verified_email      Boolean   @default(false)
   valid_email_address Boolean   @default(true)
@@ -62,8 +44,27 @@ model customers {
   updated_at          DateTime?
   market_email        Boolean   @default(false)
   market_sms          Boolean   @default(false)
+  shop_id             String?
 
+  shop                   shop?                  @relation(fields: [shop_id], references: [id])
   customer_service_staff CustomerServiceStaff[]
+  address                address[]
+  Order                  Order[]
+}
+
+model shop {
+  id                  String    @id @unique
+  name                String
+  email               String    @unique
+  shop_owner_name     String
+  shopify_plus        Boolean   @default(false)
+  partner_development Boolean   @default(true)
+  public_display_name String
+  shopify_domain      String    @unique
+  createdAt           DateTime? @default(now())
+  updatedAt           DateTime?
+
+  customers customers[]
 }
 
 model CustomerServiceStaff {
@@ -140,6 +141,171 @@ model Message {
   @@map("messages")
 }
 
+// 订单状态枚举
+enum OrderStatus {
+  CREATED
+  PAYMENT_PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  FAILED
+}
+
+// 退货状态枚举
+enum ReturnStatus {
+  NO_RETURN
+  RETURN_REQUESTED
+  RETURN_APPROVED
+  RETURN_REJECTED
+  RETURN_RECEIVED
+  REFUND_PROCESSING
+  REFUND_COMPLETED
+}
+
+// 货币枚举
+enum CurrencyCode {
+  CNY
+  USD
+  EUR
+  GBP
+  JPY
+}
+
+// 地址模型
+model address {
+  id         String   @id @default(cuid())
+  customerId String
+  name       String
+  address1   String
+  address2   String?
+  city       String
+  province   String
+  country    String
+  zip        String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  customer customers @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
+  Order    Order[]   @relation("OrderShippingAddress")
+
+  Orders Order[]
+
+  @@index([customerId])
+  @@index([country, province, city])
+  @@map("addresses")
+}
+
+// 订单主模型
+model Order {
+  id                 String  @id @default(cuid())
+  name               String  @unique
+  note               String?
+  confirmationNumber String  @unique
+
+  // 状态信息
+  status       OrderStatus  @default(CREATED)
+  returnStatus ReturnStatus @default(NO_RETURN)
+  fullyPaid    Boolean      @default(false)
+  unpaid       Boolean      @default(false)
+
+  // 时间信息
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // 价格信息
+  currencyCode       CurrencyCode @default(CNY)
+  subtotalPrice      Decimal      @db.Decimal(10, 2) // 189.84
+  totalTax           Decimal      @db.Decimal(10, 2) // 21.84
+  totalShippingPrice Decimal      @db.Decimal(10, 2) // 4.95
+  totalPrice         Decimal      @db.Decimal(10, 2) // 194.79
+  totalReceived      Decimal      @db.Decimal(10, 2) // 194.79
+
+  // 渠道信息
+  channelInformation String  @default("Online Store") // 如 "Online Store"
+  statusPageUrl      String?
+
+  // 外部支付信息
+  stripePaymentIntentId String?
+  stripeSessionId       String?
+  shopifyOrderId        String? @unique // gid://shopify/Order/6149102141628
+
+  // 关系
+  customerId        String
+  shippingAddressId String?
+
+  customers       customers            @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
+  shippingAddress address?             @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id])
+  lineItems       OrderLineItem[]
+  taxLines        OrderTaxLine[]
+  additionalFees  OrderAdditionalFee[]
+  order_address   address?             @relation(fields: [order_addressId], references: [id])
+  order_addressId String?
+
+  @@index([customerId])
+  @@index([status])
+  @@index([processedAt])
+  @@index([createdAt])
+  @@index([confirmationNumber])
+  @@index([shopifyOrderId])
+  @@map("orders")
+}
+
+// 订单商品行模型
+model OrderLineItem {
+  id       String  @id @default(cuid())
+  orderId  String
+  title    String // 如 "感恩密码"
+  quantity Int     @default(1)
+  sku      String? // 如 "4223-407-360"
+
+  // 价格信息
+  originalUnitPrice Decimal @db.Decimal(10, 2) // 189.84
+  price             Decimal @db.Decimal(10, 2) // 168.00
+
+  // 商品变体信息
+  variantTitle String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([sku])
+  @@map("order_line_items")
+}
+
+// 订单税费行模型
+model OrderTaxLine {
+  id             String  @id @default(cuid())
+  orderId        String
+  title          String // 如 "VAT"
+  rate           Float // 0.13
+  ratePercentage Int // 13
+  price          Decimal @db.Decimal(10, 2) // 21.84
+  source         String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_tax_lines")
+}
+
+// 订单附加费用模型
+model OrderAdditionalFee {
+  id      String  @id @default(cuid())
+  orderId String
+  title   String
+  price   Decimal @db.Decimal(10, 2)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_additional_fees")
+}
+
 enum ConversationStatus {
   ACTIVE
   RESOLVED
@@ -171,4 +337,127 @@ enum MsgStatus {
   DELIVERED
   READ
   FAILED
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  descriptionHtml String?
+  tags            String[]
+  vendor          String
+  featuredMediaId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  featuredMedia Media?               @relation("ProductFeaturedMedia", fields: [featuredMediaId], references: [id])
+  variants      Variant[]
+  media         Media[]              @relation("ProductMedia")
+  translations  ProductTranslation[]
+  variantsCount ProductVariantCount?
+  mediaCount    ProductMediaCount?
+
+  minPrice          Decimal?       @db.Decimal(10, 2)
+  maxPrice          Decimal?       @db.Decimal(10, 2)
+  minCompareAtPrice Decimal?       @db.Decimal(10, 2)
+  maxCompareAtPrice Decimal?       @db.Decimal(10, 2)
+  productMedias     ProductMedia[]
+
+  @@index([vendor])
+  @@index([tags])
+  @@map("products")
+}
+
+model Variant {
+  id           String   @id @default(cuid())
+  price        Decimal  @db.Decimal(10, 2)
+  unitPrice    Decimal? @db.Decimal(10, 2)
+  currencyCode String?  @default("USD")
+  sku          String?
+  position     Int?
+
+  productId String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, position])
+  @@index([productId])
+  @@map("variants")
+}
+
+model Media {
+  id               String    @id @default(cuid())
+  mediaContentType String
+  url              String
+  thumbhash        String?
+  featuredProducts Product[] @relation("ProductFeaturedMedia")
+  productMedia     Product[] @relation("ProductMedia")
+
+  preview       MediaPreview?
+  productMedias ProductMedia[]
+
+  @@index([mediaContentType])
+  @@map("media")
+}
+
+model MediaPreview {
+  id       String  @id @default(cuid())
+  imageUrl String?
+  mediaId  String  @unique
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@map("media_previews")
+}
+
+model ProductVariantCount {
+  id        String @id @default(cuid())
+  count     Int
+  productId String @unique
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variant_counts")
+}
+
+model ProductMediaCount {
+  id        String @id @default(cuid())
+  count     Int
+  productId String @unique
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_media_counts")
+}
+
+model ProductTranslation {
+  id        String @id @default(cuid())
+  productId String
+  locale    String
+  fieldName String
+  value     String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locale, fieldName])
+  @@index([productId])
+  @@index([locale])
+  @@map("product_translations")
+}
+
+model ProductMedia {
+  id         String   @id @default(cuid())
+  productId  String
+  mediaId    String
+  position   Int?     @default(0)
+  isFeatured Boolean? @default(false)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, mediaId])
+  @@index([productId])
+  @@index([mediaId])
+  @@map("product_media")
 }

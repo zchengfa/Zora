@@ -56,6 +56,7 @@
         padding-left: calc(var(--z-primary_padding)/2);
         font-size: 1.1rem;
         .message{
+          padding: .2rem 0;
           max-width: 6rem;
           font-size: .8rem;
           color: var(--z-color-text-secondary);

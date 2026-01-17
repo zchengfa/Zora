@@ -18,7 +18,10 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "zora-server": "node zoraServer/zoraServer.ts --tunnel-url  https://5f8aa807b821.ngrok-free.app:3001"
+    "zora-server": "node zoraServer/zoraServer.ts --tunnel-url  https://69f68ee9aaa5.ngrok-free.app:3001",
+    "shopify-worker": "node plugins/shopifyWorker.ts",
+    "logger-worker": "node plugins/loggerWorker.ts",
+    "zoraServer-worker": "concurrently \"npm run logger-worker\" \"npm run shopify-worker\" \"npm run zora-server\""
   },
   "type": "module",
   "engines": {
@@ -36,6 +39,7 @@
     "@types/express": "^5.0.5",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.66.4",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
@@ -55,6 +59,8 @@
     "socket.io-client": "^4.8.1",
     "uuid": "^13.0.0",
     "vite-tsconfig-paths": "^5.1.4",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
@@ -72,6 +78,7 @@
     "@types/socket.io-client": "^1.4.36",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "concurrently": "^9.2.1",
     "eslint": "^8.57.1",
     "eslint-import-resolver-typescript": "^3.10.1",
     "eslint-plugin-import": "^2.32.0",

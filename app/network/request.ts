@@ -6,11 +6,11 @@ export const shopifyRequestUserInfo  = (query:string)=>{
   })
 }
 
-export const shopifyApiClientInit = ({shop,accessToken}:{shop:string,accessToken:string}) => {
+export const shopifyApiClientInit = (shop:string) => {
   return Post({
     url:'/shopifyApiClientInit',
     data:{
-      shop,accessToken,
+      shop
     }
   })
 }

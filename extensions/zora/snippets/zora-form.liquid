@@ -1,4 +1,37 @@
+{% style %}
+.zora-auth-form-component{
+  max-height: 65dvh;
+  overflow-y: scroll
+  }
+  .zora-auth-form-component::-webkit-scrollbar{
+    display: none;
+  }
+  .zora-form-pwd-box,.zora-form-register-code-box{
+    position: relative;
+    width: 100%;
+  }
+  .switch-code,.switch-pwd,.auth-send{
+    height: 100%;
+    padding: 0 .8rem;
+    background-color: var(--zora-badge-hot);
+    border-radius: 20px;
+    color: var(--zora-surface);
+    border: 1px solid var(--zora-primary);
+    transition: all .3s ease-in-out;
+  }
+  .switch-code:hover,.switch-pwd:hover{
+    padding: 0 1.5rem;
+    background-color: var(--zora-primary-hover);
+  }
+  @media screen and (max-width: 767px){
+    .zora-auth-form-component{
+      max-height: 55dvh;
+    }
+  }
+{%endstyle%}
+
 <zora-auth-form-component
+  class="zora-auth-form-component"
   data-first-name="zora-firstName"
   data-last-name="zora-lastName"
   data-pwd="zora-password"
@@ -6,14 +39,18 @@
   data-market-email="zora-market-email"
   data-market-Sms="zora-market-sms"
   data-submit="zora-submit"
+  data-switch-code="switch-code"
+  data-switch-pwd="switch-pwd"
+  data-auth-code="zora-verify-auth"
+  data-register-code="zora-register-code"
 >
   <form action="#" id="zora-auth-form" onkeydown="if (event.keyCode === 13) return false;">
-    <input id="zora-firstName" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.firstName' | t }}" />
-    <input id="zora-lastName" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.lastName' | t }}" />
+    <label for="zora-firstName"></label><input id="zora-firstName" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.firstName' | t }}" />
+    <label for="zora-lastName"></label><input id="zora-lastName" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.lastName' | t }}" />
     <div class="zora-form-email-box">
-      <input id="zora-email" type="email" class="zora-input zora-form-input" placeholder="{{ 'zora.email' | t }}" />
+      <label for="zora-email"></label><input id="zora-email" type="email" class="zora-input zora-form-input" placeholder="{{ 'zora.email' | t }}" />
       <div class="zora-verify-box hidden">
-        <input id="zora-verify-code" type="text" class="zora-input zora-form-input" placeholder="{{ 'zora.verify_code' | t }}" />
+        <label for="zora-verify-code"></label><input id="zora-verify-code" type="text" class="zora-input zora-form-input" placeholder="{{ 'zora.verify_code' | t }}" />
         <div class="zora-send-verify">
           <button class="zora-code-send">{{ 'zora.send' | t }}</button>
           <span class="zora-ex hidden">0s</span>
@@ -21,7 +58,15 @@
         </div>
       </div>
     </div>
-    <input id="zora-password" type="password" class="zora-input zora-form-input" placeholder="{{ 'zora.password' | t }}" />
+    <div class="zora-form-pwd-box">
+      <label for="zora-password"></label><input id="zora-password" type="password" class="zora-input zora-form-input" placeholder="{{ 'zora.password' | t }}" />
+      <label for="zora-verify-auth"></label><input id="zora-verify-auth" type="text" class="zora-input zora-form-input hidden" placeholder="{{ 'zora.verify_auth' | t }}" />
+      <div class="zora-verify-box zora-auth-way-box">
+        <button class="switch-code hidden">{{ 'zora.password' |  t }}</button>
+        <button class="switch-pwd">{{ 'zora.verify_auth' |  t }}</button>
+        <button class="auth-send hidden">{{ 'zora.send' | t }}</button>
+      </div>
+    </div>
     <div class="zora-check-box hidden">
       <div class="zora-check-item">
         <input type="checkbox" id="zora-market-email" />

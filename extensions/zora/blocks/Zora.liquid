@@ -67,60 +67,202 @@
 
 {% style %}
 :root{
-  --zora-error-color: {{ block.settings.zora_error_color }};
-  --zora-success-color: {{ block.settings.zora_success_color }};
-  --zora-info-color: {{ block.settings.zora_info_color }};
-  --zora-warning-color: {{ block.settings.zora_warning_color }};
+  {% comment %}--zora-error-color: {{ block.settings.zora_error_color }};{% endcomment %}
+  {% comment %}--zora-success-color: {{ block.settings.zora_success_color }};{% endcomment %}
+  {% comment %}--zora-info-color: {{ block.settings.zora_info_color }};{% endcomment %}
+  {% comment %}--zora-warning-color: {{ block.settings.zora_warning_color }};{% endcomment %}
+  /* 🌷 主色调 */
+  --zora-primary: #f8a5c2;       /* 柔和水蜜桃粉 */
+  --zora-primary-hover: #f78fb1;  /* 稍深的粉色 */
+  --zora-primary-light: #fce4ec;  /* 极浅粉色背景 */
+  --zora-primary-border: #fbcfe8; /* 粉色调边框 */
+
+  /* 🍃 状态色 - 融入花卉主题 */
+  --zora-error-color: #f28b82;    /* 温柔珊瑚红 - 类似花朵中的红色 */
+  --zora-success-color: #a5d6a7;  /* 清新薄荷绿 - 叶子的颜色 */
+  --zora-info-color: #90caf9;     /* 天空淡蓝色 - 保持专业但柔和 */
+  --zora-warning-color: #ffcc80;  /* 温暖香槟橙 - 类似花朵中的橙色 */
+
+  /* 🌼 中性色 - 温柔大地色系 */
+  --zora-text-primary: #5d4037;   /* 暖褐色文字 - 不刺眼 */
+  --zora-text-secondary: #8d6e63; /* 浅褐色次要文字 */
+  --zora-background: #fef6f9;     /* 极浅粉白色背景 */
+  --zora-surface: #ffffff;        /* 纯白色卡片 */
+  --zora-border: #f3d9e4;         /* 粉调边框 */
+
+  /* 💬 聊天界面专用色 */
+  --zora-chat-bubble-customer: #f8a5c2;   /* 客户消息用主粉色 */
+  --zora-chat-bubble-agent: #f5f5f5;     /* 客服消息用浅灰 */
+  --zora-chat-bubble-text-customer: #5d4037; /* 深褐色文字 */
+  --zora-chat-bubble-text-agent: #5d4037;
+
+  /* 🌸 网站特定元素色 */
+  --zora-header-bg: #ffffff;       /* 顶部导航背景 */
+  --zora-search-border: #f8a5c2;   /* 搜索框边框 */
+  --zora-button-bg: #f8a5c2;       /* 按钮背景 */
+  --zora-button-text: #ffffff;     /* 按钮文字 */
+  --zora-badge-hot: #f28b82;       /* Hot标签背景 */
+  --zora-badge-new: #a5d6a7;       /* New标签背景 */
 }
   div,input,button{
     box-sizing: border-box;
   }
-.hidden-scroller::-webkit-scrollbar {
+  /* 隐藏滚动条 */
+  .hidden-scroller::-webkit-scrollbar {
   display: none;
-}
+  }
+
+  /* 主容器定位 */
+  .zora-main {
+  position: fixed;
+  width: fit-content;
+  height: fit-content;
+  left: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 90;
+  cursor: pointer;
+  }
+
+  /* 默认主按钮 */
+  .zora-main-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: .5rem 1rem;
+  width: fit-content;
+  height: fit-content;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f8a5c2, #f78fb1);
+  box-shadow: 0 4px 12px rgba(248, 165, 194, 0.3);
+  transition: all 0.3s ease;
+  border: 2px solid #ffffff;
+  }
+
+  .zora-main-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(248, 165, 194, 0.4);
+  }
+
+  .zora-main-btn:active {
+  transform: scale(0.95);
+  }
+
+  /* 激活状态主按钮 */
+  .zora-main-btn-active {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: fit-content;
+  height: 3.5rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f8a5c2, #f78fb1);
+  box-shadow: 0 4px 12px rgba(248, 165, 194, 0.3);
+  border: 2px solid #ffffff;
+  transition: all 0.3s ease;
+  }
+
+  /* 按钮图标 */
+  .zora-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: var(--zora-surface);
+  }
+
+  /* 聊天图标 */
+  .zora-chat-icon {
+  color: var(--zora-surface);
+  font-size: 1.8rem;
+  }
+
+  /* 关闭图标 */
+  .btn-close {
+  color: var(--zora-surface);
+  width: 1.8rem;
+  height: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  }
+
+  /* 按钮容器切换 */
+  .zora-default-btn-box,
+  .zora-active-btn-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  }
+
+  .zora-active-btn-box.btn-box-hidden,
+  .zora-default-btn-box.btn-box-hidden {
+  display: none;
+  }
+
+  /* 呼吸动画 */
+  @keyframes breathing {
+  0% {
+  box-shadow: 0 4px 12px rgba(248, 165, 194, 0.3);
+  }
+  50% {
+  box-shadow: 0 4px 20px rgba(248, 165, 194, 0.5);
+  }
+  100% {
+  box-shadow: 0 4px 12px rgba(248, 165, 194, 0.3);
+  }
+  }
+
+  /* 新消息提示 */
+  .zora-new-message-indicator {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 0.8rem;
+  height: 0.8rem;
+  background: #ff4757;
+  border-radius: 50%;
+  border: 2px solid var(--zora-surface);
+  animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+  0%, 100% {
+  transform: scale(1);
+  opacity: 1;
+  }
+  50% {
+  transform: scale(1.2);
+  opacity: 0.8;
+  }
+  }
+
+  /* 移动端适配 */
+  @media (max-width: 768px) {
   .zora-main{
-    position: fixed;
+    left: 1.2rem;
+  }
+  .zora-default-btn-box,.zora-btn{
+     font-size: 1rem;
+  }
+  .zora-main-btn,
+  .zora-main-btn-active {
     width: fit-content;
-    height: fit-content;
-    left: {{ block.settings.zora_size_position_x | append: 'rem' }};
-    bottom: {{ block.settings.zora_size_position_y | append: 'dvh' }};
-    z-index: 100000;
   }
   .zora-main-btn{
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: .5rem .8rem;
-    border-radius: .5rem;
-    font-size: 2rem;
-    background: {{block.settings.zora_bg_color }};
+    padding: .3rem .8rem;
   }
-  .zora-main-btn-active{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: .5rem;
-    border-radius: 50%;
-    font-size: 2rem;
-    background: {{ block.settings.zora_bg_color }};
+
+  .zora-chat-icon {
+  font-size: 1.5rem;
   }
-  .zora-btn{
-    display: flex;
-    font-size: 1.5rem;
-    color: #fff;
+
+  .btn-close {
+  font-size: 1.2rem;
+  width: 1.5rem;
+  height: 1.5rem;
   }
-  .btn-close{
-    width: 2rem;
-    height: 2rem;
-    font-size: 2rem;
-  }
-  .zora-default-btn-box,.zora-active-btn-box{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  .zora-active-btn-box.btn-box-hidden,.zora-default-btn-box.btn-box-hidden{
-    display: none;
   }
 {% endstyle %}
 

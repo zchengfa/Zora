@@ -1,254 +1,385 @@
 {% style %}
-  .zora-container{
-    display: none;
-  }
-  .zora-container-active,.zora-auth-container{
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 1rem;
-    width: fit-content;
-    height: fit-content;
-    left: 100%;
-    bottom: 100%;
-    border-radius: .5rem;
-    color: #fff;
-    background: {{ block.settings.zora_bg_color }};
-    z-index: 9999;
-  }
-  .zora-header{
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: flex-start;
-    width: 100%;
-    color: #fff;
-  }
-  .zora-title{
-    margin-bottom: .5rem;
-    text-transform: capitalize;
-    font-size: 1rem;
-    color: #fff;
-  }
-  .zora-description{
-    width: 20rem;
-    font-size: .9rem;
-    line-height: normal;
-  }
-  .zora-header-active-box{
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    width: 20rem;
-  }
-  .zora-shop-name{
-    flex: 1;
-    text-align: center;
-    font-size: 1.2rem;
-    color: #fff;
-    text-indent: -1.5rem;
-  }
-  .zora-content{
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 1rem;
-    width: 100%;
-    height: fit-content;
-    border-radius: .5rem;
-    background: #fff;
-  }
-  .zora-message-box{
-    width: 100%;
-    height: 0;
-    transition: height .3s ease-out;
-  }
-  .zora-message-box-active{
-    width: 100%;
-    height: 55dvh;
-    transition: height .3s ease-out;
-  }
-  .zora-input-box{
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    padding: 1rem 0;
-    height: fit-content;
-  }
-  .zora-emoji-component,.zora-send-component{
-    flex: 1;
-  }
-  .zora-input-component{
-    flex: 5;
-  }
-  .zora-input{
-    width: 100%;
-    height: 2.2rem;
-    border-radius: .5rem;
-    border: none;
-    text-indent: .8rem;
-    color: #fff;
-    background: {{ block.settings.zora_bg_color }};
-  }
-  .zora-input::placeholder{
-    color: #e8e0e0e4;
-  }
-  .zora-input:focus-visible{
-    outline: none;
-    border: none;
-    box-shadow: 4px 4px 4px #c4bebeff;
-  }
-  .zora-send-component,.zora-emoji-component{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  .zora_icon_box{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 2.2rem;
-    font-size: 1.5rem;
-  }
-  .zora-chat-btn-component{
-    width: 90%;
-    padding: 1rem;
-    background: #fff;
-    text-align: center;
-    border-radius: .5rem;
-  }
-  .zora-chat-btn{
-    width: 90%;
-    height: 2.2rem;
-    color: #fff;
-    font-size: 1.2rem;
-    background: {{ block.settings.zora_bg_color }};
-    border-radius: .5rem;
-  }
-  .zora-auth-container{
-    width: fit-content;
-    height: fit-content;
-  }
-  .zora-form-email-box{
-    position: relative;
-    width: 100%;
-  }
-  .zora-form-input{
-    margin-top: 1rem;
-    color: #000;
-    background: #fff;
-  }
-  .zora-verify-box{
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    mix-blend-mode: difference;
-    background:{{ block.settings.zora_bg_color }};
-    border-top-right-radius: .5rem;
-    border-bottom-right-radius: .5rem;
-  }
-  .zora-code-send,.zora-ex,.zora-code-verify{
-    display: flex;
-    min-width: 3rem;
-    justify-content: center;
-    align-items: center;
-    height: 2.2rem;
-    color: #000;
-  }
-  .zora-form-input::placeholder{
-    color: #aaa3a3ff;
-    text-transform: capitalize;
-  }
-  #zora-verify-code{
-    margin-top: 0;
-    max-width: 5rem;
-    text-indent: 0;
-    text-align: center;
-    border-radius: 0;
-    border-left: 1px solid #d5cccc;
-    border-right: 1px solid #d5cccc;
-    background: transparent;
-  }
-  #zora-verify-code:focus-visible{
-    box-shadow: none;
-  }
-  #zora-verify-code::placeholder{
-    color: #000;
-  }
-  .zora-check-item{
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    margin-top: .5rem;
-    font-size: .8rem;
+  /* 基础容器 */
+  .zora-container {
+  display: none;
   }
 
-  .zora-auth-btn,.zora-disabled-btn{
-    margin: 1rem auto;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 2.2rem;
-    border-radius: .5rem;
-    font-size: 1.2rem;
-  }
-  #zora-market-email, #zora-market-sms{
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-  .zora-policy-box{
-    margin-top: 1rem;
-    padding: 1rem;
-    border-radius: .5rem;
-    font-size: .8rem;
-    line-height: 1.5;
-    background: rgba(0,0,0,.1);
-  }
-  .zora-disabled-btn{
-    color: #fff;
-    background: rgba(0,0,0,.1);
-    cursor: not-allowed;
-  }
-  .zora-auth-btn{
-    color: {{ block.settings.zora_bg_color }};
-    background: #fff;
-    cursor: pointer;
-  }
-  .zora-err-box{
-    width: 100%;
-    max-height: 10dvh;
-    margin-top: 1rem;
-    background: #fff;
-    border-radius: .5rem;
-    text-align: left;
-    overflow-y: scroll;
-    overscroll-behavior: contain;
-  }
-  .zora-err-item{
-    display: block;
-    padding: .5rem 1rem;
-    color: #e89f29ff;
-    font-size: .8rem;
-    line-height: 1.5;
-  }
-  .zora-err-item:last-child{
-    padding-bottom: .5rem;
-  }
-  .zora-disabled{
-    cursor: not-allowed;
-  }
-  .hidden{
-    display: none;
+  .zora-container-active,
+  .zora-auth-container {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  width: 24rem;
+  height: fit-content;
+  left: 100%;
+  bottom: 100%;
+  border-radius: 1rem; /* 更大的圆角，更柔和 */
+  color: var(--zora-text-primary);
+  background: var(--zora-surface);
+  border: 1px solid var(--zora-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
   }
 
+  /* 头部区域 */
+  .zora-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--zora-border);
+  }
+
+  .zora-title {
+  margin-bottom: 0.5rem;
+  text-transform: capitalize;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--zora-primary);
+  font-family: 'Playfair Display', serif; /* 更优雅的字体 */
+  }
+
+  .zora-description {
+  width: 100%;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--zora-text-secondary);
+  }
+
+  .zora-header-active-box {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--zora-border);
+  }
+
+  .zora-shop-name {
+  flex: 1;
+  text-align: center;
+  font-size: 1.2rem;
+  color: var(--zora-primary);
+  font-weight: 600;
+  }
+
+  /* 返回按钮 */
+  .zora-back-component {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  }
+
+  .zora-back-component:hover {
+  transform: translateX(-4px);
+  }
+
+  .zora-back-component .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: var(--zora-primary);
+  }
+
+  /* 内容区域 */
+  .zora-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  width: 100%;
+  height: fit-content;
+  border-radius: 0.5rem;
+  }
+
+  /* 消息区域 */
+  .zora-message-box {
+  width: 100%;
+  height: 0;
+  overflow: hidden;
+  transition: height 0.3s ease-out;
+  }
+
+  .zora-message-box-active {
+  width: 100%;
+  height: 55dvh;
+  overflow-y: auto;
+  transition: height 0.3s ease-out;
+  }
+
+  /* 输入区域 */
+  .zora-input-box {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 0;
+  height: fit-content;
+  gap: 0.5rem;
+  }
+
+  .zora-input {
+  flex: 5;
+  width: 100%;
+  height: 2.5rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--zora-border);
+  padding: 0 1.2rem;
+  color: var(--zora-text-primary);
+  background: var(--zora-background);
+  transition: all 0.3s ease;
+  }
+
+  .zora-input::placeholder {
+  color: var(--zora-text-secondary);
+  opacity: 0.7;
+  }
+
+  .zora-input:focus-visible {
+  outline: none;
+  border-color: var(--zora-primary);
+  box-shadow: 0 0 0 2px rgba(248, 165, 194, 0.2);
+  }
+
+  /* 图标按钮 */
+  .zora_icon_box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--zora-background);
+  border: 1px solid var(--zora-border);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  }
+
+  .zora_icon_box:hover {
+  background: var(--zora-primary-light);
+  border-color: var(--zora-primary-border);
+  }
+
+  .zora_icon_box .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  }
+
+  .zora_icon_box.normal-send .icon {
+  fill: var(--zora-text-secondary);
+  }
+
+  .zora_icon_box.active-send .icon {
+  fill: var(--zora-primary);
+  }
+
+  /* 开始聊天按钮 */
+  .zora-chat-btn-component {
+  width: 100%;
+  padding: 1rem 0;
+  }
+
+  .zora-chat-btn {
+  width: 100%;
+  height: 2.8rem;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 500;
+  background: var(--zora-primary);
+  border: none;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  }
+
+  .zora-chat-btn:hover {
+  background: var(--zora-primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(248, 165, 194, 0.3);
+  }
+
+  /* 认证容器 */
+  .zora-auth-container {
+  width: 24rem;
+  background: var(--zora-surface);
+  }
+
+  .zora-form-email-box {
+  position: relative;
+  width: 100%;
+  }
+
+  .zora-form-input {
+  width: 100%;
+  height: 2.5rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--zora-border);
+  padding: 0 1.2rem;
+  margin-top: 1rem;
+  color: var(--zora-text-primary);
+  background: var(--zora-background);
+  }
+
+  .zora-verify-box {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 2.5rem;
+  }
+
+  .zora-code-send,
+  .zora-ex,
+  .zora-code-verify {
+  display: flex;
+  min-width: 3rem;
+  justify-content: center;
+  align-items: center;
+  height: 2.5rem;
+  color: var(--zora-primary);
+  font-weight: 500;
+  cursor: pointer;
+  }
+
+  .zora-code-send:hover {
+  color: var(--zora-primary-hover);
+  }
+
+  #zora-verify-code {
+  margin-top: 0;
+  padding: 0;
+  width: 5rem;
+  height: 2.5rem;
+  border: 1px solid var(--zora-border);
+  border-left: none;
+  border-right: none;
+  text-align: center;
+  color: var(--zora-text-primary);
+  background: var(--zora-background);
+  border-radius: unset;
+  }
+
+  /* 复选框 */
+  .zora-check-item {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--zora-text-secondary);
+  }
+
+  .zora-check-item input[type="checkbox"] {
+  margin-right: 0.5rem;
+  }
+
+  /* 按钮 */
+  .zora-auth-btn,
+  .zora-disabled-btn {
+  margin: 1rem auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 2.8rem;
+  border-radius: 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  }
+
+  .zora-auth-btn {
+  color: #fff;
+  background: var(--zora-primary);
+  border: none;
+  }
+
+  .zora-auth-btn:hover {
+  background: var(--zora-primary-hover);
+  }
+
+  .zora-disabled-btn {
+  color: var(--zora-text-secondary);
+  background: var(--zora-background);
+  border: 1px solid var(--zora-border);
+  cursor: not-allowed;
+  }
+
+  /* 错误提示框 */
+  .zora-err-box {
+  width: 100%;
+  max-height: 10dvh;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: var(--zora-error-color);
+  border-radius: 0.5rem;
+  text-align: left;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  }
+
+  .zora-err-item {
+  display: block;
+  padding: 0.5rem 1rem;
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  }
+
+  /* 协议说明框 */
+  .zora-policy-box {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--zora-text-secondary);
+  background: var(--zora-background);
+  border: 1px solid var(--zora-border);
+  }
+
+  /* 实用类 */
+  .zora-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  }
+
+  .hidden {
+  display: none;
+  }
+
+  /* 滚动条样式 */
+  .zora-message-box-active::-webkit-scrollbar {
+  width: 6px;
+  }
+
+  .zora-message-box-active::-webkit-scrollbar-track {
+  background: var(--zora-background);
+  }
+
+  .zora-message-box-active::-webkit-scrollbar-thumb {
+  background: var(--zora-border);
+  border-radius: 3px;
+  }
+
+  .zora-message-box-active::-webkit-scrollbar-thumb:hover {
+  background: var(--zora-text-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .zora-container-active,.zora-auth-container{
+      left: 0;
+      width: 90dvw;
+    }
 {% endstyle %}
 
 <div class="zora-container">
