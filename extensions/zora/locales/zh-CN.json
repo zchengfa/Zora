@@ -19,5 +19,6 @@
         "verify_code": "验证码",
         "send": "发送",
         "verify": "验证",
+        "verify_auth":"验证码"
     }
 }

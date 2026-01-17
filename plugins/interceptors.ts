@@ -73,7 +73,6 @@ const shopifyAuthMiddleware = (req: Request, res: Response, next: NextFunction) 
 const interceptors = async ({req,res,next}:{req: Request, res: Response, next: NextFunction}) => {
   const path = req.path;
   const publicRoutes = ['/app', '/shopifyApiClientInit', '/validateToken', '/checkEmail', '/sendVerifyCodeToEmail', '/verifyCode', '/authenticator'];
-
   // 放行公共路由和webhooks路由
   if (publicRoutes.includes(path) || req.path.startsWith('/webhooks')) {
     await beginLogger({

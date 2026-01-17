@@ -2,39 +2,47 @@ import {ShopifyAPI} from "./axios.ts"
 import {
   CUSTOMER_COUNT_QUERY,
   CUSTOMERS_QUERY,
-  SHOP_OWNER_NAME_QUERY,
+  SHOP_QUERY,
   ORDERS_COUNT_QUERY,
   ORDERS_QUERY,
   PRODUCTS_COUNT_QUERY,
   PRODUCTS_QUERY,
-  ORDER_QUERY
+  ORDER_QUERY,
+  CUSTOMER_QUERY_BY_identifier
 } from "./shopifyQuery.ts";
 import type {
   GraphqlShopResponse,
   GraphqlCustomerCountResponse,
-  GraphqlCustomerResponse,
+  GraphqlCustomersResponse,
   GraphqlOrdersCountResponse,
   GraphqlOrdersResponse,
   GraphqlQueryVariables,
   GraphqlProductsCountResponse,
   GraphqlProductsResponse,
-  GraphqlOrderResponse
+  GraphqlOrderResponse,
+  GraphqlCustomerByIdentifierResponse
 } from './shopifyQuery.ts'
+import {CUSTOMER_CREATE_MUTATION} from './shopifyMutation.ts'
+import type {
+  GraphqlCustomerCreateMutationResponse,
+  GraphqlMutationVariables
+} from './shopifyMutation.ts'
 import type {PrismaClient} from "@prisma/client";
 import type {Redis} from "ioredis"
 import {beginLogger} from "./bullTaskQueue.ts";
 import {handlePrismaError} from "./handleZoraError.ts";
+import express from "express";
 
 export interface IShopifyApiClient {
   /**
    * 获取店铺所有者信息
    */
-  shopOwner(): Promise<GraphqlShopResponse>,
+  shop(): Promise<GraphqlShopResponse>,
 
   /**
    * 查询客户信息
    */
-  customers(limit:number,afterCursor?:string): Promise<GraphqlCustomerResponse>,
+  customers(limit:number,afterCursor?:string): Promise<GraphqlCustomersResponse>,
 
   /**
    * 查询客户数量
@@ -65,6 +73,16 @@ export interface IShopifyApiClient {
    * 查询指定订单
    */
   order(orderId:string): Promise<GraphqlOrderResponse>,
+
+  /**
+   * 通过标识查询指定客户数据
+   */
+  customerByIdentifier(identifier:GraphqlQueryVariables['identifier']):Promise<GraphqlCustomerByIdentifierResponse>
+
+  /**
+   * 写入客户
+   */
+  customerCreate(input:GraphqlMutationVariables['input']): Promise<GraphqlCustomerCreateMutationResponse>,
 }
 export class ShopifyApiClient implements IShopifyApiClient {
   private readonly shopConfig: { apiVersion: string; shopDomain: string; accessToken: string };
@@ -77,7 +95,7 @@ export class ShopifyApiClient implements IShopifyApiClient {
       apiVersion: '2025-10'
     }
   }
-  private shopifyApiGraphqlRequest = (query:string,variables?:GraphqlQueryVariables)=>{
+  private shopifyApiGraphqlRequest = (query:string,variables?:GraphqlQueryVariables | GraphqlMutationVariables)=>{
     return this.shopifyApi.graphql({
       ...this.shopConfig,
       query,
@@ -86,8 +104,9 @@ export class ShopifyApiClient implements IShopifyApiClient {
       }
     })
   }
-  public shopOwner = ():Promise<GraphqlShopResponse>=>{
-    return this.shopifyApiGraphqlRequest(SHOP_OWNER_NAME_QUERY)
+
+  public shop = ():Promise<GraphqlShopResponse>=>{
+    return this.shopifyApiGraphqlRequest(SHOP_QUERY)
   }
 
   public ordersCount = ():Promise<GraphqlOrdersCountResponse> =>{
@@ -98,7 +117,7 @@ export class ShopifyApiClient implements IShopifyApiClient {
     return this.shopifyApiGraphqlRequest(CUSTOMER_COUNT_QUERY)
   }
 
-  public customers = (limit:number,afterCursor?:string):Promise<GraphqlCustomerResponse>=>{
+  public customers = (limit:number,afterCursor?:string):Promise<GraphqlCustomersResponse>=>{
     return this.shopifyApiGraphqlRequest(CUSTOMERS_QUERY,{
       limit,
       afterCursor
@@ -126,6 +145,17 @@ export class ShopifyApiClient implements IShopifyApiClient {
   public order = (orderId:string):Promise<GraphqlOrderResponse> =>{
     return this.shopifyApiGraphqlRequest(ORDER_QUERY,{
       orderId
+    })
+  }
+  public customerByIdentifier = (identifier:GraphqlQueryVariables['identifier']):Promise<GraphqlCustomerByIdentifierResponse>=>{
+    return this.shopifyApiGraphqlRequest(CUSTOMER_QUERY_BY_identifier,{
+      identifier
+    })
+  }
+
+  public customerCreate = (input:GraphqlMutationVariables['input']):Promise<GraphqlCustomerCreateMutationResponse> =>{
+    return this.shopifyApiGraphqlRequest(CUSTOMER_CREATE_MUTATION,{
+      input
     })
   }
 }
@@ -237,12 +267,23 @@ export const executeShopifyId = (id:string)=>{
   return id.substring(id.lastIndexOf('/')+1,id.length)
 }
 
+export const getWebhookParams = (req: express.Request):{id:string,shop:string}=>{
+  const {admin_graphql_api_id} = JSON.parse(req.body.toString('utf8'))
+  const request_shop = req?.headers['x-shopify-shop-domain']
 
-export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'orders' | 'products',prismaClient:PrismaClient,totalCount:number = 1)=>{
+  return {
+    id: admin_graphql_api_id,
+    shop: request_shop as string,
+  }
+}
+
+
+export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'orders' | 'products' | 'shop',prismaClient:PrismaClient,totalCount:number = 1)=>{
   let result = null
   if(type === 'customers'){
     const prismaData:any[] = []
-    data.map((item:GraphqlCustomerResponse['customers']['nodes'][0])=>{
+
+    data.map((item:GraphqlCustomersResponse['customers']['nodes'][0] & {shop_id?:string})=>{
       prismaData.push({
         id: executeShopifyId(item.id),
         shopify_customer_id: item.id,
@@ -256,9 +297,11 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
         total_amount_spent: item.amountSpent.amount,
         currency_code: item.amountSpent.currencyCode,
         verified_email: item.verifiedEmail,
-        market_email: item.defaultEmailAddress.marketingState !== "NOT_SUBSCRIBED"
+        market_email: item.defaultEmailAddress.marketingState !== "NOT_SUBSCRIBED",
+        shop_id: item.shop_id
       })
     })
+
     try{
       result = await prismaClient.customers.createMany({
         data: prismaData,
