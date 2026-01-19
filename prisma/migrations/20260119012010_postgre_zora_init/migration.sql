@@ -78,6 +78,7 @@ CREATE TABLE "shop" (
     "partner_development" BOOLEAN NOT NULL DEFAULT true,
     "public_display_name" TEXT NOT NULL,
     "shopify_domain" TEXT NOT NULL,
+    "is_installed" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3),
 
