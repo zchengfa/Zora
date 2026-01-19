@@ -228,6 +228,7 @@ export interface GraphqlQueryVariables {
   limit?: number;
   afterCursor?: string | null;
   orderId?:string,
+  productId?:string,
   identifier?:{
     customId?:{
       namespace?: string,
@@ -315,6 +316,10 @@ export interface GraphqlProductsCountResponse {
 
 export interface GraphqlOrderResponse {
   order: GraphqlOrdersResponse['orders']["nodes"][0]
+}
+
+export interface GraphqlProductResponse {
+  product: GraphqlProductsResponse['products']["nodes"][0]
 }
 
 export const CUSTOMER_QUERY_BY_identifier = `
@@ -734,6 +739,81 @@ export const PRODUCTS_COUNT_QUERY = `
   query GetProductsCount{
     productsCount{
       count
+    }
+  }
+`
+
+export const PRODUCT_QUERY = `
+  query getProduct($productId:ID!){
+    product(id:$productId){
+      id
+      title
+      description
+      descriptionHtml
+      tags
+      vendor
+      variants(first:10){
+        nodes{
+          id
+          price
+          position
+          unitPrice{
+            amount
+            currencyCode
+          }
+          sku
+        }
+      }
+      priceRangeV2{
+        maxVariantPrice{
+          amount
+          currencyCode
+        }
+        minVariantPrice{
+          amount
+          currencyCode
+        }
+      }
+      compareAtPriceRange{
+        maxVariantCompareAtPrice{
+          currencyCode
+          amount
+        }
+        minVariantCompareAtPrice{
+          currencyCode
+          amount
+        }
+      }
+      featuredMedia{
+        id
+        mediaContentType
+        preview{
+          image{
+            url
+            thumbhash
+          }
+        }
+      }
+      variantsCount{
+        count
+      }
+      media(first:10){
+        nodes{
+          id
+          mediaContentType
+          preview{
+            image{
+              url
+              thumbhash
+            }
+          }
+        }
+      }
+      mediaCount{
+        count
+      }
+      createdAt
+      updatedAt
     }
   }
 `

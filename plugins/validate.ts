@@ -1,11 +1,10 @@
 import nodemailer from 'nodemailer'
 import type SMTPPool from "nodemailer/lib/smtp-pool/index.d.ts";
 import {generateEmailHtml} from "./emailHtml.ts";
-import {createHmac, timingSafeEqual} from "node:crypto";
+import {createHmac, timingSafeEqual,createHash} from "node:crypto";
 import type {Request} from "express";
 import {redisClient} from "./redisClient.ts";
 import {prismaClient} from "./prismaClient.ts";
-import {returnStatement} from "@babel/types";
 
 export interface ValidateConfigType {
   email:string,
@@ -28,8 +27,24 @@ export interface MailResultType {
  * RegexEmail("xxxxx@qq.com")
  */
 export const RegexEmail = (email:string):boolean=> {
+  // 更严格的邮箱验证正则表达式
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return emailRegex.test(email);
+
+  // 检查基本格式
+  if (!emailRegex.test(email)) {
+    return false;
+  }
+
+  // 检查是否有连续的点
+  if (email.includes('..')) {
+    return false;
+  }
+
+  // 检查域名部分是否有效
+  const domainParts = email.split('@')[1].split('.');
+  return !(domainParts.length < 2 || domainParts[domainParts.length - 1].length < 2);
+
+
 }
 
 /**
@@ -125,6 +140,10 @@ export function verifyShopifyHmac(
     .digest('hex');
 
   // 恒定时间比较，防时序攻击
+  // 先比较长度，长度不同则直接返回false
+  if (expected.length !== hmac.length) {
+    return false;
+  }
   return timingSafeEqual(
     Buffer.from(expected, 'hex'),
     Buffer.from(hmac, 'hex')
@@ -251,4 +270,13 @@ export async function validateRequestSender(req:Request){
   if(redisShopDomain) return redisShopDomain
   const prismaShopDomain = await prismaClient.shop.findUnique({where:{shopify_domain: domain}, select:{id: true}})
   return prismaShopDomain?.id;
+}
+
+
+export const hashCode = (code:string)=>{
+  return createHash('sha256').update(code,'utf8').digest('hex')
+}
+
+export const validateHashCode = (code:string,storeHashCode:string)=>{
+  return timingSafeEqual(Buffer.from(hashCode(code),'hex'),Buffer.from(storeHashCode,'hex'))
 }

@@ -61,6 +61,7 @@ model shop {
   partner_development Boolean   @default(true)
   public_display_name String
   shopify_domain      String    @unique
+  is_installed        Boolean   @default(false)
   createdAt           DateTime? @default(now())
   updatedAt           DateTime?
 

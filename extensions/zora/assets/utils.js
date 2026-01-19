@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "https://69f68ee9aaa5.ngrok-free.app";
+const FETCH_BASE_URL = "https://e03debc345f4.ngrok-free.app";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {
@@ -190,7 +190,7 @@ class ZoraResponse {
             validate_email:'邮箱验证失败',
             code_error:'验证码错误',
             no_attempt_expired: '验证次数过多或验证码过期',
-            password: '账号密码错误',
+            password: '账号密码或验证码错误',
             params: '缺少必要参数'
           },
           msg_status:{
@@ -223,7 +223,7 @@ class ZoraResponse {
             validate_email:'email validate failure',
             code_error:'incorrect code',
             no_attempt_expired: 'Excessive verification attempts or expired verification code',
-            password: 'incorrect password',
+            password: 'incorrect password or code',
             params:'missing required params'
           },
           msg_status:{

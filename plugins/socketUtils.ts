@@ -41,13 +41,57 @@ export class SocketUtils{
   private config: SocketUtilConfigType;
   private ws: Socket;
   private users: Map<string,string>;
-  private agent: Map<string,string>;
+  private readonly agent: Map<string,string>;
+  private static ioInstance: Server | null = null;
+  private static agentMapInstance: Map<string,string> | null = null;
+
   constructor(config:SocketUtilConfigType,ws:Socket,users:Map<string,string>,agent:Map<string,string>) {
     this.config = config
     this.ws = ws
     this.users = users
     this.agent = agent
+    SocketUtils.ioInstance = this.config.io
+    SocketUtils.agentMapInstance = this.agent
     this.repostMessageAck()
+  }
+
+  /**
+   * 向所有在线客服发送webhook通知
+   * @param webhookType webhook类型 (orders/create, customers/update等)
+   * @param data webhook数据
+   * @param shop 店铺标识
+   */
+  public static async sendWebhookNotification({
+    webhookType,
+    data,
+    shop
+  }: {
+    webhookType: string;
+    data: any;
+    shop: string;
+  }) {
+    if (!SocketUtils.ioInstance || !SocketUtils.agentMapInstance) {
+      await beginLogger({
+        level:'error',
+        message:'Socket.IO实例或agent Map未初始化',
+        meta:{
+          taskType: 'socketUtils_sendWebhookNotification',
+          webhookType,
+          shop,
+        }
+      })
+      return;
+    }
+
+    // 通知所有在线客服
+    SocketUtils.agentMapInstance.forEach((socketId: string) => {
+      SocketUtils.ioInstance!.to(socketId).emit('webhook_notification', {
+        type: webhookType,
+        shop,
+        data,
+        timestamp: new Date().toISOString()
+      });
+    });
   }
   private setConversation = async (conversation:ConversationType,user)=>{
     await this.config.redis.hset(`conversation:${conversation.id}`,{...conversation})

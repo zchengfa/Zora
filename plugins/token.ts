@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const secretOrPrivateKey = process.env.JWT_PRIVATE_KEY as string;
+const secretOrPrivateKey = process.env.JWT_PRIVATE_KEY as string || process.env.JWT_SECRET as string;
 
 // 定义 Token 载荷接口
 interface TokenPayload {

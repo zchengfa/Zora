@@ -179,7 +179,6 @@ if(!customElements.get('zora-auth-form-component')){
           authCode: '',
           marketEmail: false,
           marketSms: false,
-          isLogin: false
         }
         this.verifyCode = ''
         this.endTime = undefined
@@ -428,7 +427,6 @@ if(!customElements.get('zora-auth-form-component')){
               })
              }).then(res=>res.json())
           this.validateStatus = emailValidate.result
-          this.formData.isLogin = emailValidate.result
 
           this.checkAllInputValue()
           this.triggerRegisterElements(emailValidate.result)

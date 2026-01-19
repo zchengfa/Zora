@@ -21,15 +21,42 @@ const shopify = shopifyApp({
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: `${process.env.VITE_BASE_URL}/webhooks/orders/create`
     },
+    ORDERS_UPDATED:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl: `${process.env.VITE_BASE_URL}/webhooks/orders/updated`
+    },
+    ORDERS_DELETE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl: `${process.env.VITE_BASE_URL}/webhooks/orders/delete`
+    },
     CUSTOMERS_CREATE:{
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/customers/create`
     },
+    CUSTOMERS_UPDATE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/customers/update`
+    },
     CUSTOMERS_DELETE:{
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/customers/delete`
+    },
+    PRODUCTS_CREATE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/products/create`
+    },
+    PRODUCTS_UPDATE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/products/update`
+    },
+    PRODUCTS_DELETE:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/products/delete`
+    },
+    APP_UNINSTALLED:{
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl:`${process.env.VITE_BASE_URL}/webhooks/app/uninstalled`
     }
-
   },
   hooks:{
     //应用安装完成，会触发该钩子
