@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1768783500945" clover="3.2.0">
+  <project timestamp="1768783500945" name="All files">
+    <metrics statements="17" coveredstatements="7" conditionals="8" coveredconditionals="3" methods="5" coveredmethods="1" elements="30" coveredelements="11" complexity="0" loc="17" ncloc="17" packages="1" files="1" classes="1"/>
+    <file name="token.ts" path="C:\Users\15229\WebstormProjects\Zora\plugins\token.ts">
+      <metrics statements="17" coveredstatements="7" conditionals="8" coveredconditionals="3" methods="5" coveredmethods="1"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="3" count="1" type="cond" truecount="2" falsecount="0"/>
+      <line num="15" count="1" type="stmt"/>
+      <line num="16" count="3" type="cond" truecount="1" falsecount="1"/>
+      <line num="17" count="0" type="stmt"/>
+      <line num="21" count="3" type="stmt"/>
+      <line num="24" count="1" type="stmt"/>
+      <line num="25" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="26" count="0" type="stmt"/>
+      <line num="27" count="0" type="stmt"/>
+      <line num="30" count="0" type="stmt"/>
+      <line num="34" count="1" type="stmt"/>
+      <line num="35" count="0" type="stmt"/>
+      <line num="36" count="0" type="stmt"/>
+      <line num="37" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="38" count="0" type="stmt"/>
+      <line num="40" count="0" type="stmt"/>
+    </file>
+  </project>
+</coverage>

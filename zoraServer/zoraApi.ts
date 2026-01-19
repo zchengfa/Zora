@@ -1,5 +1,5 @@
 import type {Express, Response} from "express-serve-static-core"
-import {RegexEmail, validate, validateRequestSender} from "../plugins/validate.ts";
+import {RegexEmail, validate, validateRequestSender,hashCode,validateHashCode} from "../plugins/validate.ts";
 import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
@@ -57,57 +57,59 @@ const RATE_LIMITS = {
   LOOSE: createRateLimiter(300),
 }
 
+const loginAuth = async ({prisma,paramsObj,shopifyApiClientsManager,redis,res}:{prisma:PrismaClient,paramsObj:FormDataType,shopifyApiClientsManager:IShopifyApiClientsManager,redis:Redis,res:Response})=>{
+  const session_id = uuidv4()
+  const expired = new Date(new Date().getTime() + SESSION_EXPIRED_DURATION)
+  const sessionPrismaUpsert = await prisma.session.upsert({
+    where:{
+      email:paramsObj.email
+    },
+    update:{
+      sessionId:session_id,
+      expires:expired
+    },
+    create:{
+      sessionId: session_id,
+      userId: paramsObj.id,
+      firstName: paramsObj.firstName,
+      lastName: paramsObj.lastName,
+      email: paramsObj.email,
+      expires: expired,
+    }
+  })
+  //获取客服数据给客户
+  let agentInfo = undefined
+  //获取商店对应的shopify api请求客户端
+  const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(paramsObj.shopDomain as string)
 
+  try{
+    const {shop} = await shopifyApiClient.shop()
+    agentInfo = await prisma.customerServiceStaff.findUnique({
+      where: {
+        email: shop.email
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true
+      }
+    })
+  }
+  catch (e) {
+    handlePrismaError(e)
+  }
+
+  const token = createToken({session_id},'1d')
+  const username = sessionPrismaUpsert.firstName as string + sessionPrismaUpsert.lastName as string
+  res.status(200).send({result:true,message:'login successfully',token,userInfo:{userId:paramsObj.id?.toString(),username,avatar:paramsObj.image_url,agentInfo}})
+}
 
 const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response,redis:Redis,prisma:PrismaClient,shopifyApiClientsManager:IShopifyApiClientsManager)=>{
   try{
     const result = await bcrypt.compare(paramsObj.password,databasePwd)
     if(result){
-      const session_id = uuidv4()
-      const expired = new Date(new Date().getTime() + SESSION_EXPIRED_DURATION)
-      const sessionPrismaUpsert = await prisma.session.upsert({
-        where:{
-          email:paramsObj.email
-        },
-        update:{
-          sessionId:session_id,
-          expires:expired
-        },
-        create:{
-          sessionId: session_id,
-          userId: paramsObj.id,
-          firstName: paramsObj.firstName,
-          lastName: paramsObj.lastName,
-          email: paramsObj.email,
-          expires: expired,
-        }
-      })
-      //获取客服数据给客户
-      let agentInfo = undefined
-      //获取商店对应的shopify api请求客户端
-      const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(paramsObj.shopDomain as string)
-
-      try{
-        const {shop} = await shopifyApiClient.shop()
-        agentInfo = await prisma.customerServiceStaff.findUnique({
-          where: {
-            email: shop.email
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatarUrl: true
-          }
-        })
-      }
-      catch (e) {
-        handlePrismaError(e)
-      }
-
-      const token = createToken({session_id},'1d')
-      const username = sessionPrismaUpsert.firstName as string + sessionPrismaUpsert.lastName as string
-      res.status(200).send({result:true,message:'login successfully',token,userInfo:{userId:paramsObj.id?.toString(),username,avatar:paramsObj.image_url,agentInfo}})
+      await loginAuth({paramsObj,redis,shopifyApiClientsManager,res,prisma})
     }
     else{
       res.status(200).send({result:false,message:'login failed with invalid credentials'})
@@ -122,7 +124,7 @@ const pwdCompare = async (paramsObj:FormDataType,databasePwd:string,res:Response
 const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClientsManager}:{redis:Redis,prisma:PrismaClient,paramsObj:FormDataType,res:Response,shopifyApiClientsManager:IShopifyApiClientsManager})=>{
   try{
     //判断是否是以密码验证方式进行登录
-    if(paramsObj.authPwd){
+    if(!paramsObj.authCode){
       if(!paramsObj.password) return res.status(400).send({result:false,message:"invalid credentials"})
       //查询该用户的密码进行比对
       const redisPwdQuery = await redis.hget(`customer:${paramsObj.email}`,'password')
@@ -155,13 +157,13 @@ const loginFunction = async ({redis,prisma,paramsObj,res,shopifyApiClientsManage
           })
         }
 
-        const redisEx = await redis.get(paramsObj.email+REDIS_AUTH_CODE_APPEND)
-        if(redisEx){
-          if(redisEx === paramsObj.authCode){
-            //验证码正确，结果反馈，删除redis中存储的对应验证码和验证次数
+        const redisHashCode = await redis.get(paramsObj.email+REDIS_AUTH_CODE_APPEND)
+        if(redisHashCode){
+          if(validateHashCode(paramsObj.authCode,redisHashCode)){
+            //验证码正确，允许登录，删除redis中存储的对应验证码和验证次数
             await redis.del(attemptKey)
             await redis.del(getRedisStorageKey(paramsObj.email))
-            res.status(200).send({result: true,message:'login success'})
+            await loginAuth({paramsObj,redis,shopifyApiClientsManager,res,prisma})
           }
           else{
             //验证码错误，增加验证次数
@@ -230,6 +232,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           public_display_name: shopResult.shop.plan.publicDisplayName,
           createdAt: shopResult.shop.createdAt,
           updatedAt: shopResult.shop.updatedAt,
+          is_installed: true
         }
         const prismaShop = await prisma.shop.upsert({
           where:{
@@ -337,14 +340,15 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
               deepCloneCustomer.shop_id = requestSenderResult
               data.push(deepCloneCustomer)
               await shopifyHandleResponseData(data,'customers',prisma)
-              //客户写入默认是没有密码的，为了嵌入块能以密码方式登录，需要在客户写入数据库后设置密码
+              //客户写入默认是没有密码和头像的的，为了嵌入块能以密码方式登录，需要在客户写入数据库后设置密码,设置默认头像
               const bcryptHashPwd = await bcrypt.hash(paramsObj.password,10)
               const newCustomer = await prisma.customers.update({
                 where:{
                   shopify_customer_id: deepCloneCustomer.id
                 },
                 data:{
-                  password: bcryptHashPwd
+                  password: bcryptHashPwd,
+                  image_url: process.env?.USER_DEFAULT_AVATAR || null
                 }
               })
 
@@ -424,13 +428,13 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
        //发送成功保存验证码到redis中，并设置过期时间，并清除之前验证的次数，防止用户在验证次数时间未过期时重新获取验证码却还是提示验证次数过多
        if(!isAuth){
          await redis.multi()
-           .setex(getRedisStorageKey(email),EXPIRED,data.code)
+           .setex(getRedisStorageKey(email),EXPIRED,hashCode(data.code))
            .setex(getRedisStorageKey(email,REDIS_ATTEMPT_KEY),EXPIRED,0)
            .exec()
        }
        else{
          await redis.multi()
-           .setex(getRedisStorageKey(email,REDIS_AUTH_CODE_APPEND),EXPIRED,data.code)
+           .setex(getRedisStorageKey(email,REDIS_AUTH_CODE_APPEND),EXPIRED,hashCode(data.code))
            .setex(getRedisStorageKey(email,REDIS_AUTH_ATTEMPT_KEY),EXPIRED,0)
            .exec()
        }
@@ -471,9 +475,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
               })
             }
 
-            const redisEx = await redis.get(email+REDIS_EMAIL_APPEND)
-            if(redisEx){
-                if(redisEx === code){
+            const redisHashCode = await redis.get(email+REDIS_EMAIL_APPEND)
+            if(redisHashCode){
+                if(validateHashCode(code,redisHashCode)){
                     //验证码正确，结果反馈，删除redis中存储的对应验证码和验证次数
                     await redis.del(attemptKey)
                     await redis.del(getRedisStorageKey(email))

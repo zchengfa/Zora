@@ -8,6 +8,7 @@ import {
   PRODUCTS_COUNT_QUERY,
   PRODUCTS_QUERY,
   ORDER_QUERY,
+  PRODUCT_QUERY,
   CUSTOMER_QUERY_BY_identifier
 } from "./shopifyQuery.ts";
 import type {
@@ -20,6 +21,7 @@ import type {
   GraphqlProductsCountResponse,
   GraphqlProductsResponse,
   GraphqlOrderResponse,
+  GraphqlProductResponse,
   GraphqlCustomerByIdentifierResponse
 } from './shopifyQuery.ts'
 import {CUSTOMER_CREATE_MUTATION} from './shopifyMutation.ts'
@@ -73,6 +75,11 @@ export interface IShopifyApiClient {
    * 查询指定订单
    */
   order(orderId:string): Promise<GraphqlOrderResponse>,
+
+  /**
+   * 查询指定产品
+   */
+  product(productId:string): Promise<GraphqlProductResponse>,
 
   /**
    * 通过标识查询指定客户数据
@@ -147,6 +154,13 @@ export class ShopifyApiClient implements IShopifyApiClient {
       orderId
     })
   }
+
+  public product = (productId:string):Promise<GraphqlProductResponse>=>{
+    return this.shopifyApiGraphqlRequest(PRODUCT_QUERY,{
+      productId
+    })
+  }
+
   public customerByIdentifier = (identifier:GraphqlQueryVariables['identifier']):Promise<GraphqlCustomerByIdentifierResponse>=>{
     return this.shopifyApiGraphqlRequest(CUSTOMER_QUERY_BY_identifier,{
       identifier
@@ -298,7 +312,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
         currency_code: item.amountSpent.currencyCode,
         verified_email: item.verifiedEmail,
         market_email: item.defaultEmailAddress.marketingState !== "NOT_SUBSCRIBED",
-        shop_id: item.shop_id
+        shop_id: item.shop_id,
+        image_url: process.env?.USER_DEFAULT_AVATAR || null
       })
     })
 
