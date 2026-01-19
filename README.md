@@ -1,10 +1,198 @@
-# Shopify App Template - React Router
+# Zora - Shopify Customer Service System
 
-This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [React Router](https://reactrouter.com/).  It was forked from the [Shopify Remix app template](https://github.com/Shopify/shopify-app-template-remix) and converted to React Router.
+Zora is a powerful customer service system for Shopify, providing comprehensive customer service solutions including real-time customer communication, order management, and customer management for Shopify merchants. Built with React Router and Socket.IO, it supports real-time message push and Webhook event notifications.
 
-Rather than cloning this repo, follow the [Quick Start steps](https://github.com/Shopify/shopify-app-template-react-router#quick-start).
+## Features
 
-Visit the [`shopify.dev` documentation](https://shopify.dev/docs/api/shopify-app-react-router) for more details on the React Router app package.
+### Real-time Customer Service System
+- **Real-time Messaging**: WebSocket-based communication using Socket.IO for real-time message transmission between customers and support agents
+- **Multi-agent Support**: Support multiple agents online simultaneously with automatic customer session assignment
+- **Message Status Tracking**: Real-time tracking of message sending, delivery, and read status
+- **Offline Messages**: Store messages when customers are offline and automatically push them when they come online
+- **Session Management**: Automatically create and manage customer sessions with status switching support
+
+### Data Synchronization
+- **Order Sync**: Real-time synchronization of Shopify order data including create, update, and delete events
+- **Customer Sync**: Automatic synchronization of Shopify customer information including create, update, and delete events
+- **Product Sync**: Real-time synchronization of Shopify product data including create, update, and delete events
+- **Webhook Notifications**: Listen to Shopify Webhook events and push real-time notifications to online agents
+
+### Customer Management
+- **Customer Information Management**: View and edit basic customer information
+- **Customer Tags**: Add tags to customers for easy categorization and management
+- **Customer Order Viewing**: Quickly view customer order history
+- **Customer Search**: Search customers by multiple criteria
+
+### Security & Authentication
+- **JWT Authentication**: User authentication using JWT tokens
+- **Email Verification**: Email verification code login support
+- **Password Encryption**: Password encryption storage using bcrypt
+- **Rate Limiting**: Multi-level request rate limiting to prevent API abuse
+
+## Tech Stack
+
+### Frontend
+- **React 18**: Latest React framework
+- **React Router 7**: Routing management based on React Router
+- **TypeScript**: Comprehensive TypeScript type support
+- **Socket.IO Client**: Real-time messaging
+- **Zustand**: Lightweight state management
+- **SCSS**: Style preprocessor
+
+### Backend
+- **Node.js**: Runtime environment
+- **Express**: Web server framework
+- **Socket.IO**: WebSocket server
+- **Prisma**: ORM database access layer
+- **PostgreSQL**: Primary database
+- **Redis**: Cache and session storage
+- **BullMQ**: Task queue management
+
+### Shopify Integration
+- **Shopify Admin API**: Interact with Shopify backend
+- **Shopify Webhooks**: Listen to Shopify events
+- **Shopify App Bridge**: Embedded app integration
+
+## Quick Start
+
+### Prerequisites
+
+Before starting, you need:
+
+1. **Node.js**: [Download and install](https://nodejs.org/en/download/) (Version requirement: >=20.19 <22 || >=22.12)
+2. **PostgreSQL**: Install and configure PostgreSQL database
+3. **Redis**: Install and run Redis server
+4. **Shopify Partner Account**: [Create account](https://partners.shopify.com/signup) (if you don't have one)
+5. **Test Store**: Set up a [development store](https://help.shopify.com/en/partners/dashboard/development-stores#create-a-development-store) or [Shopify Plus sandbox store](https://help.shopify.com/en/partners/dashboard/managing-stores/plus-sandbox-store) for testing
+6. **Shopify CLI**: [Download and install](https://shopify.dev/docs/apps/tools/cli/getting-started) (if you don't have one)
+```shell
+npm install -g @shopify/cli@latest
+```
+
+### Installation
+
+1. **Clone the project**
+```shell
+git clone <your-repository-url>
+cd Zora
+```
+
+2. **Install dependencies**
+```shell
+npm install
+```
+
+3. **Configure environment variables**
+
+Create `.env` file and configure the following variables:
+```env
+# Shopify Configuration
+SHOPIFY_API_KEY=your_api_key
+SHOPIFY_API_SECRET=your_api_secret
+SHOPIFY_SCOPES=read_products,write_products,read_customers,write_customers,read_orders,write_orders
+SHOPIFY_APP_URL=your_app_url
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/zora
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+
+# Server Configuration
+SERVER_ORIGIN=http://localhost:3000,http://localhost:3001
+
+# JWT Configuration
+JWT_SECRET=your_jwt_secret
+
+# Email Configuration
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your_email@example.com
+SMTP_PASS=your_email_password
+```
+
+4. **Initialize database**
+```shell
+npm run setup
+```
+
+5. **Start development server**
+```shell
+# Start main app
+npm run dev
+
+# Start Zora server and workers
+npm run zoraServer-worker
+```
+
+## Deployment
+
+### Deployment Preparation
+
+1. Ensure all environment variables are properly configured
+2. Set `NODE_ENV=production`
+3. Configure production database and Redis connections
+4. Configure HTTPS and domain
+
+### Deployment Steps
+
+1. **Build the application**
+```shell
+npm run build
+```
+
+2. **Run database migrations**
+```shell
+npm run setup
+```
+
+3. **Start the application**
+```shell
+npm run start
+```
+
+4. **Start Zora server**
+```shell
+npm run zora-server
+```
+
+### Recommended Cloud Providers
+
+- **App Hosting**: [Heroku](https://www.heroku.com/), [Fly.io](https://fly.io/), [Vercel](https://vercel.com/)
+- **Database**: [DigitalOcean Managed Databases](https://www.digitalocean.com/products/managed-databases/), [Amazon RDS](https://aws.amazon.com/rds/)
+- **Redis**: [DigitalOcean Managed Redis](https://www.digitalocean.com/products/managed-databases-redis), [Amazon MemoryDB](https://aws.amazon.com/memorydb/)
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature')`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details
+
+## Contact
+
+For questions or suggestions, please contact:
+
+- Submit an Issue
+- Email: support@example.com
+
+## Resources
+
+- [React Router Docs](https://reactrouter.com/home)
+- [Shopify App Development](https://shopify.dev/docs/apps/getting-started)
+- [Shopify App React Router Docs](https://shopify.dev/docs/api/shopify-app-react-router)
+- [Socket.IO Docs](https://socket.io/docs/)
+- [Prisma Docs](https://www.prisma.io/docs)
+- [Shopify CLI Docs](https://shopify.dev/docs/apps/tools/cli)
 
 ## Upgrading from Remix
 
