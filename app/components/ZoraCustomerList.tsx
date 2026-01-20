@@ -33,7 +33,7 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
                   }
                 </div>
                 <div className={ZoraCustomerListStyle.middleBox}>
-                  <span className={ZoraCustomerListStyle.username}>{item.firstName + item.lastName}</span>
+                  <span className={`${ZoraCustomerListStyle.username} multi-line-ellipsis`}>{item.firstName + item.lastName}</span>
                   <span className={ZoraCustomerListStyle.message}>{item.lastMessage}</span>
                 </div>
                 <div className={ZoraCustomerListStyle.rightBox}>

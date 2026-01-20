@@ -1,5 +1,5 @@
 {% style %}
-  /* 基础消息容器 - 匹配截图的简约风格 */
+  /* 基础消息容器 */
   .zora-message-item {
   display: flex;
   justify-content: flex-start;
@@ -16,7 +16,7 @@
   flex-direction: row-reverse;
   }
 
-  /* 消息主体 - 匹配截图的紧凑布局 */
+  /* 消息主体  */
   .zora-msg-box {
   flex: 1;
   display: flex;
@@ -24,10 +24,10 @@
   max-width: 75%;
   }
 
-  /* 用户名 - 截图中的灰色小字 */
+  /* 用户名 */
   .zora-user {
   font-size: 0.75rem;
-  color: #8a8a8a; /* 截图中的中灰色 */
+  color: #8a8a8a;
   margin-bottom: 0.1rem;
   font-weight: 400;
   }
@@ -43,7 +43,7 @@
   margin-right: 0.6rem;
   }
 
-  /* 头像 - 截图中的圆形头像 */
+  /* 头像*/
   .zora-avatar {
   width: 2.2rem;
   height: 2.2rem;
@@ -55,7 +55,9 @@
   .zora-message-right .zora-avatar {
   background: linear-gradient(135deg, #2196f3, #1e88e5);
   }
-
+  .zora-message-left .zora-msg-content{
+    flex-direction: row;
+  }
   /* 消息内容容器 */
   .zora-msg-content {
     display: flex;
@@ -64,7 +66,7 @@
     width: 100%;
   }
 
-  /* 文本消息气泡 - 匹配截图中的简洁设计 */
+  /* 文本消息气泡 */
   .zora-msg {
   padding: 0.6rem 0.9rem;
   border-radius: 1rem;
@@ -189,7 +191,7 @@
   color: #888888;
   }
 
-  /* 价格区域 - 截图中的价格样式 */
+  /* 价格区域 */
   .zora-message-product-price-box {
   display: flex;
   flex-direction: column;
@@ -208,7 +210,7 @@
   text-decoration: line-through;
   }
 
-  /* 商品卡片的特殊标记 - 截图中的花卉图标 */
+  /* 商品卡片的特殊标记  */
   .zora-message-product-flower-badge {
   position: absolute;
   top: -0.5rem;
