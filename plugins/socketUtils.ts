@@ -83,14 +83,28 @@ export class SocketUtils{
       return;
     }
 
+    // 导入通知处理器
+    const {NotificationProcessor} = await import("./notificationProcessor.ts");
+
+    // 使用通知处理器生成简洁的通知消息
+    const processedNotification = NotificationProcessor.processNotification(webhookType, data, shop);
+
+    if (!processedNotification) {
+      await beginLogger({
+        level:'warning',
+        message:'无法处理该webhook类型的通知',
+        meta:{
+          taskType: 'socketUtils_sendWebhookNotification',
+          webhookType,
+          shop,
+        }
+      })
+      return;
+    }
+
     // 通知所有在线客服
     SocketUtils.agentMapInstance.forEach((socketId: string) => {
-      SocketUtils.ioInstance!.to(socketId).emit('webhook_notification', {
-        type: webhookType,
-        shop,
-        data,
-        timestamp: new Date().toISOString()
-      });
+      SocketUtils.ioInstance!.to(socketId).emit('notification', processedNotification);
     });
   }
   private setConversation = async (conversation:ConversationType,user)=>{

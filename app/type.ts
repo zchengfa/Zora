@@ -125,3 +125,33 @@ export type MessageAckType = {
 
 export type ZoraProductType = GraphqlProductInfoType["products"]["nodes"][0]
 
+// 通知类型定义
+export type NotificationType = 'success' | 'info' | 'warning' | 'error';
+
+export interface NotificationConfig {
+  /** 通知ID */
+  id?: string;
+  /** 通知类型 */
+  type?: NotificationType;
+  /** 通知标题 */
+  title?: string;
+  /** 通知内容 */
+  message: string;
+  /** 通知持续时间(毫秒)，0表示不自动关闭 */
+  duration?: number;
+  /** 自定义图标 */
+  icon?: React.ReactNode;
+  /** 点击通知的回调 */
+  onClick?: () => void;
+  /** 关闭通知的回调 */
+  onClose?: () => void;
+  /** 显示关闭按钮 */
+  showCloseButton?: boolean;
+  /** 是否可点击关闭 */
+  closable?: boolean;
+  /** 自定义样式类名 */
+  className?: string;
+  /** 通知位置 */
+  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
+}
+

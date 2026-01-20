@@ -1,0 +1,163 @@
+
+.notification {
+  position: relative;
+  background-color: var(--z-color-surface, #ffffff);
+  border-radius: var(--z-primary_border_radius, 8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid;
+  margin-bottom: 12px;
+  max-width: 380px;
+  min-width: 280px;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+  transition: all 0.3s ease;
+
+  &.closing {
+    animation: slideOut 0.3s ease-in forwards;
+  }
+
+  &.success {
+    border-left-color: var(--z-color-success, #008060);
+    .notificationIcon {
+      color: var(--z-color-success, #008060);
+      background-color: rgba(0, 128, 96, 0.1);
+    }
+  }
+
+  &.info {
+    border-left-color: var(--z-color-primary, #5c6ac4);
+    .notificationIcon {
+      color: var(--z-color-primary, #5c6ac4);
+      background-color: rgba(92, 106, 196, 0.1);
+    }
+  }
+
+  &.warning {
+    border-left-color: var(--z-color-warning, #ffc107);
+    .notificationIcon {
+      color: var(--z-color-warning, #ffc107);
+      background-color: rgba(255, 193, 7, 0.1);
+    }
+  }
+
+  &.error {
+    border-left-color: var(--z-color-error, #d82c0d);
+    .notificationIcon {
+      color: var(--z-color-error, #d82c0d);
+      background-color: rgba(216, 44, 13, 0.1);
+    }
+  }
+}
+
+.notificationContent {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.notificationIcon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.notificationText {
+  flex: 1;
+  overflow: hidden;
+}
+
+.notificationTitle {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--z-color-text, #212b36);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.notificationMessage {
+  font-size: 13px;
+  color: var(--z-color-text-light, #637381);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.notificationCloseBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--z-color-text-light, #919eab);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: var(--z-color-bg, #f6f6f7);
+    color: var(--z-color-text, #212b36);
+  }
+}
+
+// 动画效果
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .notification {
+    max-width: calc(100vw - 32px);
+    min-width: unset;
+  }
+}
+
+// 暗色主题优化
+[data-theme="dark"] .notification {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .notificationCloseBtn:hover {
+  background-color: var(--z-color-bg, #1c1c1f);
+}
+
+// 减少动画支持
+@media (prefers-reduced-motion: reduce) {
+  .notification {
+    animation: none;
+    transition: none;
+  }
+
+  .notificationCloseBtn {
+    transition: none;
+  }
+}

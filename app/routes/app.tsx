@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "@/shopify.server.ts";
 import ZoraModalProvider from "@/contexts/ZoraModalProvider.tsx";
+import ZoraNotificationProvider from "@/contexts/ZoraNotificationProvider.tsx";
 
 import  '@styles/_variables.scss'
 import  '@styles/base.scss'
@@ -36,7 +37,9 @@ function App() {
         <s-link href="/app/settings">Settings</s-link>
       </s-app-nav>
       <ZoraModalProvider>
-        <Outlet/>
+        <ZoraNotificationProvider>
+          <Outlet/>
+        </ZoraNotificationProvider>
       </ZoraModalProvider>
     </AppProvider>
   );

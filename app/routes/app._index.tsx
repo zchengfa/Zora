@@ -6,6 +6,7 @@ import ZoraCustomerList from '@components/ZoraCustomerList'
 import ZoraMessageItems from "@components/ZoraMessageItems";
 import ZoraChat from "@components/ZoraChat.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
+import {useSocketNotification} from "@hooks/useSocketNotification.ts";
 import {useEffect} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request.ts";
@@ -43,6 +44,8 @@ export const loader = async ({request}:LoaderFunctionArgs)=>{
 function Index(){
   const {secret,customerStaff,products} = useLoaderData<typeof loader>();
   const {message,socket,messageAck} = useSocketService();
+  // 使用通知Hook监听socket通知并显示
+  useSocketNotification();
 
   const messageStore = useMessageStore();
 
