@@ -29,11 +29,11 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       await shopifyHandleResponseData(orders,'orders',prisma)
 
       // 向在线客服发送订单创建通知
-      // await SocketUtils.sendWebhookNotification({
-      //   webhookType: 'orders/create',
-      //   data: order,
-      //   shop
-      // })
+      await SocketUtils.sendWebhookNotification({
+        webhookType: 'orders/create',
+        data: order,
+        shop
+      })
     }
     catch (e) {
       handleApiError(req, e)

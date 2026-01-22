@@ -151,6 +151,86 @@ export class SocketUtils{
       this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004,payload.conversationId)
     })
   }
+
+  /**
+   * 推送离线消息
+   * @param userId 用户ID
+   * @param socketId Socket ID
+   */
+  private async pushOfflineMessages(userId: string, socketId: string) {
+    try {
+      // 查询该用户未送达的离线消息
+      const offlineMessages = await this.config.prisma.offlineMessage.findMany({
+        where: {
+          recipientId: userId,
+          isDelivered: false
+        },
+        orderBy: {
+          createdAt: 'asc'
+        }
+      })
+
+      if (offlineMessages.length === 0) {
+        return;
+      }
+
+      // 推送离线消息
+      for (const message of offlineMessages) {
+        const messagePayload = {
+          id: message.id,
+          conversationId: message.conversationId,
+          senderId: message.senderId,
+          senderType: message.senderType,
+          recipientId: message.recipientId,
+          recipientType: message.recipientType,
+          contentType: message.contentType,
+          contentBody: message.contentBody,
+          metadata: message.metadata,
+          msgId: message.msgId,
+          timestamp: message.createdAt.toISOString(),
+          isOffline: true // 标记为离线消息
+        };
+
+        // 发送消息
+        this.config.io.to(socketId).emit('message', messagePayload);
+
+        // 标记消息为已送达
+        await this.config.prisma.offlineMessage.update({
+          where: {
+            id: message.id
+          },
+          data: {
+            isDelivered: true,
+            deliveredAt: new Date()
+          }
+        });
+
+        // 发送消息送达确认
+        this.sendMessageAck(socketId, message.msgId, 'DELIVERED', 10004, message.conversationId);
+      }
+
+      await beginLogger({
+        level: 'info',
+        message: `用户${userId}成功接收${offlineMessages.length}条离线消息`,
+        meta: {
+          taskType: 'socket_util_push_offline_messages'
+        }
+      });
+    } catch (e) {
+      await beginLogger({
+        level: 'error',
+        message: `推送离线消息出错`,
+        meta: {
+          taskType: 'socket_util_error',
+          error: {
+            name: e?.name,
+            message: e?.message,
+            stack: e?.stack,
+          }
+        }
+      });
+    }
+  }
   public socketAgentOnline = ()=>{
     //客服连接
     this.ws.on('agent',(info)=>{
@@ -197,6 +277,9 @@ export class SocketUtils{
             }
           })
         }
+
+        // 推送未送达的离线消息
+        await this.pushOfflineMessages(user.userId, this.ws.id)
       }
       catch (e) {
         await beginLogger({
@@ -264,11 +347,12 @@ export class SocketUtils{
 
         if(payload.recipientType === 'AGENT'){
           recipient = this.agent.get(payload.recipientId)
-          sender = this.agent.get(payload.senderId)
+          sender = this.users.get(payload.senderId)
+
         }
         else{
           recipient = this.users.get(payload.recipientId)
-          sender = this.users.get(payload.senderId)
+          sender = this.agent.get(payload.senderId)
         }
         //接收者不在线
         if(!recipient){
@@ -279,6 +363,23 @@ export class SocketUtils{
               msgStatus: "SENT"
             }
           })
+
+          // 保存离线消息到数据库
+          await this.config.prisma.offlineMessage.create({
+            data: {
+              conversationId: payload.conversationId,
+              senderId: payload.senderId,
+              senderType: payload.senderType,
+              recipientId: payload.recipientId,
+              recipientType: payload.recipientType,
+              contentType: payload.contentType,
+              contentBody: payload.contentBody,
+              metadata: payload.metadata || {},
+              msgId: payload.msgId,
+              isDelivered: false
+            }
+          })
+
           const redis_key = payload.recipientId
           await this.config.redis.lpush(`offline_messages:${redis_key}`,JSON.stringify(saveMessagePrisma))
           await this.config.redis.expire(`offline_messages:${redis_key}`,this.config.redisExpired)
@@ -307,5 +408,25 @@ export class SocketUtils{
         this.sendMessageAck(sender as string,payload.msgId,'FAILED',10003)
       }
     })
+  }
+  public socketUserOffline = ()=>{
+    this.ws.on('offline',async ({id}:{id:string})=>{
+      //用户下线
+      const user = this.users.get(id) || this.agent.get(id)
+      if(user){
+        await beginLogger({
+          level: 'info',
+          message: `用户下线`,
+          meta:{
+            taskType: 'socket_util_offline'
+          }
+        })
+      }
+      this.users.delete(id)
+      this.agent.delete(id)
+    })
+  }
+  public static manualOffline = (id:string)=>{
+    SocketUtils.agentMapInstance!.delete(id)
   }
 }

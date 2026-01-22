@@ -6,7 +6,7 @@ import {beginLogger} from "./bullTaskQueue.ts";
 
 //Shopify请求验证中间件
 const shopifyAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const { shop,hmac,locale,embedded,session,host,id_token,timestamp, request_secret } = req.query;
+  const { shop,hmac,locale,embedded,session,host,id_token,timestamp } = req.query;
 
   if (hmac) {
     const validation = validateShopifyHmacRequest({shop,hmac,locale,embedded,session,host,id_token,timestamp} as ShopifyUrlQueryType);
@@ -32,9 +32,9 @@ const shopifyAuthMiddleware = (req: Request, res: Response, next: NextFunction) 
     }).then()
     return next();
   }
-
+  const request_secret = req.headers['x-shopify-request-key']
   if (request_secret) {
-    const validation = validateShopifySecretRequest(request_secret as string, process.env.SHOPIFY_API_SECRET as string);
+    const validation = validateShopifySecretRequest(request_secret as string, process.env.SHOPIFY_API_KEY as string);
     if (!validation.result) {
       beginLogger({
         level: 'error',
@@ -66,13 +66,13 @@ const shopifyAuthMiddleware = (req: Request, res: Response, next: NextFunction) 
       taskType: 'shopify_request_auth',
     }
   }).then()
-  return res.status(401).send({result: false, message: 'Invalid Shopify request'});
+  return res.status(400).send({result: false, message: 'Invalid Shopify request'});
 };
 
 // 主拦截器
 const interceptors = async ({req,res,next}:{req: Request, res: Response, next: NextFunction}) => {
   const path = req.path;
-  const publicRoutes = ['/app', '/shopifyApiClientInit', '/validateToken', '/checkEmail', '/sendVerifyCodeToEmail', '/verifyCode', '/authenticator'];
+  const publicRoutes = ['/app', '/validateToken', '/checkEmail', '/sendVerifyCodeToEmail', '/verifyCode', '/authenticator'];
   // 放行公共路由和webhooks路由
   if (publicRoutes.includes(path) || req.path.startsWith('/webhooks')) {
     await beginLogger({
@@ -95,7 +95,7 @@ const interceptors = async ({req,res,next}:{req: Request, res: Response, next: N
       return next();
     }
 
-    // 处理无Token请求（主要处理Shopify相关验证）
+    // 处理无Token请求（处理Shopify相关验证）
     shopifyAuthMiddleware(req, res, next);
 
   } catch (error) {

@@ -12,6 +12,7 @@ import interceptors from "../plugins/interceptors.ts";
 import {ShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
 import {beginLogger} from "../plugins/bullTaskQueue.ts";
 import {WorkerHealth} from "../plugins/workerHealth.ts";
+import {SocketUtils} from "../plugins/socketUtils.ts";
 
 dotenv.config({ path: '.env' })
 
@@ -21,21 +22,29 @@ const shopifyApiClientsManager = new ShopifyApiClientsManager({redis,prisma})
 const router = express.Router();
 
 const app = express()
+
+//信任代理
+app.set("trust proxy", 1);
 app.use(cors({
   origin: [
     ...((process.env.SERVER_ORIGIN as string).split(','))
   ],
-}))
-
-//信任代理
-app.set("trust proxy", 1);
-
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-shopify-request-key','Authorization', 'X-Requested-With','ngrok-skip-browser-warning']
+}));
 
 //监听Shopify Webhooks(需要在使用bodyParser之前执行，因为需要验证hmac，必须将原始body计算hmac)
 webhooks({app,redis,prisma,router,shopifyApiClientsManager})
 
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
+
+
+app.post('/api/agent-offline', (req, res) => {
+  SocketUtils.manualOffline(req.body.agent);
+  res.status(200).json('success');
+});
 
 app.use(async (req,res,next)=> {
   await interceptors({res,req,next})

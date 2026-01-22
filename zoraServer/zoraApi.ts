@@ -376,6 +376,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     if (!token) {
       return res.status(401).send({result:false,message: 'Authentication token missing'})
     }
+    if(!await validateRequestSender(req)){
+      return res.status(400).send({result:false,message:"invalid request"})
+    }
     try{
       await verifyTokenAsync(token)
       res.status(200).send({result:true,message:'logged in'})}
@@ -386,7 +389,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
   })
   app.post('/checkEmail',RATE_LIMITS.NORMAL,async (req,res)=>{
     const {email} = req.body
-
+    if(!await validateRequestSender(req)){
+      return res.status(400).send({result:false,message:"invalid request"})
+    }
     //检查数据库是否有该邮箱
     try{
       const redisEmailQuery = await redis.hexists(`customer:${email}`,'shop_id')
@@ -420,7 +425,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
 
   app.post('/sendVerifyCodeToEmail',RATE_LIMITS.STRICT,async (req,res)=>{
      const {email,isAuth} = req.body
-     if(!email || isAuth === undefined){
+     if(!email || isAuth === undefined || !await validateRequestSender(req)){
        return res.status(400).send({result:false,message: 'Invalid request'})
      }
      try {
@@ -449,7 +454,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
 
     app.post('/verifyCode', RATE_LIMITS.LOOSE,async (req, res) => {
         const {code,email} = req.body
-
+        if(!await validateRequestSender(req)){
+          return res.status(400).send({result:false,message:"invalid request"})
+        }
         /**
          * 将验证码与redis中的验证码进行比对，还需增加比对次数，防止暴力破解
          * 1.从redis中获取对应的验证码

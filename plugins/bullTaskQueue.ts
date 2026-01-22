@@ -37,7 +37,7 @@ export const loggerQueue = new Queue('loggerQueue',{
   }
 });
 
-export const beginLogger = async ({level,message,meta}:{level:'debug'|'info'|'warn'|'error',message:string,meta:any})=>{
+export const beginLogger = async ({level,message,meta}:{level:'debug'|'info'|'warning'|'error',message:string,meta:any})=>{
   const loggerWorkerStatus = await redisClient.get(`worker:${process.env.LOGGER_WORKER_HEALTH_KEY || 'logger'}:status`)
   if(loggerWorkerStatus){
     const job = await loggerQueue.add(level,{

@@ -47,3 +47,8 @@ socket.on('disconnect', () => {
   console.log('❌ 与服务器的连接已断开。');
 });
 
+window.addEventListener('beforeunload',()=>{
+  const userInfo = JSON.parse(sessionStorage.getItem('zora_userInfo'));
+  if(userInfo)
+  socket.emit('offline',{id:userInfo.userId})
+})

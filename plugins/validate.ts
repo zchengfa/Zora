@@ -224,7 +224,6 @@ export function validateShopifySecretRequest(requestSecret: string, expectedSecr
   if (!requestSecret) {
     return { result: false, message: 'Missing request secret' };
   }
-
   // 直接比较提供的密钥与预期密钥是否匹配
   const isSecretValid = requestSecret === expectedSecret;
 
@@ -245,7 +244,7 @@ export function validateShopifyRequest(params: any): { result: boolean; message?
   }
 
   if (request_secret) {
-    return validateShopifySecretRequest(request_secret, process.env.SHOPIFY_API_SECRET as string);
+    return validateShopifySecretRequest(request_secret, process.env.SHOPIFY_API_KEY as string);
   }
 
   return { result: false, message: 'No valid authentication method provided' };
