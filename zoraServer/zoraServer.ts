@@ -101,21 +101,78 @@ syncRedis({prisma,redis}).then(async (res)=>{
 })
 
 
-const checkWorkerHealth = ()=>{
+// 存储健康检查实例，用于后续管理
+const workerHealthChecks: Map<string, WorkerHealth> = new Map();
+
+const checkWorkerHealth = async ()=>{
+  // 检查logger worker
   const loggerWorkerHealth = new WorkerHealth({
     connection: redis,
-    workerName: process.env.LOGGER_WORKER_HEALTH_KEY || 'logger'
+    workerName: process.env.LOGGER_WORKER_HEALTH_KEY || 'logger',
+    maxCheckAttempts: 5,
+    workerHealthCheckDelay: 5000
   })
-  //logger worker检测
-  loggerWorkerHealth.checkWorkerHealthStatus()
+  workerHealthChecks.set('logger', loggerWorkerHealth);
+  loggerWorkerHealth.checkWorkerHealthStatus();
 
+  // 检查shopify worker
   const shopifyWorkerHealth = new WorkerHealth({
     connection: redis,
-    workerName: process.env.SHOPIFY_WORKER_HEALTH_KEY || 'shopify'
+    workerName: process.env.SHOPIFY_WORKER_HEALTH_KEY || 'shopify',
+    maxCheckAttempts: 5,
+    workerHealthCheckDelay: 5000
   })
-  //shopify worker检测
-  shopifyWorkerHealth.checkWorkerHealthStatus()
+  workerHealthChecks.set('shopify', shopifyWorkerHealth);
+  shopifyWorkerHealth.checkWorkerHealthStatus();
 
+  // 检查offlineMessage worker
+  const offlineMessageWorkerHealth = new WorkerHealth({
+    connection: redis,
+    workerName: process.env.OFFLINE_MESSAGE_WORKER_HEALTH_KEY || 'offlineMessage',
+    maxCheckAttempts: 5,
+    workerHealthCheckDelay: 5000
+  })
+  workerHealthChecks.set('offlineMessage', offlineMessageWorkerHealth);
+  offlineMessageWorkerHealth.checkWorkerHealthStatus();
+
+  await beginLogger({
+    level: 'info',
+    message: '已启动所有worker健康检查',
+    meta:{
+      taskType: 'worker_health_check_init',
+      workers: Array.from(workerHealthChecks.keys())
+    }
+  })
 }
-//检测worker是否开启
-checkWorkerHealth()
+
+// 检测worker是否开启
+checkWorkerHealth().then();
+
+// 优雅关闭时停止所有健康检查
+process.on('SIGTERM', async () => {
+  workerHealthChecks.forEach((healthCheck, name) => {
+    healthCheck.stopHealthCheck();
+    beginLogger({
+      level: 'info',
+      message: `已停止${name} worker的健康检查`,
+      meta:{
+        taskType: 'worker_health_check_stop',
+        worker: name
+      }
+    }).then();
+  });
+});
+
+process.on('SIGINT', async () => {
+  workerHealthChecks.forEach((healthCheck, name) => {
+    healthCheck.stopHealthCheck();
+    beginLogger({
+      level: 'info',
+      message: `已停止${name} worker的健康检查`,
+      meta:{
+        taskType: 'worker_health_check_stop',
+        worker: name
+      }
+    }).then();
+  });
+});

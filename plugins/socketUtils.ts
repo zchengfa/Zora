@@ -44,6 +44,7 @@ export class SocketUtils{
   private readonly agent: Map<string,string>;
   private static ioInstance: Server | null = null;
   private static agentMapInstance: Map<string,string> | null = null;
+  private static usersMapInstance: Map<string,string> | null = null;
 
   constructor(config:SocketUtilConfigType,ws:Socket,users:Map<string,string>,agent:Map<string,string>) {
     this.config = config
@@ -52,6 +53,7 @@ export class SocketUtils{
     this.agent = agent
     SocketUtils.ioInstance = this.config.io
     SocketUtils.agentMapInstance = this.agent
+    SocketUtils.usersMapInstance = this.users
     this.repostMessageAck()
   }
 
@@ -128,7 +130,7 @@ export class SocketUtils{
         break;
     }
   }
-  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD',codeType:number,conversationId:string | undefined = undefined)=>{
+  private sendMessageAck = (sender:string,msgId:string,status:'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD',codeType:number,conversationId:string)=>{
     this.config.io.to(sender).emit('message_ack',{
       type: 'ACK',
       msgId,
@@ -153,73 +155,98 @@ export class SocketUtils{
   }
 
   /**
-   * 推送离线消息
+   * 触发离线消息推送任务
    * @param userId 用户ID
-   * @param socketId Socket ID
    */
-  private async pushOfflineMessages(userId: string, socketId: string) {
+  private async triggerOfflineMessagePush(userId: string) {
     try {
-      // 查询该用户未送达的离线消息
-      const offlineMessages = await this.config.prisma.offlineMessage.findMany({
-        where: {
-          recipientId: userId,
-          isDelivered: false
-        },
-        orderBy: {
-          createdAt: 'asc'
+      // 检查该用户是否有未送达的离线消息
+      let messageCount = await this.config.redis.llen(`offline_messages:${userId}`);
+      
+      // 如果Redis中没有消息，尝试从Prisma数据库中加载
+      if (messageCount === 0) {
+        const offlineMessages = await this.config.prisma.offlineMessage.findMany({
+          where: {
+            recipientId: userId,
+            isDelivered: false
+          },
+          orderBy: {
+            createdAt: 'asc'
+          },
+          take: 100 // 最多加载100条消息
+        });
+        
+        if (offlineMessages.length > 0) {
+          // 将消息重新加载到Redis
+          const redisKey = `offline_messages:${userId}`;
+          const messagesToLoad = offlineMessages.map(msg => JSON.stringify({
+            id: msg.id,
+            conversationId: msg.conversationId,
+            senderId: msg.senderId,
+            senderType: msg.senderType,
+            recipientId: msg.recipientId,
+            recipientType: msg.recipientType,
+            contentType: msg.contentType,
+            contentBody: msg.contentBody,
+            metadata: msg.metadata,
+            msgId: msg.msgId,
+            createdAt: msg.createdAt.toISOString(),
+            isOffline: true
+          }));
+          
+          // 使用pipeline批量加载消息
+          const pipeline = this.config.redis.pipeline();
+          messagesToLoad.forEach(msg => {
+            pipeline.lpush(redisKey, msg);
+          });
+          pipeline.expire(redisKey, this.config.redisExpired);
+          await pipeline.exec();
+          
+          messageCount = messagesToLoad.length;
+          
+          await beginLogger({
+            level: 'info',
+            message: `已从数据库为用户${userId}重新加载${messageCount}条离线消息到Redis`,
+            meta: {
+              taskType: 'socket_util_reload_offline_messages',
+              userId,
+              messageCount
+            }
+          });
         }
-      })
-
-      if (offlineMessages.length === 0) {
+      }
+      
+      if (messageCount === 0) {
         return;
       }
-
-      // 推送离线消息
-      for (const message of offlineMessages) {
-        const messagePayload = {
-          id: message.id,
-          conversationId: message.conversationId,
-          senderId: message.senderId,
-          senderType: message.senderType,
-          recipientId: message.recipientId,
-          recipientType: message.recipientType,
-          contentType: message.contentType,
-          contentBody: message.contentBody,
-          metadata: message.metadata,
-          msgId: message.msgId,
-          timestamp: message.createdAt.toISOString(),
-          isOffline: true // 标记为离线消息
-        };
-
-        // 发送消息
-        this.config.io.to(socketId).emit('message', messagePayload);
-
-        // 标记消息为已送达
-        await this.config.prisma.offlineMessage.update({
-          where: {
-            id: message.id
-          },
-          data: {
-            isDelivered: true,
-            deliveredAt: new Date()
-          }
-        });
-
-        // 发送消息送达确认
-        this.sendMessageAck(socketId, message.msgId, 'DELIVERED', 10004, message.conversationId);
-      }
-
+      
+      // 添加离线消息推送任务到队列
+      const { addOfflineMessageJob } = await import("./bullTaskQueue.ts");
+      await addOfflineMessageJob({
+        userId: userId,
+        messageType: 'system',
+        messageContent: {
+          type: 'push_offline_messages',
+          messageCount: messageCount
+        },
+        senderId: 'system',
+        timestamp: new Date().toISOString(),
+        priority: 1 // 设置较高优先级
+      });
+      
       await beginLogger({
         level: 'info',
-        message: `用户${userId}成功接收${offlineMessages.length}条离线消息`,
+        message: `已为用户${userId}创建离线消息推送任务，待推送消息数：${messageCount}`,
         meta: {
-          taskType: 'socket_util_push_offline_messages'
+          taskType: 'socket_util_trigger_offline_message_push',
+          userId,
+          messageCount
         }
       });
     } catch (e) {
       await beginLogger({
         level: 'error',
-        message: `推送离线消息出错`,
+        message: `触发离线消息推送任务出错`,
         meta: {
           taskType: 'socket_util_error',
           error: {
@@ -278,8 +305,8 @@ export class SocketUtils{
           })
         }
 
-        // 推送未送达的离线消息
-        await this.pushOfflineMessages(user.userId, this.ws.id)
+        // 触发离线消息推送任务
+        await this.triggerOfflineMessagePush(user.userId)
       }
       catch (e) {
         await beginLogger({
@@ -342,9 +369,15 @@ export class SocketUtils{
       const payload = JSON.parse(data)
       let recipient = undefined,sender = undefined
       try{
-        //查看接收者在不在线，不在线则需要保存离线消息
+        //数据表消息存储
+        payload.timestamp = new Date(payload.timestamp).toISOString()
+        const saveMessagePrisma = await this.config.prisma.message.create({
+          data:{
+            ...payload,
+            msgStatus: "SENT"
+          }
+        })
         //判断消息体中的recipientType,若是AGENT，表示是发给客服的，CUSTOMER表示发给客户的
-
         if(payload.recipientType === 'AGENT'){
           recipient = this.agent.get(payload.recipientId)
           sender = this.users.get(payload.senderId)
@@ -356,14 +389,6 @@ export class SocketUtils{
         }
         //接收者不在线
         if(!recipient){
-          payload.timestamp = new Date(payload.timestamp).toISOString()
-          const saveMessagePrisma = await this.config.prisma.message.create({
-            data:{
-              ...payload,
-              msgStatus: "SENT"
-            }
-          })
-
           // 保存离线消息到数据库
           await this.config.prisma.offlineMessage.create({
             data: {
@@ -384,7 +409,7 @@ export class SocketUtils{
           await this.config.redis.lpush(`offline_messages:${redis_key}`,JSON.stringify(saveMessagePrisma))
           await this.config.redis.expire(`offline_messages:${redis_key}`,this.config.redisExpired)
           //告诉发送者，服务器接收到消息，消息已发送，但用户不在线
-          this.sendMessageAck(sender as string,payload.msgId,'SENT',10001)
+          this.sendMessageAck(sender as string,payload.msgId,'SENT',10001,payload.conversationId)
         }
         else{
           this.config.io.to(recipient).emit('message',payload)
@@ -405,7 +430,7 @@ export class SocketUtils{
           }
         })
         //服务器出现错误，告诉发送者消息发送失败
-        this.sendMessageAck(sender as string,payload.msgId,'FAILED',10003)
+        this.sendMessageAck(sender as string,payload.msgId,'FAILED',10003,payload.conversationId)
       }
     })
   }
@@ -428,5 +453,26 @@ export class SocketUtils{
   }
   public static manualOffline = (id:string)=>{
     SocketUtils.agentMapInstance!.delete(id)
+  }
+
+  /**
+   * 获取Socket.IO实例
+   */
+  public static getIoInstance(): Server | null {
+    return SocketUtils.ioInstance;
+  }
+
+  /**
+   * 获取用户Map实例
+   */
+  public static getUsersMapInstance(): Map<string,string> | null {
+    return SocketUtils.usersMapInstance;
+  }
+
+  /**
+   * 获取客服Map实例
+   */
+  public static getAgentMapInstance(): Map<string,string> | null {
+    return SocketUtils.agentMapInstance;
   }
 }
