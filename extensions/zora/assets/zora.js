@@ -17,13 +17,16 @@ if(!customElements.get('zora-button')){
             //修改按钮状态
             this.isBtnState = !this.isBtnState
             this.className = this.isBtnState ? 'zora-main-btn-active' : 'zora-main-btn'
+            const bodyEl = document.querySelector('body')
             //根据按钮状态改变类型变换样式
             if(this.isBtnState){
+               bodyEl.style.overflow = 'hidden'
                this.defaultBtnEl.className = 'zora-default-btn-box btn-box-hidden'
                this.activeBtnEl.className = 'zora-active-btn-box'
                document.querySelector('.' + this.dataset.targetClass).className = this.dataset.activeClass
             }
             else{
+               bodyEl.style.overflow = 'scroll'
                this.defaultBtnEl.className = 'zora-default-btn-box'
                this.activeBtnEl.className = 'zora-active-btn-box btn-box-hidden'
                document.querySelector('.' + this.dataset.activeClass).className = this.dataset.targetClass

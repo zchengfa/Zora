@@ -6,6 +6,7 @@ import ZoraCustomerList from '@components/ZoraCustomerList'
 import ZoraMessageItems from "@components/ZoraMessageItems";
 import ZoraChat from "@components/ZoraChat.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
+import {useSocketNotification} from "@hooks/useSocketNotification.ts";
 import {useEffect} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request.ts";
@@ -15,9 +16,9 @@ import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
-  let secret = request.url.substring(request.url.indexOf('?'),request.url.length)
-  if(!secret.includes('hmac')){
-    secret ='?request_secret=' + process.env.SHOPIFY_API_SECRET as string
+  let params = request.url.substring(request.url.indexOf('?'),request.url.length)
+  if(!params.includes('hmac')){
+    params = ''
   }
   const shopOwnerName = await admin.graphql(SHOP_INFO_QUERY_GQL)
   const response = await  admin.graphql(PRODUCTS_QUERY_GQL, {variables:{first: 10}})
@@ -26,7 +27,7 @@ export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {data} = await shopOwnerName.json()
   let customerStaff;
   try {
-    const result = await shopifyCustomerStaffInit(secret,data.shop.email,data.shop.shopOwnerName)
+    const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName)
     customerStaff = result?.data
   }
   catch (e) {
@@ -34,15 +35,17 @@ export const loader = async ({request}:LoaderFunctionArgs)=>{
   }
 
   return {
-    secret,
+    params,
     customerStaff,
     products:result?.data,
   }
 }
 
 function Index(){
-  const {secret,customerStaff,products} = useLoaderData<typeof loader>();
+  const {params,customerStaff,products} = useLoaderData<typeof loader>();
   const {message,socket,messageAck} = useSocketService();
+  // 使用通知Hook监听socket通知并显示
+  useSocketNotification();
 
   const messageStore = useMessageStore();
 
@@ -81,7 +84,7 @@ function Index(){
       }
       //列表不存在该客户信息，需要新增客户聊天列表项
       if(!isExistUser){
-        shopifyRequestUserInfo(secret+'&id='+message.senderId).then(res=>{
+        shopifyRequestUserInfo(params ? params+'&id='+message.senderId : `?id=${message.senderId}`).then(res=>{
           const {userInfo} = res.data
           messageStore.pushChatList({
             id:userInfo.id,
@@ -92,7 +95,7 @@ function Index(){
             conversationId: message.conversationId,
             lastTimestamp: message.timestamp
           })
-          messageStore.addMessage(message)
+          messageStore.addMessage(message).then()
         }).catch(err=>{
             console.log(err)
           })
@@ -100,7 +103,7 @@ function Index(){
       //存在，只需更新对应列表项的部分数据
       else{
         messageStore.updateChatList(message)
-        messageStore.addMessage(message)
+        messageStore.addMessage(message).then()
       }
       socket.emit('message_delivered',{
         type: 'ACK',

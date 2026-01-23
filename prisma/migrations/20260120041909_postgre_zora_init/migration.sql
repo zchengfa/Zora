@@ -155,6 +155,25 @@ CREATE TABLE "messages" (
 );
 
 -- CreateTable
+CREATE TABLE "offline_messages" (
+    "id" TEXT NOT NULL,
+    "conversationId" VARCHAR(191) NOT NULL,
+    "recipientId" VARCHAR(191) NOT NULL,
+    "recipientType" "RecipientType" NOT NULL,
+    "senderId" VARCHAR(191) NOT NULL,
+    "senderType" "SenderType" NOT NULL,
+    "contentType" "ContentType" NOT NULL,
+    "contentBody" TEXT NOT NULL,
+    "metadata" JSONB,
+    "msgId" VARCHAR(100) NOT NULL,
+    "isDelivered" BOOLEAN NOT NULL DEFAULT false,
+    "deliveredAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "offline_messages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "addresses" (
     "id" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
@@ -388,6 +407,12 @@ CREATE INDEX "messages_conversationId_timestamp_idx" ON "messages"("conversation
 
 -- CreateIndex
 CREATE INDEX "messages_senderId_timestamp_idx" ON "messages"("senderId", "timestamp");
+
+-- CreateIndex
+CREATE INDEX "offline_messages_recipientId_isDelivered_idx" ON "offline_messages"("recipientId", "isDelivered");
+
+-- CreateIndex
+CREATE INDEX "offline_messages_conversationId_idx" ON "offline_messages"("conversationId");
 
 -- CreateIndex
 CREATE INDEX "addresses_customerId_idx" ON "addresses"("customerId");

@@ -31,6 +31,8 @@ export async function startSocketServer({server,redis,prisma}:{server:Server,red
 
         socketUtils.socketOnSendMessage()
 
+        socketUtils.socketUserOffline()
+
       })
       return {
         result: true,

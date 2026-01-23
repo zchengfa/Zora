@@ -142,6 +142,27 @@ model Message {
   @@map("messages")
 }
 
+// 离线消息模型
+model OfflineMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @db.VarChar(191)
+  recipientId    String   @db.VarChar(191)
+  recipientType  RecipientType
+  senderId       String   @db.VarChar(191)
+  senderType     SenderType
+  contentType    ContentType
+  contentBody    String   @db.Text
+  metadata       Json?
+  msgId          String   @db.VarChar(100)
+  isDelivered    Boolean  @default(false)
+  deliveredAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([recipientId, isDelivered])
+  @@index([conversationId])
+  @@map("offline_messages")
+}
+
 // 订单状态枚举
 enum OrderStatus {
   CREATED

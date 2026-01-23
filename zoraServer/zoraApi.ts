@@ -322,6 +322,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
             emailAddress: paramsObj.email,
           })
+          let deepCloneCustomer = []
+          const data:Array<GraphqlCustomerCreateMutationResponse["customerCreate"]['customer'] | {shop_id:string}> = []
+
           //查询结果为null，表示shopify商店没有该客户，需要执行添加客户请求
           if(!customerByIdentifier){
             const customerCreateMutationVariable:GraphqlMutationVariables["input"] = {
@@ -335,32 +338,35 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
             }
             const {customerCreate} = await shopifyApiClient.customerCreate(customerCreateMutationVariable)
             if(customerCreate.customer){
-              const data:Array<GraphqlCustomerCreateMutationResponse["customerCreate"]['customer'] | {shop_id:string}> = []
-              const deepCloneCustomer = JSON.parse(JSON.stringify(customerCreate.customer))
-              deepCloneCustomer.shop_id = requestSenderResult
-              data.push(deepCloneCustomer)
-              await shopifyHandleResponseData(data,'customers',prisma)
-              //客户写入默认是没有密码和头像的的，为了嵌入块能以密码方式登录，需要在客户写入数据库后设置密码,设置默认头像
-              const bcryptHashPwd = await bcrypt.hash(paramsObj.password,10)
-              const newCustomer = await prisma.customers.update({
-                where:{
-                  shopify_customer_id: deepCloneCustomer.id
-                },
-                data:{
-                  password: bcryptHashPwd,
-                  image_url: process.env?.USER_DEFAULT_AVATAR || null
-                }
-              })
-
-              if(newCustomer){
-                await redis.hset(`customer:${newCustomer.id}`, {...newCustomer})
-                await redis.expire(`customer:${newCustomer.id}`,24 * 60 * 60)
-                //执行登录
-                paramsObj.id = newCustomer.id
-                paramsObj.image_url = newCustomer.image_url
-                await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
-              }
+              deepCloneCustomer = JSON.parse(JSON.stringify(customerCreate.customer))
             }
+          }
+          else{
+            //查询结果不为null，表示shopify商店有该客户，需要同步到数据库中
+            deepCloneCustomer = JSON.parse(JSON.stringify(customerByIdentifier))
+          }
+          deepCloneCustomer.shop_id = requestSenderResult
+          data.push(deepCloneCustomer)
+          await shopifyHandleResponseData(data,'customers',prisma)
+          //客户写入默认是没有密码和头像的的，为了嵌入块能以密码方式登录，需要在客户写入数据库后设置密码,设置默认头像
+          const bcryptHashPwd = await bcrypt.hash(paramsObj.password,10)
+          const newCustomer = await prisma.customers.update({
+            where:{
+              shopify_customer_id: deepCloneCustomer.id
+            },
+            data:{
+              password: bcryptHashPwd,
+              image_url: process.env?.USER_DEFAULT_AVATAR || null
+            }
+          })
+
+          if(newCustomer){
+            await redis.hset(`customer:${newCustomer.id}`, {...newCustomer})
+            await redis.expire(`customer:${newCustomer.id}`,24 * 60 * 60)
+            //执行登录
+            paramsObj.id = newCustomer.id
+            paramsObj.image_url = newCustomer.image_url
+            await loginFunction({redis,prisma,paramsObj,res,shopifyApiClientsManager})
           }
         }
       }
@@ -376,6 +382,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     if (!token) {
       return res.status(401).send({result:false,message: 'Authentication token missing'})
     }
+    if(!await validateRequestSender(req)){
+      return res.status(400).send({result:false,message:"invalid request"})
+    }
     try{
       await verifyTokenAsync(token)
       res.status(200).send({result:true,message:'logged in'})}
@@ -386,7 +395,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
   })
   app.post('/checkEmail',RATE_LIMITS.NORMAL,async (req,res)=>{
     const {email} = req.body
-
+    if(!await validateRequestSender(req)){
+      return res.status(400).send({result:false,message:"invalid request"})
+    }
     //检查数据库是否有该邮箱
     try{
       const redisEmailQuery = await redis.hexists(`customer:${email}`,'shop_id')
@@ -420,7 +431,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
 
   app.post('/sendVerifyCodeToEmail',RATE_LIMITS.STRICT,async (req,res)=>{
      const {email,isAuth} = req.body
-     if(!email || isAuth === undefined){
+     if(!email || isAuth === undefined || !await validateRequestSender(req)){
        return res.status(400).send({result:false,message: 'Invalid request'})
      }
      try {
@@ -449,7 +460,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
 
     app.post('/verifyCode', RATE_LIMITS.LOOSE,async (req, res) => {
         const {code,email} = req.body
-
+        if(!await validateRequestSender(req)){
+          return res.status(400).send({result:false,message:"invalid request"})
+        }
         /**
          * 将验证码与redis中的验证码进行比对，还需增加比对次数，防止暴力破解
          * 1.从redis中获取对应的验证码

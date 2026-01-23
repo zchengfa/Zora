@@ -18,6 +18,7 @@ export const PRODUCTS_QUERY_GQL =
           descriptionHtml
           tags
           vendor
+          onlineStorePreviewUrl
           variants(first:10){
             nodes{
               price

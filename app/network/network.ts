@@ -7,7 +7,8 @@ const instance = axios.create({
   baseURL,
   timeout,
   headers:{
-    "ngrok-skip-browser-warning": 'true'
+    "ngrok-skip-browser-warning": 'true',
+    "x-shopify-request-key": import.meta.env.VITE_SHOPIFY_API_KEY
   }
 })
 

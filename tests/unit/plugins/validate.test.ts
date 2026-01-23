@@ -46,10 +46,10 @@ describe('Validate Plugin Tests', () => {
       expect(RegexEmail('test..email@example.com')).toBe(false);
       expect(RegexEmail('test.email..name@example.com')).toBe(false);
       expect(RegexEmail('test@email..example.com')).toBe(false);
-      
+
       // 测试单字符顶级域名
       expect(RegexEmail('test@example.c')).toBe(false);
-      
+
       // 测试特殊字符
       expect(RegexEmail('test%email@example.com')).toBe(true);
       expect(RegexEmail('test+email@example.com')).toBe(true);
@@ -78,11 +78,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       const paramsWithValidHmac = { ...testParams, hmac: validHmac };
       expect(verifyShopifyHmac(paramsWithValidHmac, testSecret)).toBe(true);
     });
@@ -102,11 +102,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       // 使用截断的HMAC值
       const truncatedHmac = validHmac.substring(0, validHmac.length - 10);
       const paramsWithTruncatedHmac = { ...testParams, hmac: truncatedHmac };
@@ -139,11 +139,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       const queryWithValidHmac = { ...mockQuery, hmac: validHmac };
       const result = validateShopifyHmacRequest(queryWithValidHmac);
       expect(result.result).toBe(true);
@@ -169,11 +169,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       const queryWithInvalidShop = { ...mockQuery, hmac: validHmac, shop: 'invalid-shop.com' };
       const result = validateShopifyHmacRequest(queryWithInvalidShop);
       expect(result.result).toBe(false);
@@ -186,11 +186,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       const queryWithValidHmac = { ...mockQuery, hmac: validHmac };
       const result = validateShopifyHmacRequest(queryWithValidHmac, true);
       expect(result.result).toBe(true);
@@ -202,11 +202,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       // 使用10分钟前的时间戳
       const oldTimestamp = Math.floor((Date.now() - 10 * 60 * 1000) / 1000).toString();
       const queryWithOldTimestamp = { ...mockQuery, hmac: validHmac, timestamp: oldTimestamp };
@@ -287,7 +287,7 @@ describe('Validate Plugin Tests', () => {
     };
 
     beforeEach(() => {
-      process.env.SHOPIFY_API_SECRET = testSecret;
+      process.env.SHOPIFY_API_KEY = testSecret;
     });
 
     it('should validate request with HMAC', () => {
@@ -296,11 +296,11 @@ describe('Validate Plugin Tests', () => {
         .sort()
         .map(k => `${k}=${rest[k]}`)
         .join('&');
-      
+
       const validHmac = createHmac('sha256', testSecret)
         .update(message, 'utf8')
         .digest('hex');
-      
+
       const queryWithValidHmac = { ...mockQuery, hmac: validHmac };
       const result = validateShopifyRequest(queryWithValidHmac);
       expect(result.result).toBe(true);
@@ -338,14 +338,14 @@ describe('Validate Plugin Tests', () => {
       const validHmac = createHmac('sha256', testSecret)
         .update(testBody, 'utf-8')
         .digest('base64');
-      
+
       const mockReq = {
         headers: {
           'x-shopify-hmac-sha256': validHmac
         },
         body: testBody
       } as Request;
-      
+
       expect(validateWebhookHmac(mockReq)).toBe(true);
     });
 
@@ -356,7 +356,7 @@ describe('Validate Plugin Tests', () => {
         },
         body: testBody
       } as Request;
-      
+
       expect(validateWebhookHmac(mockReq)).toBe(false);
     });
 
@@ -365,7 +365,7 @@ describe('Validate Plugin Tests', () => {
         headers: {},
         body: testBody
       } as Request;
-      
+
       expect(validateWebhookHmac(mockReq)).toBe(false);
     });
 
@@ -373,14 +373,14 @@ describe('Validate Plugin Tests', () => {
       const validHmac = createHmac('sha256', testSecret)
         .update(testBody, 'utf-8')
         .digest('base64');
-      
+
       const mockReq = {
         headers: {
           'x-shopify-hmac-sha256': validHmac
         },
         body: JSON.stringify({ different: 'data' })
       } as Request;
-      
+
       expect(validateWebhookHmac(mockReq)).toBe(false);
     });
   });
