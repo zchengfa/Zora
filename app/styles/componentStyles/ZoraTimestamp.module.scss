@@ -1,8 +1,15 @@
-.timeBox{
+.timeBox,.timeBoxActive{
   width: max-content;
   .time{
     display: flex;
     width: max-content;
-    color: var(--z-color-text-secondary);
+
   }
+}
+.timeBox .time{
+  color: var(--z-color-text-secondary);
+}
+
+.timeBoxActive .time{
+  color: var(--z-color-text-secondary-active);
 }

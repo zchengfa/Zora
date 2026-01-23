@@ -95,7 +95,7 @@ function Index(){
             conversationId: message.conversationId,
             lastTimestamp: message.timestamp
           })
-          messageStore.addMessage(message)
+          messageStore.addMessage(message).then()
         }).catch(err=>{
             console.log(err)
           })
@@ -103,7 +103,7 @@ function Index(){
       //存在，只需更新对应列表项的部分数据
       else{
         messageStore.updateChatList(message)
-        messageStore.addMessage(message)
+        messageStore.addMessage(message).then()
       }
       socket.emit('message_delivered',{
         type: 'ACK',

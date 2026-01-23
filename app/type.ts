@@ -79,7 +79,8 @@ export interface GraphqlProductInfoType {
       description: string,
       descriptionHtml: string,
       tags: Array<string>,
-      vendor:string
+      vendor:string,
+      onlineStorePreviewUrl: string,
       variants:{
         nodes:Array<{price:number}>
       },

@@ -38,7 +38,7 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
                 </div>
                 <div className={ZoraCustomerListStyle.rightBox}>
                   <div className={ZoraCustomerListStyle.timeBox}>
-                    <ZoraTimestamp timestamp={item.lastTimestamp}></ZoraTimestamp>
+                    <ZoraTimestamp timestamp={item.lastTimestamp} active={item.isActive}></ZoraTimestamp>
                   </div>
                   {
                     item.hadRead ? null : <Badge count={item.unreadMessageCount}></Badge>
