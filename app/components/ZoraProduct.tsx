@@ -30,18 +30,17 @@ export default function ZoraProduct (){
       confirmButtonText: '推荐',
       cancelButtonText:'不推荐',
       onConfirm:()=>{
-        console.log(item)
         const msgData:MessageDataType = {
           senderId: messageStore.customerStaff?.id,
           senderType: 'AGENT',
-          contentType: 'PRODUCT_CARD',
+          contentType: 'PRODUCT',
           msgStatus: '',
           recipientType: 'CUSTOMER',
           recipientId: messageStore.activeCustomerInfo.id,
           contentBody:JSON.stringify(item),
           msgId: 'msg_'+ new Date().getTime(),
           conversationId: messageStore.activeCustomerItem,
-          timestamp: new Date().getTime().toString(),
+          timestamp: new Date().getTime(),
         }
         MessageServiceSendMessage({
           message:msgData,

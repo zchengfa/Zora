@@ -196,7 +196,7 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
                   case "IMAGE":
                     item.lastMessage = '[图片]'
                     break;
-                  case "PRODUCT_CARD":
+                  case "PRODUCT":
                     item.lastMessage = `[产品] ${JSON.parse(payload.contentBody)?.title}`
                     break;
                   default:

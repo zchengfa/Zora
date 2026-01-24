@@ -1,10 +1,10 @@
 /**
  * 处理给定时间与当前时间的间隔时间（五分钟前、当天几点几分、昨天几时几分、前天几时几分、星期一到七几时几分、几年几月几日几时几分）
- * @param time { number } 给定时间
+ * @param time { number | string | Date } 给定时间，支持时间戳、ISO 8601格式字符串或Date对象
  * @param separator { string | string[] | undefined } 时间分割符
  * @return { string } 返回处理后的时间
  */
-export function dealMsgTime (time:number,separator:string | string[] = ['/',':']): string{
+export function dealMsgTime (time:number | string | Date,separator:string | string[] = ['/',':']): string{
 
   //返回处理后的时间
   let showTime: string,YS = '',HS = ''
@@ -36,11 +36,11 @@ export function dealMsgTime (time:number,separator:string | string[] = ['/',':']
   const NY = nowDate.getFullYear(),NM = nowDate.getMonth(),ND = nowDate.getDate()
 
   //获取给定的时间属于哪年哪月哪日
-  const timeDate = new Date(time)
+  const timeDate = typeof time === 'string' || typeof time === 'number' ? new Date(time) : time
   const TY = timeDate.getFullYear(),TM = timeDate.getMonth(),TD = timeDate.getDate()
 
   //给定时间的几时几分
-  let HM = timeFormatting(HS,new Date(time))
+  let HM = timeFormatting(HS, timeDate)
 
   //判断给定时间与当前时间是否是同年同月
   if( NY === TY && NM === TM ){
@@ -51,7 +51,9 @@ export function dealMsgTime (time:number,separator:string | string[] = ['/',':']
     if( ND === TD){
       //同一天（判断间隔是否超过5分钟）
       const fiveMinutes = 5*60*1000
-      if(nowDate.getTime() - time >= fiveMinutes && nowDate.getTime() - time <= 7*60*1000){
+      const timeTimestamp = timeDate.getTime()
+      const nowTimestamp = nowDate.getTime()
+      if(nowTimestamp - timeTimestamp >= fiveMinutes && nowTimestamp - timeTimestamp <= 7*60*1000){
         HM = '五分钟前'
       }
       str = ''
@@ -72,7 +74,7 @@ export function dealMsgTime (time:number,separator:string | string[] = ['/',':']
     }
     else if(interval >= 3 && interval <= 7){
       //间隔三道七天获取给定时间是在星期几
-      const week = new Date(time).getDay()
+      const week = timeDate.getDay()
       switch (week) {
         case 0:
           str = '星期天';
@@ -98,8 +100,8 @@ export function dealMsgTime (time:number,separator:string | string[] = ['/',':']
       }
     }
     else if(interval > 7){
-      str = timeFormatting(YS,new Date(time))
-      HM = timeFormatting(HS,new Date(time))
+      str = timeFormatting(YS, timeDate)
+      HM = timeFormatting(HS, timeDate)
     }
 
     showTime = str + HM
@@ -107,9 +109,9 @@ export function dealMsgTime (time:number,separator:string | string[] = ['/',':']
   }
   else{
     //异年同月或同年异月
-    //showTime = timeFormatting(YS + ' ' + HS,new Date(time))
+    //showTime = timeFormatting(YS + ' ' + HS, timeDate)
     //只显示年月日
-    showTime = timeFormatting(YS,new Date(time))
+    showTime = timeFormatting(YS, timeDate)
   }
 
   return showTime
@@ -153,7 +155,8 @@ export function timeFormatting (fm:string,time?:Date | number | string){
     return fmt;
   }
   if (time){
-    return time.format(fm)
+    const dateObj = typeof time === 'string' || typeof time === 'number' ? new Date(time) : time
+    return dateObj.format(fm)
   }
   else {
     return new Date().format(fm)

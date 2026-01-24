@@ -45,7 +45,7 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
     switch (itemData.contentType) {
       case 'TEXT':
         return itemData.contentBody
-      case 'PRODUCT_CARD':
+      case 'PRODUCT':
         return <ZoraProductCard width={'20rem'} display={'row'} product={JSON.parse(itemData.contentBody)}></ZoraProductCard>
       case "IMAGE":
         return <img className={ZoraMessageItemStyle.imageMsg} alt={'zora_msg_image'}/>

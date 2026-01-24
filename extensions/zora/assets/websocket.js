@@ -41,6 +41,34 @@ socket.on('message', (data) => {
   })
   renderMessage.addMessage(data,1);
 });
+//离线消息接收
+socket.on('offline_messages',(data)=>{
+  console.log('收到离线消息',data);
+  const { messages, totalCount } = data;
+
+  if(messages && messages.length > 0){
+    // 批量处理消息模板
+    const processedMessages = messages.map(msg => {
+
+      return {
+        ...msg,
+        isOffline: true // 标记为离线消息
+      };
+    });
+
+    // 一次性渲染所有离线消息
+    renderMessage.addMessage(processedMessages, 1);
+
+    // 收集所有离线消息的msgId
+    const msgIds = processedMessages.map(msg => msg.msgId);
+
+    // 发送离线消息确认回执给服务端
+    console.log('发送离线消息确认回执，消息数量:', msgIds.length);
+    socket.emit('offline_message_ack', {
+      msgIds: msgIds
+    });
+  }
+})
 
 // 监听连接断开事件
 socket.on('disconnect', () => {

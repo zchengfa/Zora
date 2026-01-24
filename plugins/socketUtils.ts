@@ -152,6 +152,125 @@ export class SocketUtils{
       }
       this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004,payload.conversationId)
     })
+
+    // 处理离线消息确认回执
+    this.ws.on('offline_message_ack', async (payload) => {
+      try {
+        const { msgIds } = payload;
+        if (!msgIds || !Array.isArray(msgIds) || msgIds.length === 0) {
+          await beginLogger({
+            level: 'warning',
+            message: `收到无效的离线消息确认回执`,
+            meta: {
+              taskType: 'offline_message_ack',
+              payload
+            }
+          });
+          return;
+        }
+
+        // 获取当前用户ID
+        let userId = null;
+        for (const [uid, socketId] of this.users.entries()) {
+          if (socketId === this.ws.id) {
+            userId = uid;
+            break;
+          }
+        }
+
+        if (!userId) {
+          await beginLogger({
+            level: 'warning',
+            message: `无法找到对应的用户ID`,
+            meta: {
+              taskType: 'offline_message_ack',
+              socketId: this.ws.id
+            }
+          });
+          return;
+        }
+
+        // 从待确认集合中移除已确认的消息ID
+        const pendingAckKey = `pending_offline_ack:${userId}`;
+        const removedCount = await this.config.redis.srem(pendingAckKey, ...msgIds);
+
+        // 从离线消息列表中删除已确认的消息
+        const offlineMessagesKey = `offline_messages:${userId}`;
+        const allMessages = await this.config.redis.lrange(offlineMessagesKey, 0, -1);
+
+        // 找出需要删除的消息
+        const messagesToRemove = [];
+        const dbMessageIds = []; // 存储数据库中的消息ID
+        for (const msgStr of allMessages) {
+          try {
+            const msg = JSON.parse(msgStr);
+            if (msgIds.includes(msg.msgId)) {
+              messagesToRemove.push(msgStr);
+              // 如果消息有数据库ID，添加到待删除列表
+              if (msg.id) {
+                dbMessageIds.push(msg.id);
+              }
+            }
+          } catch (e) {
+            console.error('解析离线消息失败:', e);
+          }
+        }
+
+        // 批量删除Redis中的已确认消息
+        if (messagesToRemove.length > 0) {
+          const pipeline = this.config.redis.pipeline();
+          for (const msgStr of messagesToRemove) {
+            pipeline.lrem(offlineMessagesKey, 1, msgStr);
+          }
+          await pipeline.exec();
+        }
+
+        // 批量删除数据库中的离线消息
+        if (dbMessageIds.length > 0) {
+          await this.config.prisma.offlineMessage.deleteMany({
+            where: {
+              id: {
+                in: dbMessageIds
+              }
+            }
+          });
+
+          await beginLogger({
+            level: 'info',
+            message: `已从数据库删除${dbMessageIds.length}条离线消息`,
+            meta: {
+              taskType: 'offline_message_ack',
+              userId,
+              dbMessageIds
+            }
+          });
+        }
+
+        await beginLogger({
+          level: 'info',
+          message: `收到离线消息确认回执，用户${userId}确认了${removedCount}条消息`,
+          meta: {
+            taskType: 'offline_message_ack',
+            userId,
+            msgIds,
+            removedCount
+          }
+        });
+      } catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `处理离线消息确认回执失败`,
+          meta: {
+            taskType: 'offline_message_ack',
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -162,7 +281,7 @@ export class SocketUtils{
     try {
       // 检查该用户是否有未送达的离线消息
       let messageCount = await this.config.redis.llen(`offline_messages:${userId}`);
-      
+
       // 如果Redis中没有消息，尝试从Prisma数据库中加载
       if (messageCount === 0) {
         const offlineMessages = await this.config.prisma.offlineMessage.findMany({
@@ -175,7 +294,7 @@ export class SocketUtils{
           },
           take: 100 // 最多加载100条消息
         });
-        
+
         if (offlineMessages.length > 0) {
           // 将消息重新加载到Redis
           const redisKey = `offline_messages:${userId}`;
@@ -193,7 +312,7 @@ export class SocketUtils{
             createdAt: msg.createdAt.toISOString(),
             isOffline: true
           }));
-          
+
           // 使用pipeline批量加载消息
           const pipeline = this.config.redis.pipeline();
           messagesToLoad.forEach(msg => {
@@ -201,9 +320,9 @@ export class SocketUtils{
           });
           pipeline.expire(redisKey, this.config.redisExpired);
           await pipeline.exec();
-          
+
           messageCount = messagesToLoad.length;
-          
+
           await beginLogger({
             level: 'info',
             message: `已从数据库为用户${userId}重新加载${messageCount}条离线消息到Redis`,
@@ -215,11 +334,11 @@ export class SocketUtils{
           });
         }
       }
-      
+
       if (messageCount === 0) {
         return;
       }
-      
+
       // 添加离线消息推送任务到队列
       const { addOfflineMessageJob } = await import("./bullTaskQueue.ts");
       await addOfflineMessageJob({
@@ -233,7 +352,7 @@ export class SocketUtils{
         timestamp: new Date().toISOString(),
         priority: 1 // 设置较高优先级
       });
-      
+
       await beginLogger({
         level: 'info',
         message: `已为用户${userId}创建离线消息推送任务，待推送消息数：${messageCount}`,
@@ -260,9 +379,11 @@ export class SocketUtils{
   }
   public socketAgentOnline = ()=>{
     //客服连接
-    this.ws.on('agent',(info)=>{
+    this.ws.on('agent',async (info)=>{
       if(info){
         this.agent.set(info.id,this.ws.id)
+        // 将客服ID和socketId的映射关系存储到Redis
+        await this.config.redis.set(`agent_socket:${info.id}`, this.ws.id, 'EX', this.config.redisExpired)
         beginLogger({
           level: 'info',
           message: `客服${info.name}上线了`,
@@ -286,6 +407,8 @@ export class SocketUtils{
             }
           })
           this.users.set(String(prismaQuery.userId),this.ws.id)
+          // 将用户ID和socketId的映射关系存储到Redis
+          await this.config.redis.set(`user_socket:${prismaQuery.userId}`, this.ws.id, 'EX', this.config.redisExpired)
           await beginLogger({
             level: 'info',
             message: `客户${prismaQuery.email}上线了`,
@@ -296,6 +419,8 @@ export class SocketUtils{
         }
         else{
           this.users.set(user.userId,this.ws.id)
+          // 将用户ID和socketId的映射关系存储到Redis
+          await this.config.redis.set(`user_socket:${user.userId}`, this.ws.id, 'EX', this.config.redisExpired)
           await beginLogger({
             level: 'info',
             message: `客户${redisQuery}上线了`,
@@ -369,11 +494,27 @@ export class SocketUtils{
       const payload = JSON.parse(data)
       let recipient = undefined,sender = undefined
       try{
+        payload.timestamp = Number(payload.timestamp)
         //数据表消息存储
         payload.timestamp = new Date(payload.timestamp).toISOString()
+        const clonePayload = JSON.parse(JSON.stringify(payload))
+        //传输的是产品时，数据库只存储部分关键数据，不全量存储
+        if(payload.contentType === 'PRODUCT'){
+          const content = JSON.parse(payload.contentBody)
+          clonePayload.contentBody = JSON.stringify({
+            id:content.id,
+            title: content.title,
+            onlineStorePreviewUrl: content.onlineStorePreviewUrl,
+            vendor: content.vendor,
+            description: content.description,
+            featuredMedia: content.featuredMedia,
+            tags: content.tags,
+            compareAtPriceRange: content.compareAtPriceRange,
+          })
+        }
         const saveMessagePrisma = await this.config.prisma.message.create({
           data:{
-            ...payload,
+            ...clonePayload,
             msgStatus: "SENT"
           }
         })

@@ -20,6 +20,8 @@ export type WorkerHealthType = {
   registerWorker():Promise<WorkerStatus>,
   updateWorkerHeartBeat(): Promise<void>,
   unregisterWorker():Promise<void>,
+  checkWorkerHealthStatus():void,
+  stopHealthCheck():void
 }
 
 export class WorkerHealth implements WorkerHealthType{
@@ -74,26 +76,26 @@ export class WorkerHealth implements WorkerHealthType{
       clearInterval(this.WORKER_HEALTH_TIMER)
       this.currentCheckAttempts = 0
     }
-    
+
     const keyArr = this.WORKER_STATUS_KEY.split(':')
     const target = `${keyArr[1]} ${keyArr[0]}`
-    
+
     this.WORKER_HEALTH_TIMER = setInterval(async ()=>{
       try {
         this.checkStatus = await this.redis.get(this.WORKER_STATUS_KEY)
         this.currentCheckAttempts ++
-        
+
         if(this.checkStatus){
           clearInterval(this.WORKER_HEALTH_TIMER)
           this.WORKER_HEALTH_TIMER = undefined
-          
+
           let statusData
           try {
             statusData = JSON.parse(this.checkStatus)
           } catch (e) {
             statusData = this.checkStatus
           }
-          
+
           await beginLogger({
             level: 'info',
             message: `${target} is healthy`,
@@ -104,11 +106,11 @@ export class WorkerHealth implements WorkerHealthType{
             }
           })
         }
-        
+
         if(this.currentCheckAttempts >= this.maxCheckAttempts){
           clearInterval(this.WORKER_HEALTH_TIMER)
           this.WORKER_HEALTH_TIMER = undefined
-          
+
           await beginLogger({
             level: 'error',
             message: `${target} is unhealthy`,
@@ -136,7 +138,7 @@ export class WorkerHealth implements WorkerHealthType{
       }
     },this.workerHealthCheckDelay)
   }
-  
+
   /**
    * 停止健康检查
    */

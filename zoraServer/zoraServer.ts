@@ -148,31 +148,3 @@ const checkWorkerHealth = async ()=>{
 // 检测worker是否开启
 checkWorkerHealth().then();
 
-// 优雅关闭时停止所有健康检查
-process.on('SIGTERM', async () => {
-  workerHealthChecks.forEach((healthCheck, name) => {
-    healthCheck.stopHealthCheck();
-    beginLogger({
-      level: 'info',
-      message: `已停止${name} worker的健康检查`,
-      meta:{
-        taskType: 'worker_health_check_stop',
-        worker: name
-      }
-    }).then();
-  });
-});
-
-process.on('SIGINT', async () => {
-  workerHealthChecks.forEach((healthCheck, name) => {
-    healthCheck.stopHealthCheck();
-    beginLogger({
-      level: 'info',
-      message: `已停止${name} worker的健康检查`,
-      meta:{
-        taskType: 'worker_health_check_stop',
-        worker: name
-      }
-    }).then();
-  });
-});

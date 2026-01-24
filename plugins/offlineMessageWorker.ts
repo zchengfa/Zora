@@ -1,6 +1,6 @@
 import {Worker} from "bullmq";
 import {redisClient} from "./redisClient.ts";
-import {beginLogger} from "./bullTaskQueue.ts";
+import {beginLogger, offlineMessageQueue} from "./bullTaskQueue.ts";
 import {WorkerHealth} from "./workerHealth.ts";
 
 const workerHealth = new WorkerHealth({
@@ -17,36 +17,20 @@ const MESSAGE_STORAGE_PREFIX = "offline_messages:" // 离线消息存储前缀
 const getOfflineMessages = async (userId:string, count:number)=>{
   const key = `${MESSAGE_STORAGE_PREFIX}${userId}`
   const messages = await redisClient.lrange(key, 0, count - 1)
-  return messages.map(msg => JSON.parse(msg))
-}
+  const parsedMessages = messages.map(msg => JSON.parse(msg))
 
-const removeOfflineMessages = async (userId:string, count:number)=>{
-  const key = `${MESSAGE_STORAGE_PREFIX}${userId}`
-  await redisClient.ltrim(key, count, -1)
+  // 每批次消息内部按时间升序排序（最早的在前，最新的在后）
+  return parsedMessages.sort((a, b) => {
+    const timeA = new Date(a.createdAt || a.timestamp).getTime()
+    const timeB = new Date(b.createdAt || b.timestamp).getTime()
+    return timeA - timeB
+  })
 }
 
 const pushMessagesToUser = async (userId:string, messages:any[])=>{
   try {
-    // 获取Socket.IO实例和用户Map
-    const { SocketUtils } = await import("./socketUtils.ts");
-    const io = SocketUtils.getIoInstance();
-    const usersMap = SocketUtils.getUsersMapInstance();
-
-    if (!io || !usersMap) {
-      await beginLogger({
-        level: 'error',
-        message: `Socket.IO实例或用户Map未初始化，无法推送离线消息给用户${userId}`,
-        meta:{
-          taskType: 'push_offline_messages',
-          userId,
-          messageCount: messages.length
-        }
-      })
-      return;
-    }
-
-    // 获取用户的socketId
-    const socketId = usersMap.get(userId);
+    // 从Redis获取用户的socketId
+    const socketId = await redisClient.get(`user_socket:${userId}`);
 
     if (!socketId) {
       await beginLogger({
@@ -58,54 +42,68 @@ const pushMessagesToUser = async (userId:string, messages:any[])=>{
           messageCount: messages.length
         }
       })
-      return;
+      return false;
     }
 
     // 批量推送消息
-    const messagePayloads = messages.map(message => ({
-      id: message.id,
-      conversationId: message.conversationId,
-      senderId: message.senderId,
-      senderType: message.senderType,
-      recipientId: message.recipientId,
-      recipientType: message.recipientType,
-      contentType: message.contentType,
-      contentBody: message.contentBody,
-      metadata: message.metadata,
-      msgId: message.msgId,
-      timestamp: message.createdAt || new Date().toISOString(),
-      isOffline: true // 标记为离线消息
-    }));
+    const messagePayloads = messages.map(message => {
+      let contentBody = message.contentBody;
 
-    // 一次性发送所有消息
-    io.to(socketId).emit('offline_messages', {
-      messages: messagePayloads,
-      totalCount: messagePayloads.length
+      // 如果是产品消息，从Shopify获取完整的产品信息
+      if (message.contentType === 'PRODUCT') {
+        try {
+          const productData = JSON.parse(message.contentBody);
+          if (productData && productData.product_id) {
+            contentBody = message.contentBody;
+          }
+        } catch (e) {
+          console.error('解析产品消息体失败:', e);
+        }
+      }
+
+      return {
+        id: message.id,
+        conversationId: message.conversationId,
+        senderId: message.senderId,
+        senderType: message.senderType,
+        recipientId: message.recipientId,
+        recipientType: message.recipientType,
+        contentType: message.contentType,
+        contentBody: contentBody,
+        metadata: message.metadata,
+        msgId: message.msgId,
+        timestamp: message.createdAt || new Date().toISOString(),
+        isOffline: true // 标记为离线消息
+      };
     });
 
-    // 批量发送消息送达确认
-    const ackPayloads = messagePayloads.map(msg => ({
-      type: 'ACK',
-      msgId: msg.msgId,
-      msgStatus: 'DELIVERED',
-      code: 'message delivered',
-      timestamp: new Date().toISOString(),
-      conversationId: msg.conversationId
+    // 通过Redis发布消息到Socket.IO
+    await redisClient.publish(`socket.io#${socketId}`, JSON.stringify({
+      type: 'offline_messages',
+      data: {
+        messages: messagePayloads,
+        totalCount: messagePayloads.length
+      }
     }));
 
-    io.to(socketId).emit('message_ack_batch', {
-      acks: ackPayloads
-    });
+    // 将推送的消息ID存储到临时Redis集合中，等待客户端确认
+    const pendingAckKey = `pending_offline_ack:${userId}`;
+    const msgIds = messagePayloads.map(msg => msg.msgId);
+    await redisClient.sadd(pendingAckKey, ...msgIds);
+    await redisClient.expire(pendingAckKey, 3600 * 24 * 7); // 7天过期
 
     await beginLogger({
       level: 'info',
-      message: `成功推送${messages.length}条离线消息给用户${userId}`,
+      message: `成功推送${messages.length}条离线消息给用户${userId}，等待客户端确认`,
       meta:{
         taskType: 'push_offline_messages',
         userId,
-        messageCount: messages.length
+        messageCount: messages.length,
+        msgIds
       }
     })
+
+    return true;
   } catch (error) {
     await beginLogger({
       level: 'error',
@@ -143,22 +141,44 @@ const processOfflineMessageJob = async (job:any)=>{
     const batchSize = Math.min(messageCount, BATCH_SIZE)
     const messages = await getOfflineMessages(userId, batchSize)
 
-    await pushMessagesToUser(userId, messages)
-    await removeOfflineMessages(userId, batchSize)
+    const pushResult = await pushMessagesToUser(userId, messages)
 
-    await beginLogger({
-      level: 'info',
-      message: `成功推送${batchSize}条离线消息给用户${userId}`,
-      meta:{
-        taskType: 'process_offline_message_job',
-        userId,
-        batchSize,
-        remainingCount: messageCount - batchSize
+    // 只有推送成功后才记录日志，但不立即删除消息
+    // 等待客户端确认后再删除
+    if(pushResult){
+      await beginLogger({
+        level: 'info',
+        message: `成功推送${batchSize}条离线消息给用户${userId}，等待客户端确认`,
+        meta:{
+          taskType: 'process_offline_message_job',
+          userId,
+          batchSize,
+          remainingCount: messageCount - batchSize
+        }
+      })
+
+      // 如果还有剩余消息，添加新的延迟任务而不是使用moveToDelayed
+      // 这样可以避免Lock mismatch错误
+      if(messageCount > batchSize){
+        await offlineMessageQueue.add('pushOfflineMessage', {
+          userId,
+          messageType: 'system'
+        }, {
+          delay: BATCH_DELAY,
+          jobId: `offline_msg_${userId}_${Date.now()}`,
+          attempts: 3
+        })
+
+        await beginLogger({
+          level: 'info',
+          message: `已创建延迟任务继续推送用户${userId}的剩余${messageCount - batchSize}条离线消息`,
+          meta:{
+            taskType: 'process_offline_message_job',
+            userId,
+            remainingCount: messageCount - batchSize
+          }
+        })
       }
-    })
-
-    if(messageCount > batchSize){
-      await job.moveToDelayed(Date.now() + BATCH_DELAY, `继续推送用户${userId}的剩余离线消息`)
     }
   } catch (error) {
     await beginLogger({

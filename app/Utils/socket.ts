@@ -2,7 +2,7 @@ import {io, ManagerOptions, SocketOptions,Socket} from "socket.io-client";
 
 export type MessageDataType = {
   contentBody: string ,
-  contentType: 'TEXT' | 'PRODUCT_CARD' | 'IMAGE',
+  contentType: 'TEXT' | 'PRODUCT' | 'IMAGE',
   conversationId:string,
   msgId:string,
   msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED' | 'READ' | "",

@@ -35,7 +35,7 @@ class RenderMessage {
   }
   renderMessageContent = (payload)=>{
     let product = ''
-    if(payload.contentType === 'PRODUCT_CARD'){
+    if(payload.contentType === 'PRODUCT'){
       product = JSON.parse(payload.contentBody)
     }
     switch (payload.contentType) {
@@ -43,7 +43,7 @@ class RenderMessage {
         return payload.contentBody;
       case 'IMAGE':
         return `<img src={JSON.parse(payload.contentBody)?.featuredMedia?.preview?.image?.url} alt={'img_message'}/>`
-      case 'PRODUCT_CARD':
+      case 'PRODUCT':
         return `<a class="zora-product-link" href=${product.onlineStorePreviewUrl}>
             <div class='zora-message-product-container'>
             <div class="zora-message-product-image-box">
@@ -77,9 +77,10 @@ class RenderMessage {
         break;
     }
   }
-  addMessage = (payload)=>{
-    const elData = this.getElData(payload.senderType,payload.msgStatus)
-    const messageHtml = `
+  // 生成单条消息的HTML
+  generateMessageHtml = (payload) => {
+    const elData = this.getElData(payload.senderType, payload.msgStatus);
+    return `
       <div class="zora-message-item ${elData.itemClass}" data-msg-unique="${payload.msgId}">
         <div class="zora-message-avatar">
           <img class="zora-avatar" width="32px" height="32px" src="${elData.avatar}" alt="zora_avatar" />
@@ -93,34 +94,80 @@ class RenderMessage {
           </div>
         </div>
       </div>
-    `
-    this.zoraMessageContainer.insertAdjacentHTML('beforeend',messageHtml)
-    const parentEl = this.zoraMessageContainer.parentNode
-    const msgBoxEl = document.querySelector('.zora-message-box-active')
-    if(msgBoxEl){
+    `;
+  }
+
+  // 滚动到消息底部
+  scrollToBottom = () => {
+    const parentEl = this.zoraMessageContainer.parentNode;
+    const msgBoxEl = document.querySelector('.zora-message-box-active');
+    if (msgBoxEl) {
       parentEl.scrollTo({
         top: parentEl.scrollHeight,
         behavior: 'smooth'
-      })
+      });
     }
-    if(payload.senderType === 'CUSTOMER'){
-      this.setMessageStatus(payload.msgId, 'SENDING');
-      let sendingTimer = setTimeout(()=>{
-        this.zoraMsgStateTimer.delete(payload.msgId)
-        if(this.getMessageStatus(payload.msgId) === 'SENDING'){
-          this.updateMessageStatus(payload.msgId,payload.msgStatus)
-        }
-      },this.SENDING_THRESHOLD)
+  }
 
-      //兜底，防止消息长时间没有回执
-      let msgMaxTimer = setTimeout(()=>{
+  // 设置客户消息的发送状态和定时器
+  setupCustomerMessageTimers = (payload) => {
+    if (payload.senderType === 'CUSTOMER') {
+      this.setMessageStatus(payload.msgId, 'SENDING');
+      let sendingTimer = setTimeout(() => {
+        this.zoraMsgStateTimer.delete(payload.msgId)
+        if (this.getMessageStatus(payload.msgId) === 'SENDING') {
+          this.updateMessageStatus(payload.msgId, payload.msgStatus)
+        }
+      }, this.SENDING_THRESHOLD)
+
+      // 兜底，防止消息长时间没有回执
+      let msgMaxTimer = setTimeout(() => {
         this.zoraMaxWaitingTimer.delete(payload.msgId)
         if (this.getMessageStatus(payload.msgId) === 'SENDING') {
           this.updateMessageStatus(payload.msgId, 'FAILED')
         }
-      },this.MAX_WAITING_THRESHOLD)
-      this.zoraMsgStateTimer.set(payload.msgId,sendingTimer)
-      this.zoraMaxWaitingTimer.set(payload.msgId,msgMaxTimer)
+      }, this.MAX_WAITING_THRESHOLD)
+      this.zoraMsgStateTimer.set(payload.msgId, sendingTimer)
+      this.zoraMaxWaitingTimer.set(payload.msgId, msgMaxTimer)
+    }
+  }
+
+  addMessage = (payload, isBatch = false) => {
+    // 如果是数组，说明是批量消息
+    if (Array.isArray(payload)) {
+      this.addBatchMessages(payload);
+      return;
+    }
+
+    // 生成并插入单条消息
+    const messageHtml = this.generateMessageHtml(payload);
+    this.zoraMessageContainer.insertAdjacentHTML('beforeend', messageHtml);
+
+    // 滚动到底部
+    this.scrollToBottom();
+
+    // 设置客户消息的发送状态和定时器
+    this.setupCustomerMessageTimers(payload);
+  }
+
+  // 批量添加消息
+  addBatchMessages = (messages) => {
+    if (!messages || messages.length === 0) return;
+
+    // 检查是否是离线消息
+    const isOfflineMessages = messages.some(msg => msg.isOffline);
+
+    // 批量生成所有消息的HTML
+    const messagesHtml = messages.map(payload => this.generateMessageHtml(payload)).join('');
+
+    if (isOfflineMessages) {
+      // 离线消息插入到列表前面（历史消息位置）
+      this.zoraMessageContainer.insertAdjacentHTML('afterbegin', messagesHtml);
+    } else {
+      // 普通消息插入到列表末尾
+      this.zoraMessageContainer.insertAdjacentHTML('beforeend', messagesHtml);
+      // 滚动到底部
+      this.scrollToBottom();
     }
   }
   getMessageStatus(msgId) {
@@ -130,7 +177,6 @@ class RenderMessage {
     this.msgStatusMap.set(msgId, status);
   }
   getElData = (senderType,msgStatus)=>{
-    //`<span class="zora-msg-read-state hidden">${zoraResponse.responseMessage('msg_status','READ')}</span>`
     const {avatar,username,agentInfo} = JSON.parse(sessionStorage.getItem('zora_userInfo'))
     if(senderType === 'CUSTOMER'){
       return {
