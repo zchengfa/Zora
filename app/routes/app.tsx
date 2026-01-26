@@ -24,7 +24,7 @@ function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   const { socket } = useSocketService()
 
-  const {customerStaff} = useMessageStore()
+  const {customerStaff, chatList, activeCustomerItem} = useMessageStore()
 
   useEffect(() => {
     //设置主题
@@ -38,16 +38,23 @@ function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      socket.emit('offline',{id:customerStaff.id})
+      // 通过socket发送下线通知
+      socket.emit('offline',{
+        id: customerStaff.id,
+        chatList: chatList,
+        activeCustomerItem: activeCustomerItem
+      })
     }
+    
 // 处理 iframe 被卸载（在 Shopify Admin 内切换页面）
     const handleUnload = () => {
       const logoutData = new Blob([JSON.stringify({
         agent: customerStaff?.id,
-        action: 'offline_via_unload'
+        action: 'offline_via_unload',
+        chatList: chatList,
+        activeCustomerItem: activeCustomerItem
       })], { type: 'application/json' });
       navigator.sendBeacon(`${import.meta.env.VITE_BASE_URL}/api/agent-offline`, logoutData);
-
     };
 
     window.addEventListener('unload', handleUnload);
@@ -57,10 +64,9 @@ function App() {
       // 清理时移除两个事件的监听
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('unload', handleUnload);
-
     };
 
-  },[socket,customerStaff])
+  },[socket,customerStaff,chatList,activeCustomerItem])
 
   return (
     <AppProvider embedded apiKey={apiKey}>

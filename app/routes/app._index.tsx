@@ -9,7 +9,7 @@ import {useSocketService} from "@hooks/useSocketService.ts";
 import {useSocketNotification} from "@hooks/useSocketNotification.ts";
 import {useEffect} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
-import {shopifyRequestUserInfo,shopifyCustomerStaffInit} from "@/network/request.ts";
+import {shopifyRequestUserInfo,shopifyCustomerStaffInit,getChatList} from "@/network/request.ts";
 import {SHOP_INFO_QUERY_GQL,PRODUCTS_QUERY_GQL} from "@Utils/graphql.ts";
 import {MessageDataType} from "@Utils/socket.ts";
 import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
@@ -27,7 +27,7 @@ export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {data} = await shopOwnerName.json()
   let customerStaff;
   try {
-    const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName)
+    const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName,data.shop.myshopifyDomain)
     customerStaff = result?.data
   }
   catch (e) {
@@ -52,6 +52,20 @@ function Index(){
   useEffect(() => {
     messageStore.initZustandState(customerStaff,products)
     messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+
+    // 获取并同步聊天列表
+    if (customerStaff?.id) {
+      getChatList(customerStaff.id)
+        .then(res => {
+          if (res?.data?.chatList) {
+            messageStore.setChatList(res.data.chatList)
+          }
+        })
+        .catch(err => {
+          console.error('获取聊天列表失败:', err)
+        })
+    }
+
     socket.on('connect', () => {
       console.log('✅ 已成功连接到服务器！');
       socket.emit('agent',{

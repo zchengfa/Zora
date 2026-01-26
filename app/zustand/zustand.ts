@@ -35,6 +35,7 @@ export interface UseMessageStoreType {
   readChatList: (conversationId: string) => void;
   updateTimer: (payload: {timer:ReturnType<typeof setTimeout>,maxTimer:ReturnType<typeof setTimeout>} & MessageAckType) => void;
   clearUpTimer: (ack: MessageAckType) => void;
+  setChatList: (chatList: CustomerDataType[]) => void;
 }
 
 export const useMessageStore = create<UseMessageStoreType>((set)=>{
@@ -284,6 +285,15 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
           return {
             messageTimers: cloneTimers,
             messageMaxWaitingTimers: cloneMaxWaitingTimers,
+          }
+        })
+      },
+      setChatList:(chatList:CustomerDataType[])=>{
+        set(()=>{
+          //将更新后的列表保存至sessionStorage
+          somethingSaveToSessionStorage(SESSION_STORAGE_CHAT_LIST_KEY,chatList)
+          return {
+            chatList
           }
         })
       }

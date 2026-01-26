@@ -86,7 +86,7 @@ CREATE TABLE "shop" (
 );
 
 -- CreateTable
-CREATE TABLE "customer_service_staff" (
+CREATE TABLE "staff_profiles" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "email" TEXT,
@@ -95,7 +95,17 @@ CREATE TABLE "customer_service_staff" (
     "department" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3),
-    "userId" BIGINT,
+
+    CONSTRAINT "staff_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "customer_service_staff" (
+    "id" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3),
+    "profileId" TEXT NOT NULL,
+    "userId" BIGINT NOT NULL,
 
     CONSTRAINT "customer_service_staff_pkey" PRIMARY KEY ("id")
 );
@@ -174,6 +184,28 @@ CREATE TABLE "offline_messages" (
 );
 
 -- CreateTable
+CREATE TABLE "chat_list_items" (
+    "id" TEXT NOT NULL,
+    "conversationId" VARCHAR(191) NOT NULL,
+    "customerId" VARCHAR(191) NOT NULL,
+    "customerFirstName" TEXT,
+    "customerLastName" TEXT,
+    "customerAvatar" TEXT,
+    "lastMessage" TEXT,
+    "lastTimestamp" TIMESTAMP(3),
+    "isOnline" BOOLEAN NOT NULL DEFAULT false,
+    "hadRead" BOOLEAN NOT NULL DEFAULT true,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "unreadMessageCount" INTEGER NOT NULL DEFAULT 0,
+    "agentId" VARCHAR(191),
+    "shop" VARCHAR(100) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "chat_list_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "addresses" (
     "id" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
@@ -214,7 +246,7 @@ CREATE TABLE "orders" (
     "stripePaymentIntentId" TEXT,
     "stripeSessionId" TEXT,
     "shopifyOrderId" TEXT,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "shippingAddressId" TEXT,
     "order_addressId" TEXT,
 
@@ -350,6 +382,14 @@ CREATE TABLE "product_media" (
 );
 
 -- CreateTable
+CREATE TABLE "_ChatListItemToCustomerServiceStaff" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_ChatListItemToCustomerServiceStaff_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
 CREATE TABLE "_ProductMedia" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
@@ -382,13 +422,7 @@ CREATE UNIQUE INDEX "shop_email_key" ON "shop"("email");
 CREATE UNIQUE INDEX "shop_shopify_domain_key" ON "shop"("shopify_domain");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "customer_service_staff_id_key" ON "customer_service_staff"("id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "customer_service_staff_email_key" ON "customer_service_staff"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "customer_service_staff_userId_key" ON "customer_service_staff"("userId");
+CREATE UNIQUE INDEX "customer_service_staff_profileId_userId_key" ON "customer_service_staff"("profileId", "userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "session_userId_key" ON "session"("userId");
@@ -413,6 +447,18 @@ CREATE INDEX "offline_messages_recipientId_isDelivered_idx" ON "offline_messages
 
 -- CreateIndex
 CREATE INDEX "offline_messages_conversationId_idx" ON "offline_messages"("conversationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "chat_list_items_conversationId_key" ON "chat_list_items"("conversationId");
+
+-- CreateIndex
+CREATE INDEX "chat_list_items_agentId_shop_idx" ON "chat_list_items"("agentId", "shop");
+
+-- CreateIndex
+CREATE INDEX "chat_list_items_shop_customerId_idx" ON "chat_list_items"("shop", "customerId");
+
+-- CreateIndex
+CREATE INDEX "chat_list_items_lastTimestamp_idx" ON "chat_list_items"("lastTimestamp");
 
 -- CreateIndex
 CREATE INDEX "addresses_customerId_idx" ON "addresses"("customerId");
@@ -502,16 +548,28 @@ CREATE INDEX "product_media_mediaId_idx" ON "product_media"("mediaId");
 CREATE UNIQUE INDEX "product_media_productId_mediaId_key" ON "product_media"("productId", "mediaId");
 
 -- CreateIndex
+CREATE INDEX "_ChatListItemToCustomerServiceStaff_B_index" ON "_ChatListItemToCustomerServiceStaff"("B");
+
+-- CreateIndex
 CREATE INDEX "_ProductMedia_B_index" ON "_ProductMedia"("B");
 
 -- AddForeignKey
 ALTER TABLE "customers" ADD CONSTRAINT "customers_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shop"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customer_service_staff" ADD CONSTRAINT "customer_service_staff_userId_fkey" FOREIGN KEY ("userId") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "customer_service_staff" ADD CONSTRAINT "customer_service_staff_profileId_fkey" FOREIGN KEY ("profileId") REFERENCES "staff_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "customer_service_staff" ADD CONSTRAINT "customer_service_staff_userId_fkey" FOREIGN KEY ("userId") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "messages" ADD CONSTRAINT "messages_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "chat_list_items" ADD CONSTRAINT "chat_list_items_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "chat_list_items" ADD CONSTRAINT "chat_list_items_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "staff_profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "addresses" ADD CONSTRAINT "addresses_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customers"("shopify_customer_id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -557,6 +615,12 @@ ALTER TABLE "product_media" ADD CONSTRAINT "product_media_productId_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "product_media" ADD CONSTRAINT "product_media_mediaId_fkey" FOREIGN KEY ("mediaId") REFERENCES "media"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_ChatListItemToCustomerServiceStaff" ADD CONSTRAINT "_ChatListItemToCustomerServiceStaff_A_fkey" FOREIGN KEY ("A") REFERENCES "chat_list_items"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_ChatListItemToCustomerServiceStaff" ADD CONSTRAINT "_ChatListItemToCustomerServiceStaff_B_fkey" FOREIGN KEY ("B") REFERENCES "customer_service_staff"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ProductMedia" ADD CONSTRAINT "_ProductMedia_A_fkey" FOREIGN KEY ("A") REFERENCES "media"("id") ON DELETE CASCADE ON UPDATE CASCADE;

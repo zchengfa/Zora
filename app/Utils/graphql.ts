@@ -5,6 +5,7 @@ export const SHOP_INFO_QUERY_GQL =
         shop {
           email
           shopOwnerName
+          myshopifyDomain
         }
     }`
 

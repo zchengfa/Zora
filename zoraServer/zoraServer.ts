@@ -41,9 +41,23 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
 
-app.post('/api/agent-offline', (req, res) => {
-  SocketUtils.manualOffline(req.body.agent);
-  res.status(200).json('success');
+app.post('/api/agent-offline', async (req, res) => {
+  try {
+    const { agent, action, chatList, activeCustomerItem } = req.body;
+
+    // 将客服标记为离线
+    SocketUtils.manualOffline(agent);
+
+    // 如果有聊天列表数据，保存到数据库
+    if (chatList.length && Array.isArray(chatList)) {
+      await SocketUtils.saveChatList(agent, chatList, activeCustomerItem);
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('保存聊天列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.use(async (req,res,next)=> {

@@ -597,6 +597,145 @@ export class SocketUtils{
   }
 
   /**
+   * 保存客服的聊天列表到数据库
+   * @param agentId 客服ID
+   * @param chatList 聊天列表数据
+   * @param activeCustomerItem 当前激活的会话ID
+   */
+  public static async saveChatList(
+    agentId: string,
+    chatList: Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      avatar: string | null;
+      isOnline?: boolean;
+      lastMessage: string;
+      lastTimestamp: string | number;
+      hadRead?: boolean;
+      isActive?: boolean;
+      unreadMessageCount?: number;
+      conversationId?: string;
+    }>,
+    activeCustomerItem?: string,
+    shopDomain?: string
+  ) {
+    try {
+      // 获取prisma实例
+      const { prismaClient } = await import('../plugins/prismaClient.ts');
+      const prisma = prismaClient;
+
+      // 获取客服信息
+      const agent = await prisma.staffProfile.findUnique({
+        where: { id: agentId }
+      });
+
+      if (!agent) {
+        throw new Error('客服信息不存在');
+      }
+
+      // 获取商店信息
+      let shop;
+      if (shopDomain) {
+        shop = await prisma.shop.findUnique({
+          where: { shopify_domain: shopDomain }
+        });
+      } else {
+        // 如果没有提供shopDomain，尝试从第一个聊天项获取商店信息
+        if (chatList.length > 0 && chatList[0].conversationId) {
+          const conversation = await prisma.conversation.findUnique({
+            where: { id: chatList[0].conversationId }
+          });
+          if (conversation) {
+            shop = await prisma.shop.findFirst({
+              where: { shopify_domain: conversation.shop }
+            });
+          }
+        }
+      }
+
+      if (!shop) {
+        throw new Error('商店信息不存在');
+      }
+
+      // 使用事务批量更新聊天列表
+      await prisma.$transaction(async (tx) => {
+        for (const item of chatList) {
+          if (!item.conversationId) continue;
+
+          // 转换时间戳
+          let lastTimestamp: Date | null = null;
+          if (typeof item.lastTimestamp === 'number') {
+            lastTimestamp = new Date(item.lastTimestamp);
+          } else {
+            lastTimestamp = new Date(item.lastTimestamp);
+          }
+
+          // 使用upsert更新或创建聊天列表项
+          await tx.chatListItem.upsert({
+            where: { conversationId: item.conversationId },
+            update: {
+              customerFirstName: item.firstName,
+              customerLastName: item.lastName,
+              customerAvatar: item.avatar,
+              lastMessage: item.lastMessage,
+              lastTimestamp: lastTimestamp,
+              isOnline: item.isOnline || false,
+              hadRead: item.hadRead || false,
+              isActive: item.isActive || false,
+              unreadMessageCount: item.unreadMessageCount || 0,
+              agentId: agentId,
+              shop: shop.id,
+              updatedAt: new Date()
+            },
+            create: {
+              conversationId: item.conversationId,
+              customerId: item.id,
+              customerFirstName: item.firstName,
+              customerLastName: item.lastName,
+              customerAvatar: item.avatar,
+              lastMessage: item.lastMessage,
+              lastTimestamp: lastTimestamp,
+              isOnline: item.isOnline || false,
+              hadRead: item.hadRead || false,
+              isActive: item.isActive || false,
+              unreadMessageCount: item.unreadMessageCount || 0,
+              agentId: agentId,
+              shop: shop.id
+            }
+          });
+        }
+      });
+
+      await beginLogger({
+        level: 'info',
+        message: `成功保存客服${agentId}的聊天列表，共${chatList.length}条`,
+        meta: {
+          taskType: 'save_chat_list',
+          agentId,
+          shop: shop.id,
+          chatListCount: chatList.length
+        }
+      });
+    } catch (error) {
+      await beginLogger({
+        level: 'error',
+        message: `保存客服${agentId}的聊天列表失败`,
+        meta: {
+          taskType: 'save_chat_list',
+          agentId,
+          error: {
+            name: error?.name,
+            message: error?.message,
+            stack: error?.stack
+          }
+        }
+      });
+      throw error;
+    }
+  }
+
+  /**
    * 获取Socket.IO实例
    */
   public static getIoInstance(): Server | null {
