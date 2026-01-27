@@ -101,3 +101,47 @@ export const addOfflineMessageJob = async (data:any) => {
 
   return job.id;
 }
+
+/**
+ * 消息状态更新队列
+ */
+export const messageStatusUpdateQueue = new Queue('messageStatusUpdateQueue', {
+  connection: redisClient,
+  defaultJobOptions: {
+    removeOnComplete: 10,
+    removeOnFail: 100,
+    attempts: 3,
+    backoff: {type: 'exponential', delay: 2000},
+  }
+});
+
+/**
+ * 添加消息状态更新任务
+ * @param data 消息状态数据
+ * @returns 任务ID
+ */
+export const addMessageStatusUpdateJob = async (data: {
+  msgId: string;
+  conversationId: string;
+  msgStatus: 'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD';
+}) => {
+  const job = await messageStatusUpdateQueue.add('updateMessageStatus', {
+    ...data,
+    timestamp: new Date().toISOString(),
+  }, {
+    attempts: 3,
+    backoff: {type: 'exponential', delay: 2000},
+    removeOnComplete: 10,
+    removeOnFail: 100,
+  });
+
+  logger.info(`已创建消息状态更新任务，任务：${job.id}，消息ID：${data.msgId}，状态：${data.msgStatus}`, {
+    meta: {
+      taskType: 'create_message_status_update_job',
+      msgId: data.msgId,
+      msgStatus: data.msgStatus,
+    }
+  });
+
+  return job.id;
+}

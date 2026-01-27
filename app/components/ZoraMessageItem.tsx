@@ -85,7 +85,7 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
             </div> : null
         }
         {
-          itemData.msgStatus === 'DELIVERED' || itemData.msgStatus === 'SENT' || itemData.msgStatus === 'READ' ?
+           itemData.senderType === 'AGENT' && (itemData.msgStatus === 'DELIVERED' || itemData.msgStatus === 'SENT' || itemData.msgStatus === 'READ') ?
             <span className={ZoraMessageItemStyle.zoraMsgReadState}>{msgReadStatus}</span> : null
         }
       </div>

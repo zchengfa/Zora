@@ -1,7 +1,7 @@
 import type {Redis} from "ioredis";
 import {$Enums, PrismaClient} from "@prisma/client";
 import {Server, Socket} from "socket.io";
-import {beginLogger} from "./bullTaskQueue.ts";
+import {addMessageStatusUpdateJob, beginLogger} from "./bullTaskQueue.ts";
 
 interface SocketUtilConfigType {
   redis: Redis;
@@ -141,7 +141,7 @@ export class SocketUtils{
     })
   }
   private repostMessageAck = ()=>{
-    this.ws.on('message_delivered',(payload)=>{
+    this.ws.on('message_delivered', async (payload)=>{
       let receiver = ''
       //发送者为客户，并且没有接收者id，说明是用户发给客服的消息回执
       if(payload.senderType === 'CUSTOMER'){
@@ -150,6 +150,29 @@ export class SocketUtils{
       else{
         receiver = this.users.get(payload.recipientId) as string
       }
+      // 将消息状态更新任务加入队列，异步批量更新
+      try {
+        await addMessageStatusUpdateJob({
+          msgId: payload.msgId,
+          conversationId: payload.conversationId,
+          msgStatus: payload.msgStatus
+        });
+      } catch (error) {
+        await beginLogger({
+          level: 'error',
+          message: `添加消息状态更新任务失败`,
+          meta: {
+            taskType: 'message_delivered',
+            msgId: payload.msgId,
+            error: {
+              name: error?.name,
+              message: error?.message,
+              stack: error?.stack
+            }
+          }
+        });
+      }
+
       this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004,payload.conversationId)
     })
 

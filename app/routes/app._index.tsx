@@ -13,6 +13,11 @@ import {shopifyRequestUserInfo,shopifyCustomerStaffInit,getChatList} from "@/net
 import {SHOP_INFO_QUERY_GQL,PRODUCTS_QUERY_GQL} from "@Utils/graphql.ts";
 import {MessageDataType} from "@Utils/socket.ts";
 import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
+import {
+  insertMessageToIndexedDB,
+  readMessagesFromIndexedDB,
+  syncMessageToIndexedDB
+} from "@Utils/zustandWithIndexedDB.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
@@ -51,14 +56,71 @@ function Index(){
 
   useEffect(() => {
     messageStore.initZustandState(customerStaff,products)
-    messageStore.initMessages(JSON.parse(sessionStorage.getItem('zora_active_item') as string)).then()
+    messageStore.initMessages(sessionStorage.getItem('zora_active_item') as string).then()
 
     // 获取并同步聊天列表
     if (customerStaff?.id) {
       getChatList(customerStaff.id)
-        .then(res => {
+        .then(async res => {
           if (res?.data?.chatList) {
+            // 1. 检查是否有激活的列表项
+            const activeItem = res.data.chatList.find(item => item.isActive)
+
+            // 2. 如果有激活的列表项，更新zustand状态（内部会处理sessionStorage存储）
+            if (activeItem?.conversationId) {
+              // 提取客户信息
+              const activeCustomerInfo = {
+                id: activeItem.id,
+                firstName: activeItem.firstName,
+                lastName: activeItem.lastName,
+                avatar: activeItem.avatar,
+                isOnline: activeItem.isOnline
+              }
+
+              // 更新zustand中的activeCustomerItem和activeCustomerInfo状态
+              messageStore.setActiveCustomerInfo(activeItem.conversationId, activeCustomerInfo)
+            }
+
+            // 3. 设置聊天列表
             messageStore.setChatList(res.data.chatList)
+
+            // 4. 同步消息到IndexedDB
+            for (const chatItem of res.data.chatList) {
+              if (chatItem.messages && chatItem.messages.length > 0) {
+                // 获取本地已存储的消息
+                const localMessages = await readMessagesFromIndexedDB({
+                  page: 1,
+                  pageSize: 1000,
+                  indexValue: chatItem.conversationId
+                })
+
+                // 创建本地消息的Map，用于快速查找
+                const localMessageMap = new Map<string, MessageDataType>()
+                localMessages.list.forEach((msg: MessageDataType) => {
+                  localMessageMap.set(msg.msgId, msg)
+                })
+
+                // 对比并同步消息
+                for (const remoteMsg of chatItem.messages) {
+                  const localMsg = localMessageMap.get(remoteMsg.msgId)
+
+                  if (!localMsg) {
+                    // 本地不存在该消息，直接插入
+                    await insertMessageToIndexedDB(remoteMsg)
+                  } else {
+                    // 本地已存在，对比时间戳，如果服务器消息更新则同步
+                    if (remoteMsg.timestamp > localMsg.timestamp) {
+                      await syncMessageToIndexedDB(remoteMsg)
+                    }
+                  }
+                }
+
+                // 5. 如果是激活的对话，更新zustand中的消息
+                if (chatItem.isActive && chatItem.conversationId) {
+                  messageStore.initMessages(chatItem.conversationId).then()
+                }
+              }
+            }
           }
         })
         .catch(err => {

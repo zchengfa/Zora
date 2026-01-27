@@ -1,7 +1,8 @@
 import {Worker} from "bullmq";
 import {redisClient} from "./redisClient.ts";
-import {beginLogger, offlineMessageQueue} from "./bullTaskQueue.ts";
+import {beginLogger, offlineMessageQueue, messageStatusUpdateQueue} from "./bullTaskQueue.ts";
 import {WorkerHealth} from "./workerHealth.ts";
+import {PrismaClient} from "@prisma/client";
 
 const workerHealth = new WorkerHealth({
   connection: redisClient,
@@ -10,9 +11,13 @@ const workerHealth = new WorkerHealth({
 
 await workerHealth.registerWorker()
 
+const prisma = new PrismaClient();
+
 const BATCH_SIZE = 10 // 每次批量推送的消息数量
 const BATCH_DELAY = 1000 // 批量推送之间的延迟(毫秒)
 const MESSAGE_STORAGE_PREFIX = "offline_messages:" // 离线消息存储前缀
+const PENDING_UPDATE_KEY = "pending_message_status_updates" // 待更新消息的Redis key
+const STATUS_UPDATE_BATCH_SIZE = 100 // 每次批量更新的消息数量
 
 const getOfflineMessages = async (userId:string, count:number)=>{
   const key = `${MESSAGE_STORAGE_PREFIX}${userId}`
@@ -194,12 +199,171 @@ const processOfflineMessageJob = async (job:any)=>{
   }
 }
 
+/**
+ * 处理消息状态更新任务
+ */
+const processMessageStatusUpdateJob = async (job: any) => {
+  const {msgId, conversationId, msgStatus} = job.data;
+
+  try {
+    // 将消息更新任务添加到待更新集合
+    await redisClient.sadd(PENDING_UPDATE_KEY, JSON.stringify({
+      msgId,
+      conversationId,
+      msgStatus,
+      timestamp: new Date().toISOString()
+    }));
+
+    await beginLogger({
+      level: 'info',
+      message: `消息状态更新任务已添加到待更新集合`,
+      meta: {
+        taskType: 'process_message_status_update_job',
+        msgId,
+        conversationId,
+        msgStatus
+      }
+    });
+
+    // 检查是否达到批量更新阈值
+    const pendingCount = await redisClient.scard(PENDING_UPDATE_KEY);
+
+    if (pendingCount >= STATUS_UPDATE_BATCH_SIZE) {
+      // 达到批量更新阈值，触发批量更新
+      await batchUpdateMessageStatus();
+    }
+  } catch (error) {
+    await beginLogger({
+      level: 'error',
+      message: `处理消息状态更新任务失败: ${error.message}`,
+      meta: {
+        taskType: 'process_message_status_update_job',
+        msgId,
+        conversationId,
+        msgStatus,
+        error: error.message
+      }
+    });
+    throw error;
+  }
+};
+
+/**
+ * 批量更新消息状态
+ */
+const batchUpdateMessageStatus = async () => {
+  try {
+    // 从Redis获取所有待更新的消息
+    const pendingUpdates = await redisClient.smembers(PENDING_UPDATE_KEY);
+
+    if (pendingUpdates.length === 0) {
+      return;
+    }
+
+    // 解析待更新的消息
+    const updates = pendingUpdates.map(item => {
+      try {
+        return JSON.parse(item);
+      } catch (e) {
+        console.error('解析消息更新数据失败:', e);
+        return null;
+      }
+    }).filter(Boolean);
+
+    // 按消息状态分组
+    const updatesByStatus = new Map<string, Array<{msgId: string, conversationId: string}>>();
+    updates.forEach(update => {
+      if (!updatesByStatus.has(update.msgStatus)) {
+        updatesByStatus.set(update.msgStatus, []);
+      }
+      updatesByStatus.get(update.msgStatus)!.push({
+        msgId: update.msgId,
+        conversationId: update.conversationId
+      });
+    });
+
+    // 批量更新数据库
+    for (const [status, items] of updatesByStatus.entries()) {
+      await prisma.message.updateMany({
+        where: {
+          OR: items.map(item => ({
+            msgId: item.msgId,
+            conversationId: item.conversationId
+          }))
+        },
+        data: {
+          msgStatus: status as any
+        }
+      });
+
+      await beginLogger({
+        level: 'info',
+        message: `批量更新了${items.length}条消息的状态为${status}`,
+        meta: {
+          taskType: 'batch_update_message_status',
+          status,
+          count: items.length
+        }
+      });
+    }
+
+    // 清空待更新集合
+    await redisClient.del(PENDING_UPDATE_KEY);
+
+    await beginLogger({
+      level: 'info',
+      message: `批量更新消息状态完成，共更新${updates.length}条消息`,
+      meta: {
+        taskType: 'batch_update_message_status',
+        totalUpdates: updates.length
+      }
+    });
+  } catch (error) {
+    await beginLogger({
+      level: 'error',
+      message: `批量更新消息状态失败: ${error.message}`,
+      meta: {
+        taskType: 'batch_update_message_status',
+        error: error.message
+      }
+    });
+    throw error;
+  }
+};
+
 const worker = new Worker('offlineMessageQueue',async (job)=>{
   await processOfflineMessageJob(job)
 },{
   connection: redisClient,
   concurrency: 5
 })
+
+// 创建消息状态更新的worker
+const messageStatusUpdateWorker = new Worker('messageStatusUpdateQueue', async (job) => {
+  await processMessageStatusUpdateJob(job);
+}, {
+  connection: redisClient,
+  concurrency: 10
+});
+
+// 定时批量更新消息状态
+const batchUpdateTimer = setInterval(async () => {
+  try {
+    const pendingCount = await redisClient.scard(PENDING_UPDATE_KEY);
+    if (pendingCount > 0) {
+      await batchUpdateMessageStatus();
+    }
+  } catch (error) {
+    await beginLogger({
+      level: 'error',
+      message: `定时批量更新消息状态失败: ${error.message}`,
+      meta: {
+        taskType: 'scheduled_batch_update_message_status',
+        error: error.message
+      }
+    });
+  }
+}, BATCH_DELAY);
 
 worker.on('completed', async (job) => {
   await beginLogger({
@@ -246,6 +410,52 @@ worker.on('error', async (err) => {
   })
 });
 
+// 消息状态更新worker事件监听
+messageStatusUpdateWorker.on('completed', async (job) => {
+  await beginLogger({
+    level: 'info',
+    message: `message status update worker completed`,
+    meta: {
+      taskType: 'message_status_update_worker',
+      jobId: job.id,
+      taskState: 'completed'
+    }
+  });
+});
+
+messageStatusUpdateWorker.on('failed', async (job, err) => {
+  await beginLogger({
+    level: 'error',
+    message: `message status update worker failed`,
+    meta: {
+      taskType: 'message_status_update_worker',
+      jobId: job?.id,
+      taskState: 'failed',
+      error: {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      }
+    }
+  });
+});
+
+messageStatusUpdateWorker.on('error', async (err) => {
+  await beginLogger({
+    level: 'error',
+    message: `message status update worker error`,
+    meta: {
+      taskType: 'message_status_update_worker',
+      taskState: 'error',
+      error: {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      }
+    }
+  });
+});
+
 const offlineMessageWorkerHeartBeatTimer = setInterval(async ()=>{
   await workerHealth.updateWorkerHeartBeat()
 },15000)
@@ -254,13 +464,19 @@ const offlineMessageWorkerHeartBeatTimer = setInterval(async ()=>{
 process.on('SIGINT', async () => {
   await workerHealth.unregisterWorker()
   clearInterval(offlineMessageWorkerHeartBeatTimer)
+  clearInterval(batchUpdateTimer)
   await worker.close()
+  await messageStatusUpdateWorker.close()
+  await prisma.$disconnect()
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   await workerHealth.unregisterWorker()
   clearInterval(offlineMessageWorkerHeartBeatTimer)
+  clearInterval(batchUpdateTimer)
   await worker.close()
+  await messageStatusUpdateWorker.close()
+  await prisma.$disconnect()
   process.exit(0);
 });

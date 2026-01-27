@@ -36,6 +36,7 @@ export interface UseMessageStoreType {
   updateTimer: (payload: {timer:ReturnType<typeof setTimeout>,maxTimer:ReturnType<typeof setTimeout>} & MessageAckType) => void;
   clearUpTimer: (ack: MessageAckType) => void;
   setChatList: (chatList: CustomerDataType[]) => void;
+  setActiveCustomerInfo: (activeCustomerItem: string, activeCustomerInfo: any) => void;
 }
 
 export const useMessageStore = create<UseMessageStoreType>((set)=>{
@@ -71,7 +72,7 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
       initZustandState:(customerStaff:CustomerStaffType,products)=>{
         set(()=>{
           const chatList = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_CHAT_LIST_KEY) as string) || []
-          const activeCustomerItem = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) as string) || undefined
+          const activeCustomerItem = sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) || undefined
           const activeCustomerInfo = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) || null
           if(!customerStaff){
             return {
@@ -294,6 +295,16 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
           somethingSaveToSessionStorage(SESSION_STORAGE_CHAT_LIST_KEY,chatList)
           return {
             chatList
+          }
+        })
+      },
+      setActiveCustomerInfo:(activeCustomerItem:string, activeCustomerInfo:any)=>{
+        set(()=>{
+          //将激活的客户信息保存至sessionStorage
+          somethingSaveToSessionStorage([SESSION_STORAGE_ACTIVE_ITEM_KEY, SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY], [activeCustomerItem, activeCustomerInfo])
+          return {
+            activeCustomerItem,
+            activeCustomerInfo
           }
         })
       }

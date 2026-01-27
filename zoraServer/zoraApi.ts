@@ -642,19 +642,47 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
         }
       });
 
-      // 转换为前端需要的格式
-      const chatList = chatListItems.map(item => ({
-        id: item.customerId,
-        firstName: item.customerFirstName,
-        lastName: item.customerLastName,
-        avatar: item.customerAvatar,
-        isOnline: item.isOnline,
-        lastMessage: item.lastMessage,
-        lastTimestamp: item.lastTimestamp?.getTime() || 0,
-        hadRead: item.hadRead,
-        isActive: item.isActive,
-        unreadMessageCount: item.unreadMessageCount,
-        conversationId: item.conversationId
+      // 转换为前端需要的格式，并获取每个对话的部分消息
+      const chatList = await Promise.all(chatListItems.map(async item => {
+        // 获取该对话的最新10条消息
+        const messages = await prisma.message.findMany({
+          where: {
+            conversationId: item.conversationId
+          },
+          orderBy: {
+            timestamp: 'desc'
+          },
+          take: 10
+        });
+
+        // 转换消息格式
+        const formattedMessages = messages.map(msg => ({
+          contentBody: msg.contentBody,
+          contentType: msg.contentType,
+          conversationId: msg.conversationId,
+          msgId: msg.msgId,
+          msgStatus: msg.msgStatus,
+          recipientType: msg.recipientType,
+          recipientId: msg.recipientId,
+          senderId: msg.senderId,
+          senderType: msg.senderType,
+          timestamp: msg.timestamp.getTime()
+        }));
+
+        return {
+          id: item.customerId,
+          firstName: item.customerFirstName,
+          lastName: item.customerLastName,
+          avatar: item.customerAvatar,
+          isOnline: item.isOnline,
+          lastMessage: item.lastMessage,
+          lastTimestamp: item.lastTimestamp?.getTime() || 0,
+          hadRead: item.hadRead,
+          isActive: item.isActive,
+          unreadMessageCount: item.unreadMessageCount,
+          conversationId: item.conversationId,
+          messages: formattedMessages.reverse() // 按时间正序排列
+        };
       }));
 
       res.json({ chatList });
