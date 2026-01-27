@@ -1,12 +1,12 @@
 import {Worker} from "bullmq";
 import {redisClient} from "./redisClient.ts";
-import {beginLogger, offlineMessageQueue, messageStatusUpdateQueue} from "./bullTaskQueue.ts";
+import {beginLogger, messageQueue} from "./bullTaskQueue.ts";
 import {WorkerHealth} from "./workerHealth.ts";
 import {PrismaClient} from "@prisma/client";
 
 const workerHealth = new WorkerHealth({
   connection: redisClient,
-  workerName: process.env.OFFLINE_MESSAGE_WORKER_HEALTH_KEY || 'offlineMessage'
+  workerName: process.env.OFFLINE_MESSAGE_WORKER_HEALTH_KEY || 'message'
 })
 
 await workerHealth.registerWorker()
@@ -165,7 +165,7 @@ const processOfflineMessageJob = async (job:any)=>{
       // 如果还有剩余消息，添加新的延迟任务而不是使用moveToDelayed
       // 这样可以避免Lock mismatch错误
       if(messageCount > batchSize){
-        await offlineMessageQueue.add('pushOfflineMessage', {
+        await messageQueue.add('pushOfflineMessage', {
           userId,
           messageType: 'system'
         }, {
@@ -331,16 +331,14 @@ const batchUpdateMessageStatus = async () => {
   }
 };
 
-const worker = new Worker('offlineMessageQueue',async (job)=>{
-  await processOfflineMessageJob(job)
-},{
-  connection: redisClient,
-  concurrency: 5
-})
-
-// 创建消息状态更新的worker
-const messageStatusUpdateWorker = new Worker('messageStatusUpdateQueue', async (job) => {
-  await processMessageStatusUpdateJob(job);
+// 创建统一的worker，处理离线消息和消息状态更新
+const worker = new Worker('offlineMessageQueue', async (job) => {
+  // 根据任务名称判断任务类型
+  if (job.name === 'pushOfflineMessage') {
+    await processOfflineMessageJob(job);
+  } else if (job.name === 'updateMessageStatus') {
+    await processMessageStatusUpdateJob(job);
+  }
 }, {
   connection: redisClient,
   concurrency: 10
@@ -366,11 +364,12 @@ const batchUpdateTimer = setInterval(async () => {
 }, BATCH_DELAY);
 
 worker.on('completed', async (job) => {
+  const taskType = job.name === 'pushOfflineMessage' ? 'offline_message_worker' : 'message_status_update_worker';
   await beginLogger({
     level: 'info',
-    message: `offline message worker completed`,
+    message: `${taskType} completed`,
     meta:{
-      taskType: `offline_message_worker`,
+      taskType: taskType,
       jobId: job.id,
       taskState: 'completed',
     }
@@ -378,11 +377,12 @@ worker.on('completed', async (job) => {
 });
 
 worker.on('failed', async (job, err) => {
+  const taskType = job.name === 'pushOfflineMessage' ? 'offline_message_worker' : 'message_status_update_worker';
   await beginLogger({
     level: 'error',
-    message: `offline message worker failed`,
+    message: `${taskType} failed`,
     meta:{
-      taskType: `offline_message_worker`,
+      taskType: taskType,
       jobId: job?.id,
       taskState: 'failed',
       error:{
@@ -397,9 +397,9 @@ worker.on('failed', async (job, err) => {
 worker.on('error', async (err) => {
   await beginLogger({
     level: 'error',
-    message: `offline message worker failed`,
+    message: `worker error`,
     meta:{
-      taskType: `offline_message_worker`,
+      taskType: 'worker',
       taskState: 'error',
       error:{
         name: err.name,
@@ -410,73 +410,25 @@ worker.on('error', async (err) => {
   })
 });
 
-// 消息状态更新worker事件监听
-messageStatusUpdateWorker.on('completed', async (job) => {
-  await beginLogger({
-    level: 'info',
-    message: `message status update worker completed`,
-    meta: {
-      taskType: 'message_status_update_worker',
-      jobId: job.id,
-      taskState: 'completed'
-    }
-  });
-});
-
-messageStatusUpdateWorker.on('failed', async (job, err) => {
-  await beginLogger({
-    level: 'error',
-    message: `message status update worker failed`,
-    meta: {
-      taskType: 'message_status_update_worker',
-      jobId: job?.id,
-      taskState: 'failed',
-      error: {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      }
-    }
-  });
-});
-
-messageStatusUpdateWorker.on('error', async (err) => {
-  await beginLogger({
-    level: 'error',
-    message: `message status update worker error`,
-    meta: {
-      taskType: 'message_status_update_worker',
-      taskState: 'error',
-      error: {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      }
-    }
-  });
-});
-
-const offlineMessageWorkerHeartBeatTimer = setInterval(async ()=>{
+const messageWorkerHeartBeatTimer = setInterval(async ()=>{
   await workerHealth.updateWorkerHeartBeat()
 },15000)
 
 // 监听进程关闭信号，进行优雅关闭
 process.on('SIGINT', async () => {
   await workerHealth.unregisterWorker()
-  clearInterval(offlineMessageWorkerHeartBeatTimer)
+  clearInterval(messageWorkerHeartBeatTimer)
   clearInterval(batchUpdateTimer)
   await worker.close()
-  await messageStatusUpdateWorker.close()
   await prisma.$disconnect()
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   await workerHealth.unregisterWorker()
-  clearInterval(offlineMessageWorkerHeartBeatTimer)
+  clearInterval(messageWorkerHeartBeatTimer)
   clearInterval(batchUpdateTimer)
   await worker.close()
-  await messageStatusUpdateWorker.close()
   await prisma.$disconnect()
   process.exit(0);
 });
