@@ -11,6 +11,7 @@ import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shop
 import {executeShopifyId, shopifyHandleResponseData} from "../plugins/shopifyUtils.ts";
 import {addShopifySyncDataJob, beginLogger} from "../plugins/bullTaskQueue.ts";
 import type {GraphqlCustomerCreateMutationResponse, GraphqlMutationVariables} from "../plugins/shopifyMutation.ts";
+import {generateCustomerProfile} from "../plugins/customerProfile.ts";
 
 interface ZoraApiType {
   app:Express,
@@ -685,6 +686,9 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
             timestamp: msg.timestamp.getTime()
           }));
 
+        // 获取客户画像
+        const customerProfile = await generateCustomerProfile(prisma, item.customerId);
+
         return {
           id: item.customerId,
           firstName: item.customerFirstName,
@@ -697,7 +701,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           isActive: item.isActive,
           unreadMessageCount: item.unreadMessageCount,
           conversationId: item.conversationId,
-          messages: formattedMessages.reverse() // 按时间正序排列
+          messages: formattedMessages.reverse(), // 按时间正序排列
+          customerProfile // 添加客户画像信息
         };
       }));
 
