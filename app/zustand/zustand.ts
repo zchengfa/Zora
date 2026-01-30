@@ -1,11 +1,11 @@
 import {create} from "zustand/react";
 import {deepCloneTS} from "@Utils/Utils.ts";
 import {MessageDataType} from "@Utils/socket.ts";
-import {CustomerDataType, CustomerStaffType, GraphqlProductInfoType, MessageAckType} from "@/type.ts";
+import type {CustomerDataType, CustomerStaffType, GraphqlProductInfoType, MessageAckType} from "@/type.ts";
 import {
-  insertMessageToIndexedDB,
   readMessagesFromIndexedDB,
-  syncMessageToIndexedDB
+  syncMessageToIndexedDB,
+  syncMessagesBatchToIndexedDB
 } from "@Utils/zustandWithIndexedDB.ts";
 
 const SESSION_STORAGE_CHAT_LIST_KEY = "zora_chat_list";
@@ -25,13 +25,14 @@ export interface UseMessageStoreType {
   activeCustomerInfo: any;
   activeCustomerItem: string;
   shopify_Shop_products: GraphqlProductInfoType;
+  countedMsgIds: Set<string>;
   initMessages: (target: string) => Promise<void>;
   initZustandState: (customerStaff: any, products: GraphqlProductInfoType) => void;
-  addMessage: (message: MessageDataType) => Promise<void>;
+  addMessage: (message: MessageDataType | MessageDataType[]) => Promise<void>;
   changeMessages: (params: { conversationId: string; page: number; pageSize: number }) => Promise<void>;
   updateMessageStatus: (ack: MessageAckType) => void;
   pushChatList: (payload: CustomerDataType) => void;
-  updateChatList: (payload: MessageDataType, fromAgent?: boolean) => void;
+  updateChatList: (payload: MessageDataType | MessageDataType[], fromAgent?: boolean) => void;
   readChatList: (conversationId: string) => void;
   updateTimer: (payload: {timer:ReturnType<typeof setTimeout>,maxTimer:ReturnType<typeof setTimeout>} & MessageAckType) => void;
   clearUpTimer: (ack: MessageAckType) => void;
@@ -46,6 +47,7 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
       messageMaxWaitingTimers: new Map() as Map<string,Map<string,ReturnType<typeof setTimeout>>>,
       chatList: [],
       SENDING_THRESHOLD:1000,
+      countedMsgIds: new Set<string>(),
       MAX_WAITING_THRESHOLD:10000,
       page: 1,
       pageSize: 20,
@@ -91,13 +93,31 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
           }
         })
       },
-      addMessage:async (message:MessageDataType) => {
-        await insertMessageToIndexedDB(message)
+      addMessage:async (message:MessageDataType | MessageDataType[]) => {
+        // 判断是单条消息还是消息数组
+        const messages = Array.isArray(message) ? message : [message]
+
         set((state)=>{
           const newMsg = deepCloneTS(state.messages)
-          if(message.conversationId === state.activeCustomerItem){
-            newMsg.push(message)
+          // 创建一个Set来快速查找已存在的消息ID
+          const existingMsgIds = new Set(state.messages.map(msg => msg.msgId))
+          // 收集需要添加的新消息
+          const messagesToAdd:MessageDataType[] = []
+
+          messages.forEach((msg: MessageDataType) => {
+            if(!existingMsgIds.has(msg.msgId)){
+              messagesToAdd.push(msg)
+            }
+            if(msg.conversationId === state.activeCustomerItem){
+              newMsg.push(msg)
+            }
+          })
+
+          // 批量插入到IndexedDB
+          if(messagesToAdd.length > 0){
+            syncMessagesBatchToIndexedDB(messagesToAdd).then()
           }
+
           return {
             messages:newMsg
           }
@@ -115,15 +135,31 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
           }
         })
       },
-      updateMessageStatus:(ack)=>{
+      updateMessageStatus:(ack: MessageAckType)=>{
         set((state)=>{
           const newMessages = deepCloneTS(state.messages)
-          newMessages.map((item:MessageDataType)=>{
-            if(item.msgId === ack.msgId){
-              item.msgStatus = ack.msgStatus
-              syncMessageToIndexedDB(item).then()
-            }
-          })
+          // 检查是否是批量更新（包含msgIds数组）
+          if (ack.msgId && Array.isArray(ack.msgId)) {
+            // 批量更新：创建一个Set来快速查找需要更新的msgId
+            const msgIdsSet = new Set(ack.msgId)
+            const messagesToUpdate:MessageDataType[] = []
+            newMessages.forEach((item:MessageDataType)=>{
+              if(msgIdsSet.has(item.msgId)){
+                item.msgStatus = ack.msgStatus
+                messagesToUpdate.push(item)
+              }
+            })
+            // 批量更新IndexedDB
+            syncMessagesBatchToIndexedDB(messagesToUpdate).then()
+          } else {
+            // 单条更新
+            newMessages.map((item:MessageDataType)=>{
+              if(item.msgId === ack.msgId){
+                item.msgStatus = ack.msgStatus
+                syncMessageToIndexedDB(item).then()
+              }
+            })
+          }
           return {
             messages:newMessages
           }
@@ -132,7 +168,7 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
       pushChatList:(payload:CustomerDataType)=>{
         set((state)=>{
           const newChatList = deepCloneTS(state.chatList);
-          let existCount = 0,activeCustomerInfo = {}
+          let existCount = 0
           if(newChatList.length > 0){
             newChatList.map((item:CustomerDataType)=>{
               if(item.conversationId === payload.conversationId){
@@ -154,65 +190,87 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
               isActive:false,
               unreadMessageCount:1
             })
-            activeCustomerInfo = {
-              avatar:payload.avatar,
-              conversationId:payload.conversationId,
-              id:payload.id,
-              username:payload.firstName + payload.lastName,
-            }
             //将更新后的列表保存至sessionStorage
-            somethingSaveToSessionStorage([SESSION_STORAGE_CHAT_LIST_KEY,SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY],[newChatList,activeCustomerInfo])
+            somethingSaveToSessionStorage(SESSION_STORAGE_CHAT_LIST_KEY,newChatList)
           }
           return {
             chatList:newChatList,
-            activeCustomerInfo
           }
         })
       },
-      updateChatList:(payload:MessageDataType,fromAgent = false)=>{
+      updateChatList:(payload:MessageDataType | MessageDataType[],fromAgent = false)=>{
         set((state)=>{
           const newChatList = deepCloneTS(state.chatList);
+          const messages = Array.isArray(payload) ? payload : [payload]
+          const newCountedMsgIds = new Set(state.countedMsgIds)
+
           newChatList.map((item:CustomerDataType)=>{
-            if(!fromAgent){
-              if(item.id === payload.senderId){
-                item.lastMessage = payload.contentBody
-                item.lastTimestamp = payload.timestamp
-                if(item.conversationId === state.activeCustomerItem){
-                  item.hadRead = true
-                  item.unreadMessageCount = 0
-                  item.isActive = true
-                }
-                else{
-                  item.hadRead = false
-                  item.unreadMessageCount ++
-                  item.isActive = false
+            messages.forEach((msg: MessageDataType) => {
+              // 检查消息是否属于当前聊天项
+              const isMessageForThisChat = item.conversationId === msg.conversationId;
+
+              if(!fromAgent){
+                // 处理客户发送的消息
+                if(item.id === msg.senderId || isMessageForThisChat){
+                  item.lastMessage = msg.contentBody
+                  item.lastTimestamp = msg.timestamp
+                  // 不管是否是活跃聊天项，都检查未读计数
+                  if(item.conversationId === state.activeCustomerItem){
+                    item.hadRead = true
+                    item.unreadMessageCount = 0
+                    item.isActive = true
+                  }
+                  else{
+                    // 只对消息状态不为READ且未计过数的消息进行计数
+                    if(msg.msgStatus !== 'READ' && !newCountedMsgIds.has(msg.msgId)){
+                      item.hadRead = false
+                      item.unreadMessageCount ++
+                      item.isActive = false
+                      // 将消息ID添加到countedMsgIds中
+                      newCountedMsgIds.add(msg.msgId)
+                    }
+                  }
                 }
               }
-            }
-            else{
-              if(item.conversationId === state.activeCustomerItem){
-                switch (payload.contentType) {
-                  case "TEXT":
-                    item.lastMessage = payload.contentBody
-                    break;
-                  case "IMAGE":
-                    item.lastMessage = '[图片]'
-                    break;
-                  case "PRODUCT":
-                    item.lastMessage = `[产品] ${JSON.parse(payload.contentBody)?.title}`
-                    break;
-                  default:
-                    break;
+              else{
+                // 处理客服发送的消息
+                if(isMessageForThisChat){
+                  switch (msg.contentType) {
+                    case "TEXT":
+                      item.lastMessage = msg.contentBody
+                      break;
+                    case "IMAGE":
+                      item.lastMessage = '[图片]'
+                      break;
+                    case "PRODUCT":
+                      item.lastMessage = `[产品] ${JSON.parse(msg.contentBody)?.title}`
+                      break;
+                    default:
+                      break;
+                  }
+                  item.lastTimestamp = msg.timestamp
+
+                  // 不管是否是活跃聊天项，都检查未读计数
+                  if(item.conversationId !== state.activeCustomerItem){
+                    // 只对消息状态不为READ且未计过数的消息进行计数
+                    if(msg.msgStatus !== 'READ' && !newCountedMsgIds.has(msg.msgId)){
+                      item.hadRead = false
+                      item.unreadMessageCount ++
+                      item.isActive = false
+                      // 将消息ID添加到countedMsgIds中
+                      newCountedMsgIds.add(msg.msgId)
+                    }
+                  }
                 }
-                item.lastTimestamp = payload.timestamp
               }
-            }
+            })
             return item
           })
           //将更新后的列表保存至sessionStorage
           somethingSaveToSessionStorage(SESSION_STORAGE_CHAT_LIST_KEY,newChatList)
           return {
             chatList:newChatList,
+            countedMsgIds: newCountedMsgIds
           }
         })
       },

@@ -305,6 +305,55 @@ export function updateDB(db:IDBDatabase,storeName:string,data:object){
 }
 
 /**
+ * 批量更新数据
+ * @param db {IDBDatabase} 数据库实例
+ * @param storeName {string} 仓库名
+ * @param dataList {Array<Object>} 数据数组
+ */
+export function updateBatchDB(db:IDBDatabase,storeName:string,dataList:object[]){
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([storeName],"readwrite")
+    const store = transaction.objectStore(storeName)
+    
+    let successCount = 0
+    let errorCount = 0
+    const errors: any[] = []
+    
+    dataList.forEach((data) => {
+      const request = store.put(data)
+      
+      request.onsuccess = function () {
+        successCount++
+        if (successCount + errorCount === dataList.length) {
+          if (errorCount > 0) {
+            reject({
+              errors,
+              msg: `批量更新完成，成功${successCount}条，失败${errorCount}条`
+            })
+          } else {
+            resolve({
+              successCount,
+              msg: '批量更新成功'
+            })
+          }
+        }
+      }
+      
+      request.onerror = function (e:any) {
+        errorCount++
+        errors.push({ data, error: e })
+        if (successCount + errorCount === dataList.length) {
+          reject({
+            errors,
+            msg: `批量更新完成，成功${successCount}条，失败${errorCount}条`
+          })
+        }
+      }
+    })
+  })
+}
+
+/**
  * 删除数据库
  * @param dbName {string} 数据库名
  * @param callback {Function} 回调

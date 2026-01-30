@@ -2,9 +2,19 @@ import ZoraEmptyStyle from '@styles/componentStyles/ZoraEmpty.module.scss'
 import React from 'react'
 interface ZoraEmptyProps {
   isEmptyMessage?: boolean
+  isEmptyProfile?: boolean
 }
 
-const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage})=> {
+const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile})=> {
+  if(isEmptyProfile) {
+    return <div className={ZoraEmptyStyle.chatMainArea}>
+      <div className={ZoraEmptyStyle.emptyState + ' ' + ZoraEmptyStyle.emptyStateSide}>
+        <div className={ZoraEmptyStyle.emptyStateIcon}>👤</div>
+        <div className={ZoraEmptyStyle.emptyStateTitle}>No Customer Profile</div>
+        <div className={ZoraEmptyStyle.emptyStateDesc}>Select a customer to view their profile.</div>
+      </div>
+    </div>
+  }
   if(!isEmptyMessage) {
     return <div className={ZoraEmptyStyle.chatMainArea}>
       <div className={ZoraEmptyStyle.emptyState + ' ' + ZoraEmptyStyle.emptyStateSide}>

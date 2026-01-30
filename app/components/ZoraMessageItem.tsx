@@ -30,7 +30,7 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
       setAvatar(customerStaff?.avatarUrl)
       setUsername(customerStaff?.name)
     }
-  }, []);
+  }, [activeCustomerInfo, customerStaff, itemData.senderType]);
 
   useEffect(() => {
     if(itemData.msgStatus === 'READ'){

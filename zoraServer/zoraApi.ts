@@ -655,19 +655,35 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           take: 10
         });
 
-        // 转换消息格式
-        const formattedMessages = messages.map(msg => ({
-          contentBody: msg.contentBody,
-          contentType: msg.contentType,
-          conversationId: msg.conversationId,
-          msgId: msg.msgId,
-          msgStatus: msg.msgStatus,
-          recipientType: msg.recipientType,
-          recipientId: msg.recipientId,
-          senderId: msg.senderId,
-          senderType: msg.senderType,
-          timestamp: msg.timestamp.getTime()
-        }));
+        // 获取该客服的离线消息列表（用于过滤）
+        const offlineMessages = await prisma.offlineMessage.findMany({
+          where: {
+            conversationId: item.conversationId,
+            isDelivered: false
+          },
+          select: {
+            msgId: true
+          }
+        });
+
+        // 创建离线消息ID的集合，用于快速查找
+        const offlineMsgIdSet = new Set(offlineMessages.map(msg => msg.msgId));
+
+        // 转换消息格式，并过滤掉存在于离线消息表中的消息
+        const formattedMessages = messages
+          .filter(msg => !offlineMsgIdSet.has(msg.msgId))
+          .map(msg => ({
+            contentBody: msg.contentBody,
+            contentType: msg.contentType,
+            conversationId: msg.conversationId,
+            msgId: msg.msgId,
+            msgStatus: msg.msgStatus,
+            recipientType: msg.recipientType,
+            recipientId: msg.recipientId,
+            senderId: msg.senderId,
+            senderType: msg.senderType,
+            timestamp: msg.timestamp.getTime()
+          }));
 
         return {
           id: item.customerId,

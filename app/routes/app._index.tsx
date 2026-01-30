@@ -5,6 +5,7 @@ import ZoraSearch from '@components/ZoraSearch'
 import ZoraCustomerList from '@components/ZoraCustomerList'
 import ZoraMessageItems from "@components/ZoraMessageItems";
 import ZoraChat from "@components/ZoraChat.tsx";
+import ZoraCustomerProfile from "@components/ZoraCustomerProfile.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
 import {useSocketNotification} from "@hooks/useSocketNotification.ts";
 import {useEffect} from "react";
@@ -48,7 +49,7 @@ export const loader = async ({request}:LoaderFunctionArgs)=>{
 
 function Index(){
   const {params,customerStaff,products} = useLoaderData<typeof loader>();
-  const {message,socket,messageAck} = useSocketService();
+  const {message,socket,messageAck,offlineMessages} = useSocketService();
   // 使用通知Hook监听socket通知并显示
   useSocketNotification();
 
@@ -56,17 +57,19 @@ function Index(){
 
   useEffect(() => {
     messageStore.initZustandState(customerStaff,products)
-    messageStore.initMessages(sessionStorage.getItem('zora_active_item') as string).then()
 
     // 获取并同步聊天列表
     if (customerStaff?.id) {
       getChatList(customerStaff.id)
         .then(async res => {
           if (res?.data?.chatList) {
-            // 1. 检查是否有激活的列表项
+            // 1. 设置聊天列表
+            messageStore.setChatList(res.data.chatList)
+
+            // 2. 检查是否有激活的列表项
             const activeItem = res.data.chatList.find(item => item.isActive)
 
-            // 2. 如果有激活的列表项，更新zustand状态（内部会处理sessionStorage存储）
+            // 3. 如果有激活的列表项，更新zustand状态（内部会处理sessionStorage存储）
             if (activeItem?.conversationId) {
               // 提取客户信息
               const activeCustomerInfo = {
@@ -74,17 +77,18 @@ function Index(){
                 firstName: activeItem.firstName,
                 lastName: activeItem.lastName,
                 avatar: activeItem.avatar,
-                isOnline: activeItem.isOnline
+                isOnline: activeItem.isOnline,
+                username: activeItem.firstName + activeItem.lastName
               }
 
               // 更新zustand中的activeCustomerItem和activeCustomerInfo状态
               messageStore.setActiveCustomerInfo(activeItem.conversationId, activeCustomerInfo)
+
+              // 4. 初始化消息（在设置activeCustomerInfo之后）
+              messageStore.initMessages(activeItem.conversationId).then()
             }
 
-            // 3. 设置聊天列表
-            messageStore.setChatList(res.data.chatList)
-
-            // 4. 同步消息到IndexedDB
+            // 5. 同步消息到IndexedDB
             for (const chatItem of res.data.chatList) {
               if (chatItem.messages && chatItem.messages.length > 0) {
                 // 获取本地已存储的消息
@@ -113,11 +117,6 @@ function Index(){
                       await syncMessageToIndexedDB(remoteMsg)
                     }
                   }
-                }
-
-                // 5. 如果是激活的对话，更新zustand中的消息
-                if (chatItem.isActive && chatItem.conversationId) {
-                  messageStore.initMessages(chatItem.conversationId).then()
                 }
               }
             }
@@ -155,9 +154,12 @@ function Index(){
       }
       else{
         userList.forEach(user=>{
-          isExistUser =  user.id === message.senderId
+          if(user.id === message.senderId){
+            isExistUser = true
+          }
         })
       }
+
       //列表不存在该客户信息，需要新增客户聊天列表项
       if(!isExistUser){
         shopifyRequestUserInfo(params ? params+'&id='+message.senderId : `?id=${message.senderId}`).then(res=>{
@@ -190,6 +192,26 @@ function Index(){
       })
     }
   }, [message]);
+
+  useEffect(() => {
+    if(offlineMessages){
+      // 客服端只处理客户发送的离线消息
+      const customerMessages = offlineMessages.messages.filter((msg:MessageDataType) => msg.senderType === 'CUSTOMER')
+
+      // 更新客户消息到聊天列表
+      if(customerMessages.length > 0){
+        messageStore.updateChatList(customerMessages, false)
+      }
+
+      // 添加所有消息到消息列表
+      messageStore.addMessage(offlineMessages.messages).then()
+
+      const msgIds = offlineMessages.messages.map((msg:MessageDataType)=>msg.msgId)
+      socket.emit('offline_message_ack', {
+        msgIds: Array.from(new Set(msgIds))
+      });
+    }
+  }, [offlineMessages]);
 
   const customerItemClick = async (conversationId:string)=>{
     if(messageStore.activeCustomerItem !== conversationId){
@@ -239,10 +261,12 @@ function Index(){
           <div className={indexStyle.chatMiddle}>
             <ZoraMessageItems messageData={messageStore.messages}></ZoraMessageItems>
             {
-              messageStore.messages.length ? <ZoraChat sendMessage={sendMsg}></ZoraChat> : null
+              messageStore.messages.length || messageStore.activeCustomerItem ? <ZoraChat sendMessage={sendMsg}></ZoraChat> : null
             }
           </div>
-          <div className={indexStyle.chatRight}></div>
+          <div className={indexStyle.chatRight}>
+              <ZoraCustomerProfile></ZoraCustomerProfile>
+            </div>
         </div>
       </div>
     </div>

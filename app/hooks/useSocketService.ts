@@ -6,6 +6,7 @@ export const useSocketService = ()=>{
   const [message,setMessage] = useState<MessageDataType | null>(null)
   const [messageAck, setMessageAck] = useState(null)
   const [notification, setNotification] = useState<NotificationDataType | null>(null)
+  const [offlineMessages, setOfflineMesages] = useState<MessageDataType[] | null>(null)
 
   useEffect(()=>{
     if(typeof window === 'undefined') return ;
@@ -22,15 +23,21 @@ export const useSocketService = ()=>{
       setNotification(data)
     }
 
+    const handleOfflineMessages = (data:MessageDataType[])=>{
+      setOfflineMesages(data)
+    }
+
     socketService.on('message', handleMessage)
     socketService.on('message_ack',handleMessageAck)
     socketService.on('notification', handleNotification)
+    socketService.on('offline_messages',handleOfflineMessages)
 
     return ()=>{
       socketService.off('message', handleMessage)
       socketService.off('message_ack', handleMessageAck)
       socketService.off('notification', handleNotification)
+      socketService.off('offline_messages',handleOfflineMessages)
     }
   })
-  return {message,socket:socketService,messageAck,notification}
+  return {message,socket:socketService,messageAck,notification,offlineMessages}
 }

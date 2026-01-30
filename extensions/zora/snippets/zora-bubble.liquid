@@ -1,0 +1,170 @@
+{% style %}
+  /* 气泡基础样式 */
+  .zora-bubble {
+    position: relative;
+    display: flex;
+    width: fit-content;
+    height: fit-content;
+    max-width: 90%;
+    padding: 0.75rem 1.2rem;
+    border-radius: 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    transition: all 0.3s ease;
+    text-align: center;
+    background: var(--zora-surface);
+    color: var(--zora-text-primary);
+    border: 1px solid var(--zora-border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+  }
+
+  /* 气泡内容样式 - 两行溢出显示省略号 */
+  .zora-bubble-content {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-all;
+    max-width: 15rem;
+    font-weight: bold;
+    color: var(--zora-error-color);
+  }
+
+  /* 气泡容器 - 绝对定位在zora-main右侧 */
+  .zora-bubble-container {
+    position: absolute;
+    left: calc(100% + 1rem);
+    top: 0;
+    width: fit-content;
+    max-width: 90vw;
+    z-index: 100;
+    transform: translateY(-25%);
+    filter: drop-shadow(2px 4px 6px var(--zora-border));
+    z-index: 12;
+  }
+
+  /* 气泡三角形 */
+  .zora-bubble::before,
+  .zora-bubble::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+  }
+
+  /* 左侧三角形（指向zora-main） */
+  .zora-bubble::before {
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-width: 10px 10px 10px 0;
+    border-color: transparent var(--zora-border) transparent transparent;
+  }
+
+  .zora-bubble::after {
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-width: 8px 8px 8px 0;
+    border-color: transparent var(--zora-surface) transparent transparent;
+  }
+
+  /* 气泡容器 */
+  .zora-bubble-container {
+    display: flex;
+    justify-content: flex-start;
+    min-width: 15rem;
+    max-width:24rem;
+    padding: 0.3rem 0;
+  }
+
+  /* 气泡图标 */
+  .zora-bubble-icon {
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 1rem;
+  }
+
+  /* 气泡关闭按钮 */
+  .zora-bubble-close {
+    position: absolute;
+    padding: .3rem;
+    top: 0;
+    right: 0;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    transform: translate(25%, -25%);
+    transition: opacity 0.3s ease;
+    font-size: .8rem;
+    line-height: 1;
+    border-radius: 50%;
+    background: var(--zora-surface);
+  }
+
+  .zora-bubble-close:hover {
+    opacity: 1;
+  }
+
+  /* 气泡动画 */
+  @keyframes bubbleFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes bubbleFadeOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+
+  .zora-bubble {
+    animation: bubbleFadeIn 0.3s ease-out;
+  }
+
+  .zora-bubble.hiding {
+    animation: bubbleFadeOut 0.3s ease-out forwards;
+  }
+
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    .zora-bubble-container{
+      max-width: 50vw;
+    }
+    .zora-bubble {
+      max-width: 95%;
+      padding: 0.65rem 1rem;
+      font-size: 0.8rem;
+    }
+  }
+{% endstyle %}
+
+<!-- 气泡 -->
+<zora-bubble data-close="zora-bubble-close" data-container="zora-bubble-container">
+  <div class="zora-bubble-container hidden">
+    <div class="zora-bubble">
+      {% if show_close %}
+        <span class="zora-bubble-close">×</span>
+      {% endif %}
+      {% if icon %}
+        <span class="zora-bubble-icon">{{ icon }}</span>
+      {% endif %}
+      <span class="zora-bubble-content">{{ content }}</span>
+    </div>
+  </div>
+</zora-bubble>

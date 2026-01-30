@@ -33,18 +33,26 @@ const getOfflineMessages = async (userId:string, count:number)=>{
 }
 
 const pushMessagesToUser = async (userId:string, messages:any[])=>{
+  let isAgent = false;
+
   try {
-    // 从Redis获取用户的socketId
-    const socketId = await redisClient.get(`user_socket:${userId}`);
+    // 判断是用户还是客服
+    // 从离线消息中获取recipientType来判断
+    const recipientType = messages[0]?.recipientType;
+    isAgent = recipientType === 'AGENT';
+
+    // 根据类型获取对应的socketId
+    const socketId = await redisClient.get(isAgent ? `agent_socket:${userId}` : `user_socket:${userId}`);
 
     if (!socketId) {
       await beginLogger({
         level: 'warning',
-        message: `用户${userId}不在线，无法推送离线消息`,
+        message: `${isAgent ? '客服' : '用户'}${userId}不在线，无法推送离线消息`,
         meta:{
           taskType: 'push_offline_messages',
           userId,
-          messageCount: messages.length
+          messageCount: messages.length,
+          userType: isAgent ? 'AGENT' : 'CUSTOMER'
         }
       })
       return false;
@@ -99,12 +107,13 @@ const pushMessagesToUser = async (userId:string, messages:any[])=>{
 
     await beginLogger({
       level: 'info',
-      message: `成功推送${messages.length}条离线消息给用户${userId}，等待客户端确认`,
+      message: `成功推送${messages.length}条离线消息给${isAgent ? '客服' : '用户'}${userId}，等待客户端确认`,
       meta:{
         taskType: 'push_offline_messages',
         userId,
         messageCount: messages.length,
-        msgIds
+        msgIds,
+        userType: isAgent ? 'AGENT' : 'CUSTOMER'
       }
     })
 
@@ -112,12 +121,13 @@ const pushMessagesToUser = async (userId:string, messages:any[])=>{
   } catch (error) {
     await beginLogger({
       level: 'error',
-      message: `推送离线消息给用户${userId}失败: ${error.message}`,
+      message: `推送离线消息给${isAgent ? '客服' : '用户'}${userId}失败: ${error.message}`,
       meta:{
         taskType: 'push_offline_messages',
         userId,
         messageCount: messages.length,
-        error: error.message
+        error: error.message,
+        userType: isAgent ? 'AGENT' : 'CUSTOMER'
       }
     })
     throw error;

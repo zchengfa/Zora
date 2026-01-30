@@ -120,12 +120,11 @@ export interface GraphqlProductInfoType {
 export type MessageAckType = {
   code?:string
   conversationId?:string,
-  msgId:string,
-  msgStatus:string
+  msgId:string | string[],
+  msgStatus:'SENT' | 'FAILED' | 'DELIVERED' | 'READ'
   timestamp?:string
   type?:'ACK',
 }
-
 
 export type ZoraProductType = GraphqlProductInfoType["products"]["nodes"][0]
 

@@ -81,7 +81,7 @@ class RenderMessage {
   generateMessageHtml = (payload) => {
     const elData = this.getElData(payload.senderType, payload.msgStatus);
     return `
-      <div class="zora-message-item ${elData.itemClass}" data-msg-unique="${payload.msgId}">
+      <div class="zora-message-item ${elData.itemClass}" data-msg-unique="${payload.msgId}" data-status="${payload.msgStatus}">
         <div class="zora-message-avatar">
           <img class="zora-avatar" width="32px" height="32px" src="${elData.avatar}" alt="zora_avatar" />
         </div>
@@ -195,23 +195,42 @@ class RenderMessage {
       statusSvg: ''
     }
   }
-  updateMessageStatus = (msgId,status)=>{
+  updateMessageStatus(msgId, status) {
+    // 如果msgId是数组，则批量更新
+    if (Array.isArray(msgId)) {
+      this.batchUpdateMessageStatus(msgId, status);
+      return;
+    }
+
+    // 单条更新
     const el = document.querySelector(`[data-msg-unique="${msgId}"]`)
-    if(!el) return ;
+    if (!el) return;
+
+    // 更新data-status属性
+    el.setAttribute('data-status', status);
+
     const svgBoxEl = el.querySelector('.msg-status-svg-box')
     const msgTimer = this.zoraMsgStateTimer.get(msgId)
     const msgMaxTimer = this.zoraMaxWaitingTimer.get(msgId)
     //清除之前的定时器
-    if(msgTimer){
+    if (msgTimer) {
       clearTimeout(msgTimer)
       this.zoraMsgStateTimer.delete(msgId)
     }
-    if(msgMaxTimer && this.getMessageStatus(msgId) !== 'SENDING'){
+    if (msgMaxTimer && this.getMessageStatus(msgId) !== 'SENDING') {
       clearTimeout(msgMaxTimer)
       this.zoraMaxWaitingTimer.delete(msgId)
     }
 
-    svgBoxEl.innerHTML = this.getRenderStatusSvg(status,msgId)
+    svgBoxEl.innerHTML = this.getRenderStatusSvg(status, msgId)
+  }
+
+  // 批量更新消息状态
+  batchUpdateMessageStatus(msgId, status) {
+    if (!msgId || msgId.length === 0) return;
+    msgId.forEach(msgId => {
+      this.updateMessageStatus(msgId, status);
+    });
   }
   getRenderStatusSvg = (status,msgId)=>{
     const readStateEl = document.querySelector(`[data-msg-unique="${msgId}"] .zora-msg-read-state`)

@@ -178,6 +178,10 @@ export class SocketUtils{
 
     // 处理离线消息确认回执
     this.ws.on('offline_message_ack', async (payload) => {
+      // 在try块外部声明变量，确保在catch块中可以访问
+      let userId = null;
+      let isAgent = false;
+
       try {
         const { msgIds } = payload;
         if (!msgIds || !Array.isArray(msgIds) || msgIds.length === 0) {
@@ -192,19 +196,31 @@ export class SocketUtils{
           return;
         }
 
-        // 获取当前用户ID
-        let userId = null;
-        for (const [uid, socketId] of this.users.entries()) {
+        // 获取当前用户ID或客服ID
+        // 先检查是否是客服
+        for (const [uid, socketId] of this.agent.entries()) {
           if (socketId === this.ws.id) {
             userId = uid;
+            isAgent = true;
             break;
+          }
+        }
+
+        // 如果不是客服，再检查是否是用户
+        if (!userId) {
+          for (const [uid, socketId] of this.users.entries()) {
+            if (socketId === this.ws.id) {
+              userId = uid;
+              isAgent = false;
+              break;
+            }
           }
         }
 
         if (!userId) {
           await beginLogger({
             level: 'warning',
-            message: `无法找到对应的用户ID`,
+            message: `无法找到对应的用户ID或客服ID`,
             meta: {
               taskType: 'offline_message_ack',
               socketId: this.ws.id
@@ -230,8 +246,8 @@ export class SocketUtils{
             if (msgIds.includes(msg.msgId)) {
               messagesToRemove.push(msgStr);
               // 如果消息有数据库ID，添加到待删除列表
-              if (msg.id) {
-                dbMessageIds.push(msg.id);
+              if (msg.msgId) {
+                dbMessageIds.push(msg.msgId);
               }
             }
           } catch (e) {
@@ -247,36 +263,36 @@ export class SocketUtils{
           }
           await pipeline.exec();
         }
-
         // 批量删除数据库中的离线消息
         if (dbMessageIds.length > 0) {
-          await this.config.prisma.offlineMessage.deleteMany({
+          const offlineMsgResult = await this.config.prisma.offlineMessage.deleteMany({
             where: {
-              id: {
+              msgId: {
                 in: dbMessageIds
               }
             }
           });
-
           await beginLogger({
             level: 'info',
-            message: `已从数据库删除${dbMessageIds.length}条离线消息`,
+            message: `已从数据库删除${offlineMsgResult.count}条离线消息`,
             meta: {
               taskType: 'offline_message_ack',
               userId,
-              dbMessageIds
+              dbMessageIds,
+              userType: isAgent ? 'AGENT' : 'CUSTOMER'
             }
           });
         }
 
         await beginLogger({
           level: 'info',
-          message: `收到离线消息确认回执，用户${userId}确认了${removedCount}条消息`,
+          message: `收到离线消息确认回执，${isAgent ? '客服' : '用户'}${userId}确认了${removedCount}条消息`,
           meta: {
             taskType: 'offline_message_ack',
             userId,
             msgIds,
-            removedCount
+            removedCount,
+            userType: isAgent ? 'AGENT' : 'CUSTOMER'
           }
         });
       } catch (e) {
@@ -294,6 +310,324 @@ export class SocketUtils{
         });
       }
     });
+
+    // 处理消息已读请求
+    this.ws.on('mark_messages_as_read', async (payload) => {
+      console.log('收到mark_messages_as_read:', payload);
+      try {
+        const { msgId, msgStatus, conversationId, senderType } = payload;
+
+        if (!msgId || !msgStatus || !conversationId) {
+          await beginLogger({
+            level: 'warning',
+            message: `收到无效的消息已读回执`,
+            meta: {
+              taskType: 'mark_messages_as_read',
+              payload
+            }
+          });
+          return;
+        }
+
+        // 获取当前消息的时间戳
+        const currentMessage = await this.config.prisma.message.findFirst({
+          where: { msgId: msgId },
+          select: { timestamp: true, senderId: true, senderType: true }
+        });
+        if (!currentMessage) {
+          await beginLogger({
+            level: 'warning',
+            message: `未找到消息记录`,
+            meta: {
+              taskType: 'mark_messages_as_read',
+              msgId
+            }
+          });
+          return;
+        }
+
+        // 在更新消息状态之前，先查询待更新的消息ID
+        const messagesToUpdate = await this.config.prisma.message.findMany({
+          where: {
+            conversationId: conversationId,
+            senderId: currentMessage.senderId,
+            senderType: currentMessage.senderType,
+            msgStatus:{
+              in: ['DELIVERED', 'SENT']
+            },
+            timestamp: {
+              lte: currentMessage.timestamp
+            }
+          },
+          select: {
+            id: true,
+            msgId: true
+          }
+        });
+
+        // 更新数据库中消息状态，包括当前消息及之前的所有未读消息
+        await this.config.prisma.message.updateMany({
+          where: {
+            conversationId: conversationId,
+            senderId: currentMessage.senderId,
+            senderType: currentMessage.senderType,
+            msgStatus:{
+              in: ['DELIVERED', 'SENT']
+            },
+            timestamp: {
+              lte: currentMessage.timestamp
+            }
+          },
+          data: { msgStatus }
+        });
+
+        // 更新完消息状态后，向发送者和接收者都发送回执，确保双方消息状态同步
+        if (msgStatus === 'READ' && messagesToUpdate.length > 0) {
+          const msgIds = messagesToUpdate.map(msg => msg.msgId);
+
+          // 获取会话信息
+          const conversation = await this.config.prisma.conversation.findUnique({
+            where: { id: conversationId },
+            select: { customer: true }
+          });
+
+          // 获取客服信息
+          const chatListItem = await this.config.prisma.chatListItem.findUnique({
+            where: { conversationId: conversationId },
+            select: { agentId: true }
+          });
+
+          if (conversation && chatListItem?.agentId) {
+            // 获取客户和客服的socket ID
+            const customerSocketId = this.users.get(conversation.customer as string);
+            const agentSocketId = this.agent.get(chatListItem.agentId);
+
+            // 准备已读回执数据
+            const readReceipt = {
+              msgId: msgIds,
+              msgStatus: 'READ',
+              conversationId,
+              senderType: currentMessage.senderType
+            };
+
+            // 向客户发送已读回执
+            if (customerSocketId) {
+              this.config.io.to(customerSocketId).emit('messages_batch_read', readReceipt);
+
+              await beginLogger({
+                level: 'info',
+                message: `已向客户发送消息已读回执`,
+                meta: {
+                  taskType: 'messages_batch_read',
+                  conversationId,
+                  msgId,
+                  customerSocketId
+                }
+              });
+            }
+
+            // 向客服发送已读回执
+            if (agentSocketId) {
+              this.config.io.to(agentSocketId).emit('messages_batch_read', readReceipt);
+
+              await beginLogger({
+                level: 'info',
+                message: `已向客服发送消息已读回执`,
+                meta: {
+                  taskType: 'messages_batch_read',
+                  conversationId,
+                  msgId,
+                  agentSocketId
+                }
+              });
+            }
+          }
+        }
+      } catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `处理消息已读回执失败`,
+          meta: {
+            taskType: 'message_delivered',
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
+          }
+        });
+      }
+    });
+
+    // 处理获取消息状态请求
+    this.ws.on('get_message_status', async (payload) => {
+      try {
+        const { conversationId, msgIds } = payload;
+
+        if (!conversationId) {
+          await beginLogger({
+            level: 'warning',
+            message: `收到无效的获取消息状态请求`,
+            meta: {
+              taskType: 'get_message_status',
+              payload
+            }
+          });
+          return;
+        }
+
+        // 如果提供了msgIds，只查询这些消息的状态；否则查询该会话的所有消息
+        const whereCondition: any = {
+          conversationId: conversationId
+        };
+
+        if (msgIds && Array.isArray(msgIds) && msgIds.length > 0) {
+          whereCondition.msgId = {
+            in: msgIds
+          };
+        }
+
+        // 查询消息及其状态
+        const messages = await this.config.prisma.message.findMany({
+          where: whereCondition,
+          select: {
+            msgId: true,
+            msgStatus: true,
+            conversationId: true,
+            senderId: true,
+            senderType: true,
+            recipientId: true,
+            recipientType: true,
+            contentType: true,
+            contentBody: true,
+            timestamp: true
+          },
+          orderBy: {
+            timestamp: 'asc'
+          }
+        });
+
+        // 发送消息状态更新给请求的客户端
+        this.ws.emit('message_status_update', {
+          conversationId: conversationId,
+          messages: messages
+        });
+
+        await beginLogger({
+          level: 'info',
+          message: `已发送消息状态更新`,
+          meta: {
+            taskType: 'get_message_status',
+            conversationId,
+            messageCount: messages.length,
+            requestedMsgIds: msgIds
+          }
+        });
+      } catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `处理获取消息状态请求失败`,
+          meta: {
+            taskType: 'get_message_status',
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
+          }
+        });
+      }
+    });
+
+    // 处理获取未读消息数请求
+    this.ws.on('get_unread_messages', async (payload) => {
+      try {
+        const { userId, shop } = payload;
+
+        if (!userId) {
+          await beginLogger({
+            level: 'warning',
+            message: `收到无效的获取未读消息请求`,
+            meta: {
+              taskType: 'get_unread_messages',
+              payload
+            }
+          });
+          return;
+        }
+
+        // 统计该用户的未读消息数（状态为SENT或DELIVERED且发送者为AGENT的消息）
+        const unreadCount = await this.config.prisma.message.count({
+          where: {
+            conversationId: {
+              in: await this.config.prisma.conversation.findMany({
+                where: {
+                  customer: userId,
+                  shop: shop
+                },
+                select: { id: true }
+              }).then(convs => convs.map(c => c.id))
+            },
+            senderType: 'AGENT',
+            msgStatus: {
+              in: ['SENT', 'DELIVERED']
+            }
+          }
+        });
+
+        // 获取该用户的未读消息（仅DELIVERED状态且发送者为AGENT的消息）
+        const unreadMessages = await this.config.prisma.message.findMany({
+          where: {
+            conversationId: {
+              in: await this.config.prisma.conversation.findMany({
+                where: {
+                  customer: userId,
+                  shop: shop
+                },
+                select: { id: true }
+              }).then(convs => convs.map(c => c.id))
+            },
+            senderType: 'AGENT',
+            msgStatus: 'DELIVERED'
+          },
+          orderBy: {
+            timestamp: 'asc'
+          },
+          take: 100 // 最多返回100条未读消息
+        });
+
+        // 发送未读消息列表给客户端
+        this.ws.emit('unread_messages', {
+          messages: unreadMessages,
+          count: unreadCount
+        });
+
+        await beginLogger({
+          level: 'info',
+          message: `已发送未读消息列表给用户`,
+          meta: {
+            taskType: 'get_unread_messages',
+            userId,
+            unreadCount: unreadMessages.length,
+            shop
+          }
+        });
+      } catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `处理获取未读消息请求失败`,
+          meta: {
+            taskType: 'get_unread_messages',
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
+          }
+        });
+      }
+    });
+
   }
 
   /**
@@ -407,13 +741,14 @@ export class SocketUtils{
         this.agent.set(info.id,this.ws.id)
         // 将客服ID和socketId的映射关系存储到Redis
         await this.config.redis.set(`agent_socket:${info.id}`, this.ws.id, 'EX', this.config.redisExpired)
-        beginLogger({
+        await beginLogger({
           level: 'info',
           message: `客服${info.name}上线了`,
           meta:{
             taskType: 'socket_util_agent'
           }
-        }).then()
+        })
+        await this.triggerOfflineMessagePush(info.id)
       }
     })
   }
@@ -600,19 +935,32 @@ export class SocketUtils{
   }
   public socketUserOffline = ()=>{
     this.ws.on('offline',async ({id}:{id:string})=>{
-      //用户下线
-      const user = this.users.get(id) || this.agent.get(id)
-      if(user){
+      //用户或客服下线
+      const isAgent = this.agent.has(id);
+      const socketId = isAgent ? this.agent.get(id) : this.users.get(id);
+
+      if(socketId){
+        // 清理Redis中的socket映射
+        const redisKey = isAgent ? `agent_socket:${id}` : `user_socket:${id}`;
+        await this.config.redis.del(redisKey);
+
         await beginLogger({
           level: 'info',
-          message: `用户下线`,
+          message: `${isAgent ? '客服' : '用户'}${id}下线`,
           meta:{
-            taskType: 'socket_util_offline'
+            taskType: 'socket_util_offline',
+            userType: isAgent ? 'AGENT' : 'CUSTOMER',
+            id
           }
         })
       }
-      this.users.delete(id)
-      this.agent.delete(id)
+
+      // 清理内存中的映射
+      if(isAgent){
+        this.agent.delete(id);
+      } else {
+        this.users.delete(id);
+      }
     })
   }
   public static manualOffline = (id:string)=>{
