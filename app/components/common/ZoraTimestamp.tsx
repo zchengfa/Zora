@@ -3,15 +3,17 @@ import ZoraTimestampStyle from '@styles/componentStyles/ZoraTimestamp.module.scs
 import {dealMsgTime} from "@Utils/Utils";
 
 interface Timestamp {
-  timestamp: string;
+  timestamp: string | number;
+  active?: boolean;
 }
 
 const ZoraTimestamp:React.FC<Timestamp> = (
   {
-    timestamp
+    timestamp,
+    active = false,
   })=>{
 
-  return <div className={ZoraTimestampStyle.timeBox}>
+  return <div className={active ? `${ZoraTimestampStyle.timeBoxActive}` : ZoraTimestampStyle.timeBox}>
     <span className={ZoraTimestampStyle.time}>{dealMsgTime(Number(timestamp))}</span>
   </div>
 }

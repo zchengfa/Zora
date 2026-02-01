@@ -156,11 +156,11 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       await shopifyHandleResponseData(customers,'customers',prisma)
 
       // 向在线客服发送客户更新通知
-      await SocketUtils.sendWebhookNotification({
-        webhookType: 'customers/update',
-        data: customer,
-        shop
-      })
+      // await SocketUtils.sendWebhookNotification({
+      //   webhookType: 'customers/update',
+      //   data: customer,
+      //   shop
+      // })
     }
     catch (e) {
       handleApiError(req,e)

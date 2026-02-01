@@ -69,35 +69,82 @@ export class WorkerHealth implements WorkerHealthType{
   }
 
   public checkWorkerHealthStatus = ()=>{
+    // 如果已有定时器在运行，先清理
+    if (this.WORKER_HEALTH_TIMER) {
+      clearInterval(this.WORKER_HEALTH_TIMER)
+      this.currentCheckAttempts = 0
+    }
+    
     const keyArr = this.WORKER_STATUS_KEY.split(':')
     const target = `${keyArr[1]} ${keyArr[0]}`
+    
     this.WORKER_HEALTH_TIMER = setInterval(async ()=>{
-      this.checkStatus = await this.redis.get(this.WORKER_STATUS_KEY)
-      this.currentCheckAttempts ++
-      if(this.checkStatus){
-        clearInterval(this.WORKER_HEALTH_TIMER)
-        await beginLogger({
-          level: 'info',
-          message: `${target} is healthy`,
-          meta:{
-            taskType: `worker_health_check`,
-            attempts: this.currentCheckAttempts,
-            status: JSON.parse(this.checkStatus)
+      try {
+        this.checkStatus = await this.redis.get(this.WORKER_STATUS_KEY)
+        this.currentCheckAttempts ++
+        
+        if(this.checkStatus){
+          clearInterval(this.WORKER_HEALTH_TIMER)
+          this.WORKER_HEALTH_TIMER = undefined
+          
+          let statusData
+          try {
+            statusData = JSON.parse(this.checkStatus)
+          } catch (e) {
+            statusData = this.checkStatus
           }
-        })
-      }
-      if(this.currentCheckAttempts >= this.maxCheckAttempts){
-        clearInterval(this.WORKER_HEALTH_TIMER)
+          
+          await beginLogger({
+            level: 'info',
+            message: `${target} is healthy`,
+            meta:{
+              taskType: `worker_health_check`,
+              attempts: this.currentCheckAttempts,
+              status: statusData
+            }
+          })
+        }
+        
+        if(this.currentCheckAttempts >= this.maxCheckAttempts){
+          clearInterval(this.WORKER_HEALTH_TIMER)
+          this.WORKER_HEALTH_TIMER = undefined
+          
+          await beginLogger({
+            level: 'error',
+            message: `${target} is unhealthy`,
+            meta:{
+              taskType: `worker_health_check`,
+              attempts: this.currentCheckAttempts,
+              status: this.checkStatus
+            }
+          })
+        }
+      } catch (e) {
         await beginLogger({
           level: 'error',
-          message: `${target} is unhealthy`,
+          message: `${target} health check failed`,
           meta:{
             taskType: `worker_health_check`,
             attempts: this.currentCheckAttempts,
-            status: this.checkStatus
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
           }
         })
       }
     },this.workerHealthCheckDelay)
+  }
+  
+  /**
+   * 停止健康检查
+   */
+  public stopHealthCheck = ()=>{
+    if (this.WORKER_HEALTH_TIMER) {
+      clearInterval(this.WORKER_HEALTH_TIMER)
+      this.WORKER_HEALTH_TIMER = undefined
+      this.currentCheckAttempts = 0
+    }
   }
 }

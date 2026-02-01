@@ -37,7 +37,7 @@ export const loggerQueue = new Queue('loggerQueue',{
   }
 });
 
-export const beginLogger = async ({level,message,meta}:{level:'debug'|'info'|'warn'|'error',message:string,meta:any})=>{
+export const beginLogger = async ({level,message,meta}:{level:'debug'|'info'|'warning'|'error',message:string,meta:any})=>{
   const loggerWorkerStatus = await redisClient.get(`worker:${process.env.LOGGER_WORKER_HEALTH_KEY || 'logger'}:status`)
   if(loggerWorkerStatus){
     const job = await loggerQueue.add(level,{
@@ -59,4 +59,45 @@ export const beginLogger = async ({level,message,meta}:{level:'debug'|'info'|'wa
       ...meta,
     }
   })
+}
+
+/**
+ * 离线消息推送队列
+ */
+export const offlineMessageQueue = new Queue('offlineMessageQueue',{
+  connection: redisClient,
+  defaultJobOptions:{
+    removeOnComplete: 10,
+    removeOnFail: 100,
+    attempts: 3,
+    backoff:{type:'exponential',delay: 2000},
+  }
+});
+
+/**
+ * 添加离线消息推送任务
+ * @param data 离线消息数据
+ * @returns 任务ID
+ */
+export const addOfflineMessageJob = async (data:any) => {
+  const job = await offlineMessageQueue.add('pushOfflineMessage', {
+    ...data,
+    timestamp: data.timestamp || new Date().toISOString(),
+  }, {
+    priority: data.priority || 0,
+    attempts: 3,
+    backoff: {type: 'exponential', delay: 2000},
+    removeOnComplete: 10,
+    removeOnFail: 100,
+  });
+
+  logger.info(`已创建离线消息推送任务，任务：${job.id}，用户：${data.userId}，消息类型：${data.messageType}`, {
+    meta: {
+      taskType: 'create_offline_message_job',
+      userId: data.userId,
+      messageType: data.messageType,
+    }
+  });
+
+  return job.id;
 }

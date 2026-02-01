@@ -370,7 +370,7 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
         unpaid: item.unpaid,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
-        customerId: item.customer?.id,
+        customerId: item.customer?.id || null,
         shopifyOrderId: item.id,
         confirmationNumber: item.confirmationNumber,
         totalTax: item.totalTaxSet.shopMoney.amount,

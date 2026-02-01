@@ -2,7 +2,7 @@
 import { usePersistStorage } from '@hooks/usePersistStorage';
 
 export default function AppSettings() {
-  const LOCALSTORAGE_KEY = 'YCChat_application_theme';
+  const LOCALSTORAGE_KEY = 'zora_application_theme';
   const [theme, setPersistTheme] = usePersistStorage(LOCALSTORAGE_KEY, 'light');
 
   const changeSwitch = () => {

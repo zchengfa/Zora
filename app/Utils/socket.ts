@@ -14,6 +14,16 @@ export type MessageDataType = {
   timer?: number | undefined
 }
 
+// 通知数据类型
+export type NotificationDataType = {
+  id?: string;
+  type: 'success' | 'info' | 'warning' | 'error';
+  title?: string;
+  message: string;
+  duration?: number;
+  timestamp: string | number;
+}
+
 // 定义一个接口来描述可能的配置项，如果有需要的话
 interface SocketConfig {
   // 这里可以根据实际情况添加更多配置项，比如重连策略等

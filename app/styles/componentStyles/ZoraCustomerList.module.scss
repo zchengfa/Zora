@@ -47,6 +47,7 @@
         border-radius: 50%;
       }
       .username{
+        max-width: 6rem;
         color: var(--z-color-text);
       }
       .middleBox{
@@ -85,7 +86,13 @@
       }
     }
     .customerItem.active{
-      background-color: var(--z-color-surface);
+      background-color: var(--z-color-primary);
+      .message{
+        color: var(--z-color-text-secondary-active);
+      }
+      .username{
+        color: var(--z-color-text-secondary-active);
+      }
     }
   }
 }

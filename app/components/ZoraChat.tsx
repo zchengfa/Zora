@@ -17,7 +17,7 @@ const ZoraChat:React.FC<ZoraChatProps> = (
     setInputChatMsg(e.target?.value.trim())
   }
   const listenEnterKey = (e:KeyboardEvent)=>{
-    if(e.keyCode === 13 && inputChatMsg.length > 1){
+    if(e.keyCode === 13 && inputChatMsg.length >= 1){
       sendMessage(inputChatMsg)
       setInputChatMsg('')
     }
