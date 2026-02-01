@@ -2,6 +2,7 @@ import React,{FormEvent,useRef, useState} from "react";
 import ZoraChatStyle from '@styles/componentStyles/ZoraChat.module.scss'
 import ZoraPopover from "@components/common/ZoraPopover.tsx";
 import ZoraProduct from "@components/ZoraProduct.tsx";
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 interface ZoraChatProps {
   sendMessage: (msg:string) => void
@@ -9,6 +10,8 @@ interface ZoraChatProps {
 const ZoraChat:React.FC<ZoraChatProps> = (
   {sendMessage}
 )=>{
+  const {translation} = useAppTranslation();
+  const ct = translation.components.chat;
   const [inputChatMsg,setInputChatMsg] = useState('')
   const inputChatRef = useRef<HTMLInputElement>(null)
   const [isOpenRec,setOpenRec] = useState(false)
@@ -49,7 +52,7 @@ const ZoraChat:React.FC<ZoraChatProps> = (
         <input name={'chatInput'} ref={inputChatRef} value={inputChatMsg}
                onInput={(event: FormEvent) => chatInputHandler(event)}
                className={ZoraChatStyle.zoraInputChat} type="text"
-               placeholder={'type something'}/>
+               placeholder={ct.inputPlaceholder}/>
       </div>
       <div className={ZoraChatStyle.zoraEmojiBox}>
         <svg className="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"

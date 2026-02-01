@@ -1,4 +1,4 @@
-const FETCH_BASE_URL = "https://8dc8613d0dc9.ngrok-free.app";
+const FETCH_BASE_URL = "https://f39b88f79a49.ngrok-free.app";
 const ZORA_TOKEN = "zora_token"
 //防抖函数
 function debounce(fun,delay = 300) {
@@ -191,7 +191,8 @@ class ZoraResponse {
             code_error:'验证码错误',
             no_attempt_expired: '验证次数过多或验证码过期',
             password: '账号密码或验证码错误',
-            params: '缺少必要参数'
+            params: '缺少必要参数',
+            socket_connect_failed: 'Zora聊天服务不可用'
           },
           msg_status:{
             READ: '已读',
@@ -224,7 +225,8 @@ class ZoraResponse {
             code_error:'incorrect code',
             no_attempt_expired: 'Excessive verification attempts or expired verification code',
             password: 'incorrect password or code',
-            params:'missing required params'
+            params:'missing required params',
+            socket_connect_failed: 'Zora chat service is unavailable'
           },
           msg_status:{
             READ: 'read',

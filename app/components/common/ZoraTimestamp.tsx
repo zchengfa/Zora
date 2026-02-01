@@ -14,7 +14,7 @@ const ZoraTimestamp:React.FC<Timestamp> = (
   })=>{
 
   return <div className={active ? `${ZoraTimestampStyle.timeBoxActive}` : ZoraTimestampStyle.timeBox}>
-    <span className={ZoraTimestampStyle.time}>{dealMsgTime(Number(timestamp))}</span>
+    <span className={ZoraTimestampStyle.time}>{dealMsgTime(timestamp)}</span>
   </div>
 }
 

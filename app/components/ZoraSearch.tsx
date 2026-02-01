@@ -1,8 +1,11 @@
 import ZoraSearchStyle from '@styles/componentStyles/ZoraSearch.module.scss'
 import {useState} from "react";
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 export default function ZoraSearch(props:any){
 
+  const {translation} = useAppTranslation();
+  const ct = translation.components.chat;
   const [mouseEntered, setInputStatus] = useState(false)
   const [inputValue, setInputValue] = useState('')
 
@@ -24,7 +27,7 @@ export default function ZoraSearch(props:any){
       inputValue?.length ? <div className={ZoraSearchStyle.searchResult}>
         {
           searchResult?.length ? null : <div className={ZoraSearchStyle.emptyBox}>
-            <span>no result</span>
+            <span>{ct.noResult}</span>
           </div>
         }
       </div> : null

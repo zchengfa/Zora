@@ -54,7 +54,6 @@ interface ModalProviderProps {
 
 const ZoraModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
   const [modals, setModals] = useState<ModalState[]>([]);
-
   const showModal = (modalConfig: ModalConfig): string => {
     const modalId = Math.random().toString(36);
     const newModal: ModalState = {

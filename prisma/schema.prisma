@@ -68,19 +68,37 @@ model shop {
   customers customers[]
 }
 
-model CustomerServiceStaff {
-  id         String    @id @unique @default(uuid())
+// 客服基本信息表
+model StaffProfile {
+  id         String    @id @default(uuid())
   name       String
-  email      String?   @unique
+  email      String?
   phone      String?
   avatarUrl  String?
   department String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime? @updatedAt
 
-  userId   BigInt?    @unique
+  staffs       CustomerServiceStaff[]
+  ChatListItem ChatListItem[]
+
+  @@map("staff_profiles")
+}
+
+model CustomerServiceStaff {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  profileId String
+  profile   StaffProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  userId   BigInt
   customer customers? @relation(fields: [userId], references: [id])
 
+  chatListItems ChatListItem[]
+
+  @@unique([profileId, userId])
   @@map("customer_service_staff")
 }
 
@@ -111,7 +129,8 @@ model Conversation {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  messages Message[]
+  messages      Message[]
+  chatListItems ChatListItem[]
 
   @@index([shop, status])
   @@index([shop, customer])
@@ -144,23 +163,52 @@ model Message {
 
 // 离线消息模型
 model OfflineMessage {
-  id             String   @id @default(uuid())
-  conversationId String   @db.VarChar(191)
-  recipientId    String   @db.VarChar(191)
+  id             String        @id @default(uuid())
+  conversationId String        @db.VarChar(191)
+  recipientId    String        @db.VarChar(191)
   recipientType  RecipientType
-  senderId       String   @db.VarChar(191)
+  senderId       String        @db.VarChar(191)
   senderType     SenderType
   contentType    ContentType
-  contentBody    String   @db.Text
+  contentBody    String        @db.Text
   metadata       Json?
-  msgId          String   @db.VarChar(100)
-  isDelivered    Boolean  @default(false)
+  msgId          String        @db.VarChar(100)
+  isDelivered    Boolean       @default(false)
   deliveredAt    DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime      @default(now())
 
   @@index([recipientId, isDelivered])
   @@index([conversationId])
   @@map("offline_messages")
+}
+
+// 聊天列表项模型
+model ChatListItem {
+  id                 String    @id @default(uuid())
+  conversationId     String    @unique @db.VarChar(191)
+  customerId         String    @db.VarChar(191)
+  customerFirstName  String?
+  customerLastName   String?
+  customerAvatar     String?
+  lastMessage        String?   @db.Text
+  lastTimestamp      DateTime?
+  isOnline           Boolean   @default(false)
+  hadRead            Boolean   @default(true)
+  isActive           Boolean   @default(false)
+  unreadMessageCount Int       @default(0)
+  agentId            String?   @db.VarChar(191)
+  shop               String    @db.VarChar(100)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  conversation         Conversation?          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agent                StaffProfile?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  CustomerServiceStaff CustomerServiceStaff[]
+
+  @@index([agentId, shop])
+  @@index([shop, customerId])
+  @@index([lastTimestamp])
+  @@map("chat_list_items")
 }
 
 // 订单状态枚举
@@ -257,10 +305,10 @@ model Order {
   shopifyOrderId        String? @unique // gid://shopify/Order/6149102141628
 
   // 关系
-  customerId        String
+  customerId        String?
   shippingAddressId String?
 
-  customers       customers            @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
+  customers       customers?           @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
   shippingAddress address?             @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id])
   lineItems       OrderLineItem[]
   taxLines        OrderTaxLine[]

@@ -1,4 +1,6 @@
 // 客户信息数据类型
+import type {MessageDataType} from "@Utils/socket.ts";
+
 export interface CustomerDataType {
   id: string,
   firstName:string,
@@ -11,6 +13,7 @@ export interface CustomerDataType {
   isActive?:boolean,
   unreadMessageCount?:number,
   conversationId?:string,
+  messages?:Array<MessageDataType>
 }
 
 export interface CustomerStaffType {
@@ -117,12 +120,11 @@ export interface GraphqlProductInfoType {
 export type MessageAckType = {
   code?:string
   conversationId?:string,
-  msgId:string,
-  msgStatus:string
+  msgId:string | string[],
+  msgStatus:'SENT' | 'FAILED' | 'DELIVERED' | 'READ'
   timestamp?:string
   type?:'ACK',
 }
-
 
 export type ZoraProductType = GraphqlProductInfoType["products"]["nodes"][0]
 

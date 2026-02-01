@@ -2,7 +2,7 @@ import {io, ManagerOptions, SocketOptions,Socket} from "socket.io-client";
 
 export type MessageDataType = {
   contentBody: string ,
-  contentType: 'TEXT' | 'PRODUCT_CARD' | 'IMAGE',
+  contentType: 'TEXT' | 'PRODUCT' | 'IMAGE',
   conversationId:string,
   msgId:string,
   msgStatus: 'SENDING' | 'SENT' | 'FAILED' | 'DELIVERED' | 'READ' | "",
@@ -11,7 +11,8 @@ export type MessageDataType = {
   senderId:string
   senderType: 'CUSTOMER' | 'SYSTEM' | 'AGENT',
   timestamp: string | number,
-  timer?: number | undefined
+  timer?: number | undefined,
+  unreadMessageCount?: number ,
 }
 
 // 通知数据类型
@@ -41,6 +42,10 @@ class SocketService {
       headers: {
         "ngrok-skip-browser-warning": 'true'
       },
+      reconnectionAttempts:5, //重连次数
+      reconnectionDelay:2000,//重连间隔
+      reconnectionDelayMax: 5000,
+      timeout: 5000,
       transports: ['websocket'],
       ...this.config.options
     });
