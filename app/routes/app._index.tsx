@@ -19,6 +19,7 @@ import {
   readMessagesFromIndexedDB,
   syncMessageToIndexedDB
 } from "@Utils/zustandWithIndexedDB.ts";
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
@@ -52,6 +53,8 @@ function Index(){
   const {message,socket,messageAck,offlineMessages} = useSocketService();
   // 使用通知Hook监听socket通知并显示
   useSocketNotification();
+  const {translation} = useAppTranslation();
+  const ct = translation.components.chat;
 
   const messageStore = useMessageStore();
 
@@ -246,16 +249,16 @@ function Index(){
   return <div className={indexStyle.container}>
     <div className={indexStyle.content}>
       <div className={indexStyle.statusBox}>
-        <span className={indexStyle.tipSpan}>Status:</span>
+        <span className={indexStyle.tipSpan}>{ct.status}:</span>
         <div className={indexStyle.tipBox}>
-          <span className={indexStyle.status}>Online</span>
+          <span className={indexStyle.status}>{ct.status}</span>
         </div>
       </div>
       <div className={indexStyle.chatContent}>
-        <h3 className={indexStyle.chatTitle}>chat</h3>
+        <h3 className={indexStyle.chatTitle}>{ct.title}</h3>
         <div className={indexStyle.chatBox}>
           <div className={indexStyle.chatLeft}>
-            <ZoraSearch placeholder={'Search'}></ZoraSearch>
+            <ZoraSearch placeholder={ct.searchPlaceholder}></ZoraSearch>
             <ZoraCustomerList customerData={messageStore.chatList} ItemClick={customerItemClick}></ZoraCustomerList>
           </div>
           <div className={indexStyle.chatMiddle}>

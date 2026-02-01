@@ -7,11 +7,14 @@ import ZoraProductCard from '@/components/common/ZoraProductCard.tsx'
 import {useSocketService} from "@hooks/useSocketService.ts";
 import {MessageDataType} from "@Utils/socket.ts";
 import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 export default function ZoraProduct (){
   const [isLoading,setLoading] = useState(true)
   const {shopify_Shop_products} = useMessageStore();
   const {showModal,hideModal} = useZoraUniversalModal()
+  const {translation} = useAppTranslation();
+  const pt = translation.components.product;
   const [products,setProducts] = useState<ZoraProductType[]>([]);
   const [pageInfo,setPageInfo] = useState({});
   const {socket} = useSocketService()
@@ -25,10 +28,10 @@ export default function ZoraProduct (){
     e.stopPropagation()
     const modalId = showModal({
       type: 'confirmation',
-      title: '推荐产品',
-      confirmationText: '是否将该产品推荐给客户',
-      confirmButtonText: '推荐',
-      cancelButtonText:'不推荐',
+      title: pt.recommendTitle,
+      confirmationText: pt.confirmText,
+      confirmButtonText: pt.confirmButton,
+      cancelButtonText: pt.cancelButton,
       onConfirm:()=>{
         const msgData:MessageDataType = {
           senderId: messageStore.customerStaff?.id,
@@ -50,7 +53,7 @@ export default function ZoraProduct (){
         hideModal(modalId)
       },
       onClose:()=>{
-        console.log('您已取消推荐产品操作')
+        console.log(pt.cancelAction)
       }
     })
 

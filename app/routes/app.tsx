@@ -2,6 +2,9 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
+import {useAppBridge} from "@shopify/app-bridge-react";
+import { AppProvider as PolarisAppProvider } from "@shopify/polaris"
+import en from "@shopify/polaris/locales/en.json"
 import { authenticate } from "@/shopify.server.ts";
 import ZoraModalProvider from "@/contexts/ZoraModalProvider.tsx";
 import ZoraNotificationProvider from "@/contexts/ZoraNotificationProvider.tsx";
@@ -24,9 +27,13 @@ function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   const { socket } = useSocketService()
 
+  const appBridge = useAppBridge()
+
+
   const {customerStaff, chatList, activeCustomerItem} = useMessageStore()
 
   useEffect(() => {
+    const locale = appBridge.config.locale
     //设置主题
     const setTheme = ()=>{
       const theme = localStorage.getItem('zora_application_theme') || 'light'
@@ -45,7 +52,7 @@ function App() {
         activeCustomerItem: activeCustomerItem
       })
     }
-    
+
 // 处理 iframe 被卸载（在 Shopify Admin 内切换页面）
     const handleUnload = () => {
       const logoutData = new Blob([JSON.stringify({
@@ -70,15 +77,17 @@ function App() {
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      <s-app-nav>
-        <s-link href="/app">Chat</s-link>
-        <s-link href="/app/settings">Settings</s-link>
-      </s-app-nav>
-      <ZoraModalProvider>
-        <ZoraNotificationProvider>
-          <Outlet/>
-        </ZoraNotificationProvider>
-      </ZoraModalProvider>
+      <PolarisAppProvider i18n={en}>
+        <s-app-nav>
+          <s-link href="/app">Chat</s-link>
+          <s-link href="/app/settings">Settings</s-link>
+        </s-app-nav>
+        <ZoraModalProvider>
+          <ZoraNotificationProvider>
+            <Outlet/>
+          </ZoraNotificationProvider>
+        </ZoraModalProvider>
+      </PolarisAppProvider>
     </AppProvider>
   );
 }

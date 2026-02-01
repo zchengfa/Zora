@@ -1,17 +1,21 @@
 import ZoraEmptyStyle from '@styles/componentStyles/ZoraEmpty.module.scss'
 import React from 'react'
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
+
 interface ZoraEmptyProps {
   isEmptyMessage?: boolean
   isEmptyProfile?: boolean
 }
 
 const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile})=> {
+  const {translation} = useAppTranslation()
+  const et = translation.components.empty
   if(isEmptyProfile) {
     return <div className={ZoraEmptyStyle.chatMainArea}>
       <div className={ZoraEmptyStyle.emptyState + ' ' + ZoraEmptyStyle.emptyStateSide}>
         <div className={ZoraEmptyStyle.emptyStateIcon}>👤</div>
-        <div className={ZoraEmptyStyle.emptyStateTitle}>No Customer Profile</div>
-        <div className={ZoraEmptyStyle.emptyStateDesc}>Select a customer to view their profile.</div>
+        <div className={ZoraEmptyStyle.emptyStateTitle}>{et.profile.title}</div>
+        <div className={ZoraEmptyStyle.emptyStateDesc}>{et.profile.subtitle}</div>
       </div>
     </div>
   }
@@ -19,18 +23,18 @@ const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile})=> 
     return <div className={ZoraEmptyStyle.chatMainArea}>
       <div className={ZoraEmptyStyle.emptyState + ' ' + ZoraEmptyStyle.emptyStateSide}>
         <div className={ZoraEmptyStyle.emptyStateIcon}>👥</div>
-        <div className={ZoraEmptyStyle.emptyStateTitle}>No Customers</div>
-        <div className={ZoraEmptyStyle.emptyStateDesc}>Add a customer to start chatting.</div>
-        <button className={ZoraEmptyStyle.btnPrimary}>Add Customer</button>
+        <div className={ZoraEmptyStyle.emptyStateTitle}>{et.customer.title}</div>
+        <div className={ZoraEmptyStyle.emptyStateDesc}>{et.customer.subtitle}</div>
+        <button className={ZoraEmptyStyle.btnPrimary}>{et.customer.primaryAction.content}</button>
       </div>
     </div>
   }
   return <div className={ZoraEmptyStyle.chatMainArea}>
     <div className={ZoraEmptyStyle.emptyState + ' ' + ZoraEmptyStyle.emptyStateCenter}>
       <div className={ZoraEmptyStyle.emptyStateIcon}>💬</div>
-      <div className={ZoraEmptyStyle.emptyStateTitle}>No Message</div>
-      <div className={ZoraEmptyStyle.emptyStateDesc}>You have no messages yet.</div>
-      <button className={ZoraEmptyStyle.btnPrimary}>Start New Chat</button>
+      <div className={ZoraEmptyStyle.emptyStateTitle}>{et.message.title}</div>
+      <div className={ZoraEmptyStyle.emptyStateDesc}>{et.message.subtitle}</div>
+      <button className={ZoraEmptyStyle.btnPrimary}>{et.message.primaryAction.content}</button>
       </div>
     </div>
 }

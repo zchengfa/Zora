@@ -5,6 +5,7 @@ import {useMessageStore} from "@/zustand/zustand.ts";
 import {useInViewport} from "@hooks/useInViewport.ts";
 import ZoraLoading from "@components/common/ZoraLoading.tsx";
 import ZoraProductCard from "@components/common/ZoraProductCard.tsx";
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 interface ZoraMsgItemPropsType {
   itemData: MessageDataType
@@ -16,6 +17,8 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
   }
 )=>{
   const {activeCustomerInfo,customerStaff} = useMessageStore()
+  const {translation} = useAppTranslation();
+  const ct = translation.components.chat;
   const msgRef = useRef<HTMLDivElement>(null);
   const isVisible = useInViewport(msgRef)
   const [avatar,setAvatar] = useState('')
@@ -34,12 +37,12 @@ const ZoraMessageItem:React.FC<ZoraMsgItemPropsType> = (
 
   useEffect(() => {
     if(itemData.msgStatus === 'READ'){
-      setMsgReadStatus('已读')
+      setMsgReadStatus(ct.messageStatus.read)
     }
     else if(itemData.msgStatus === 'DELIVERED' || itemData.msgStatus === 'SENT'){
-      setMsgReadStatus('未读')
+      setMsgReadStatus(ct.messageStatus.unread)
     }
-  }, [itemData.msgStatus]);
+  }, [itemData.msgStatus, ct.messageStatus]);
 
   const renderMessageBody = ()=>{
     switch (itemData.contentType) {

@@ -2,6 +2,7 @@ import React from 'react';
 import ZoraCustomerProfileStyle from '@styles/componentStyles/ZoraCustomerProfile.module.scss';
 import { useMessageStore } from '@/zustand/zustand.ts';
 import ZoraEmpty from '@components/common/ZoraEmpty.tsx';
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 interface CustomerProfile {
   customerId: string;
@@ -44,7 +45,8 @@ interface ZoraCustomerProfileProps {}
 
 const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
   const { chatList, activeCustomerItem } = useMessageStore();
-
+  const { translation } = useAppTranslation()
+  const pt = translation.components.profile
   // 获取当前激活的客户详细信息
   const currentCustomer = chatList.find(customer => customer.conversationId === activeCustomerItem);
   const customerProfile: CustomerProfile | undefined = currentCustomer?.customerProfile;
@@ -111,22 +113,22 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
               {customerProfile.customerName || 'Customer'}
             </h3>
             <p className={ZoraCustomerProfileStyle.customerStatus}>
-              {currentCustomer?.isOnline ? 'Online' : 'Offline'}
+              {currentCustomer?.isOnline ? pt.status.online : pt.status.offline}
             </p>
           </div>
 
           {/* 客户评分卡片 */}
           <div className={ZoraCustomerProfileStyle.scoresSection}>
             <div className={`${ZoraCustomerProfileStyle.scoreCard} ${getScoreColor(customerProfile.valueScore)}`}>
-              <div className={ZoraCustomerProfileStyle.scoreLabel}>价值评分</div>
+              <div className={ZoraCustomerProfileStyle.scoreLabel}>{pt.score.loyaltyScore}</div>
               <div className={ZoraCustomerProfileStyle.scoreValue}>{customerProfile.valueScore}</div>
             </div>
             <div className={`${ZoraCustomerProfileStyle.scoreCard} ${getScoreColor(customerProfile.loyaltyScore)}`}>
-              <div className={ZoraCustomerProfileStyle.scoreLabel}>忠诚度评分</div>
+              <div className={ZoraCustomerProfileStyle.scoreLabel}>{pt.score.valueScore}</div>
               <div className={ZoraCustomerProfileStyle.scoreValue}>{customerProfile.loyaltyScore}</div>
             </div>
             <div className={`${ZoraCustomerProfileStyle.scoreCard} ${getScoreColor(customerProfile.engagementScore)}`}>
-              <div className={ZoraCustomerProfileStyle.scoreLabel}>活跃度评分</div>
+              <div className={ZoraCustomerProfileStyle.scoreLabel}>{pt.score.engagementScore}</div>
               <div className={ZoraCustomerProfileStyle.scoreValue}>{customerProfile.engagementScore}</div>
             </div>
           </div>
@@ -134,24 +136,24 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
           {/* 客户详细信息 */}
           <div className={ZoraCustomerProfileStyle.profileDetails}>
             <div className={ZoraCustomerProfileStyle.detailSection}>
-              <h4 className={ZoraCustomerProfileStyle.detailTitle}>Customer Information</h4>
+              <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.customerDetail.title}</h4>
               <div className={ZoraCustomerProfileStyle.detailItem}>
-                <span className={ZoraCustomerProfileStyle.detailLabel}>Customer ID:</span>
+                <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.customerDetail.id}:</span>
                 <span className={ZoraCustomerProfileStyle.detailValue}>{customerProfile.customerId}</span>
               </div>
               <div className={ZoraCustomerProfileStyle.detailItem}>
-                <span className={ZoraCustomerProfileStyle.detailLabel}>Email:</span>
+                <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.customerDetail.email}:</span>
                 <span className={ZoraCustomerProfileStyle.detailValue}>{customerProfile.customerEmail}</span>
               </div>
               {customerProfile.customerPhone && (
                 <div className={ZoraCustomerProfileStyle.detailItem}>
-                  <span className={ZoraCustomerProfileStyle.detailLabel}>Phone:</span>
+                  <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.customerDetail.phone}:</span>
                   <span className={ZoraCustomerProfileStyle.detailValue}>{customerProfile.customerPhone}</span>
                 </div>
               )}
               {customerProfile.customerSince && (
                 <div className={ZoraCustomerProfileStyle.detailItem}>
-                  <span className={ZoraCustomerProfileStyle.detailLabel}>Customer Since:</span>
+                  <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.customerDetail.since}:</span>
                   <span className={ZoraCustomerProfileStyle.detailValue}>{formatDate(customerProfile.customerSince)}</span>
                 </div>
               )}
@@ -160,7 +162,7 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
             {/* 客户标签 */}
             {customerProfile.tags.length > 0 && (
               <div className={ZoraCustomerProfileStyle.detailSection}>
-                <h4 className={ZoraCustomerProfileStyle.detailTitle}>Customer Tags</h4>
+                <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.tags}</h4>
                 <div className={ZoraCustomerProfileStyle.tagsContainer}>
                   {customerProfile.tags.map((tag, index) => (
                     <span key={index} className={ZoraCustomerProfileStyle.tag}>
@@ -173,30 +175,30 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
 
             {/* 订单统计 */}
             <div className={ZoraCustomerProfileStyle.detailSection}>
-              <h4 className={ZoraCustomerProfileStyle.detailTitle}>Order Statistics</h4>
+              <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.statistics.order.title}</h4>
               <div className={ZoraCustomerProfileStyle.statsGrid}>
                 <div className={ZoraCustomerProfileStyle.statItem}>
-                  <div className={ZoraCustomerProfileStyle.statLabel}>Total Orders</div>
+                  <div className={ZoraCustomerProfileStyle.statLabel}>{pt.statistics.order.totalOrders}</div>
                   <div className={ZoraCustomerProfileStyle.statValue}>{customerProfile.totalOrders}</div>
                 </div>
                 <div className={ZoraCustomerProfileStyle.statItem}>
-                  <div className={ZoraCustomerProfileStyle.statLabel}>Completed</div>
+                  <div className={ZoraCustomerProfileStyle.statLabel}>{pt.statistics.order.completed}</div>
                   <div className={ZoraCustomerProfileStyle.statValue}>{customerProfile.completedOrders}</div>
                 </div>
                 <div className={ZoraCustomerProfileStyle.statItem}>
-                  <div className={ZoraCustomerProfileStyle.statLabel}>Cancelled</div>
+                  <div className={ZoraCustomerProfileStyle.statLabel}>{pt.statistics.order.cancelled}</div>
                   <div className={ZoraCustomerProfileStyle.statValue}>{customerProfile.cancelledOrders}</div>
                 </div>
                 <div className={ZoraCustomerProfileStyle.statItem}>
-                  <div className={ZoraCustomerProfileStyle.statLabel}>Refunded</div>
+                  <div className={ZoraCustomerProfileStyle.statLabel}>{pt.statistics.order.refunded}</div>
                   <div className={ZoraCustomerProfileStyle.statValue}>{customerProfile.refundedOrders}</div>
                 </div>
                 <div className={ZoraCustomerProfileStyle.statItem}>
-                  <div className={ZoraCustomerProfileStyle.statLabel}>Processing</div>
+                  <div className={ZoraCustomerProfileStyle.statLabel}>{pt.statistics.order.processing}</div>
                   <div className={ZoraCustomerProfileStyle.statValue}>{customerProfile.processingOrders}</div>
                 </div>
                 <div className={ZoraCustomerProfileStyle.statItem}>
-                  <div className={ZoraCustomerProfileStyle.statLabel}>Shipped</div>
+                  <div className={ZoraCustomerProfileStyle.statLabel}>{pt.statistics.order.shipped}</div>
                   <div className={ZoraCustomerProfileStyle.statValue}>{customerProfile.shippedOrders}</div>
                 </div>
               </div>
@@ -204,39 +206,39 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
 
             {/* 消费统计 */}
             <div className={ZoraCustomerProfileStyle.detailSection}>
-              <h4 className={ZoraCustomerProfileStyle.detailTitle}>Spending Statistics</h4>
+              <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.statistics.spending.title}</h4>
               <div className={ZoraCustomerProfileStyle.detailItem}>
-                <span className={ZoraCustomerProfileStyle.detailLabel}>Total Spent:</span>
+                <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.statistics.spending.totalSpent}:</span>
                 <span className={ZoraCustomerProfileStyle.detailValue}>
                   {formatCurrency(customerProfile.totalSpent, customerProfile.currencyCode)}
                 </span>
               </div>
               <div className={ZoraCustomerProfileStyle.detailItem}>
-                <span className={ZoraCustomerProfileStyle.detailLabel}>Average Order Value:</span>
+                <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.statistics.spending.averageOrderValue}:</span>
                 <span className={ZoraCustomerProfileStyle.detailValue}>
                   {formatCurrency(customerProfile.averageOrderValue, customerProfile.currencyCode)}
                 </span>
               </div>
               {customerProfile.firstOrderDate && (
                 <div className={ZoraCustomerProfileStyle.detailItem}>
-                  <span className={ZoraCustomerProfileStyle.detailLabel}>First Order:</span>
+                  <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.statistics.spending.firstOrder}:</span>
                   <span className={ZoraCustomerProfileStyle.detailValue}>{formatDate(customerProfile.firstOrderDate)}</span>
                 </div>
               )}
               {customerProfile.lastOrderDate && (
                 <div className={ZoraCustomerProfileStyle.detailItem}>
-                  <span className={ZoraCustomerProfileStyle.detailLabel}>Last Order:</span>
+                  <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.statistics.spending.lastOrder}:</span>
                   <span className={ZoraCustomerProfileStyle.detailValue}>{formatDate(customerProfile.lastOrderDate)}</span>
                 </div>
               )}
               <div className={ZoraCustomerProfileStyle.detailItem}>
-                <span className={ZoraCustomerProfileStyle.detailLabel}>Days Since Last Order:</span>
-                <span className={ZoraCustomerProfileStyle.detailValue}>{customerProfile.daysSinceLastOrder} days</span>
+                <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.statistics.spending.daysSinceLastOrder}:</span>
+                <span className={ZoraCustomerProfileStyle.detailValue}>{customerProfile.daysSinceLastOrder} {pt.statistics.spending.days}</span>
               </div>
               {customerProfile.averageDaysBetweenOrders > 0 && (
                 <div className={ZoraCustomerProfileStyle.detailItem}>
-                  <span className={ZoraCustomerProfileStyle.detailLabel}>Avg Days Between Orders:</span>
-                  <span className={ZoraCustomerProfileStyle.detailValue}>{Math.round(customerProfile.averageDaysBetweenOrders)} days</span>
+                  <span className={ZoraCustomerProfileStyle.detailLabel}>{pt.statistics.spending.avgDaysBetweenOrders}:</span>
+                  <span className={ZoraCustomerProfileStyle.detailValue}>{Math.round(customerProfile.averageDaysBetweenOrders)} {pt.statistics.spending.days}</span>
                 </div>
               )}
             </div>
@@ -244,12 +246,12 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
             {/* 商品偏好 */}
             {customerProfile.topCategories.length > 0 && (
               <div className={ZoraCustomerProfileStyle.detailSection}>
-                <h4 className={ZoraCustomerProfileStyle.detailTitle}>Product Preferences</h4>
+                <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.statistics.preferences.title}</h4>
                 <div className={ZoraCustomerProfileStyle.categoriesList}>
                   {customerProfile.topCategories.map((category, index) => (
                     <div key={index} className={ZoraCustomerProfileStyle.categoryItem}>
                       <span className={ZoraCustomerProfileStyle.categoryName}>{category.category}</span>
-                      <span className={ZoraCustomerProfileStyle.categoryCount}>{category.count} items</span>
+                      <span className={ZoraCustomerProfileStyle.categoryCount}>{category.count} {pt.statistics.preferences.items}</span>
                     </div>
                   ))}
                 </div>
@@ -259,13 +261,13 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
             {/* 热门商品 */}
             {customerProfile.topProducts.length > 0 && (
               <div className={ZoraCustomerProfileStyle.detailSection}>
-                <h4 className={ZoraCustomerProfileStyle.detailTitle}>Top Products</h4>
+                <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.statistics.topProducts.title}</h4>
                 <div className={ZoraCustomerProfileStyle.productsList}>
                   {customerProfile.topProducts.map((product, index) => (
                     <div key={index} className={ZoraCustomerProfileStyle.productItem}>
                       <div className={ZoraCustomerProfileStyle.productTitle}>{product.title}</div>
                       <div className={ZoraCustomerProfileStyle.productStats}>
-                        <span>{product.count} orders</span>
+                        <span>{product.count} {pt.statistics.topProducts.orders}</span>
                         <span>{formatCurrency(product.totalSpent, customerProfile.currencyCode)}</span>
                       </div>
                     </div>
@@ -277,7 +279,7 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
             {/* 最近订单 */}
             {customerProfile.recentOrders.length > 0 && (
               <div className={ZoraCustomerProfileStyle.detailSection}>
-                <h4 className={ZoraCustomerProfileStyle.detailTitle}>Recent Orders</h4>
+                <h4 className={ZoraCustomerProfileStyle.detailTitle}>{pt.statistics.recentOrders.title}</h4>
                 <div className={ZoraCustomerProfileStyle.ordersList}>
                   {customerProfile.recentOrders.map((order, index) => (
                     <div key={index} className={ZoraCustomerProfileStyle.orderItem}>
@@ -289,7 +291,7 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
                       </div>
                       <div className={ZoraCustomerProfileStyle.orderDetails}>
                         <span>{formatDate(order.createdAt)}</span>
-                        <span>{order.itemCount} items</span>
+                        <span>{order.itemCount} {pt.statistics.recentOrders.items}</span>
                         <span>{formatCurrency(order.totalPrice, customerProfile.currencyCode)}</span>
                       </div>
                     </div>
@@ -302,13 +304,13 @@ const ZoraCustomerProfile: React.FC<ZoraCustomerProfileProps> = () => {
           {/* 快捷操作 */}
           <div className={ZoraCustomerProfileStyle.quickActions}>
             <button className={ZoraCustomerProfileStyle.actionButton}>
-              View Order History
+              {pt.actions.viewOrderHistory}
             </button>
             <button className={ZoraCustomerProfileStyle.actionButton}>
-              Send Product Recommendation
+              {pt.actions.sendProductRecommendation}
             </button>
             <button className={ZoraCustomerProfileStyle.actionButton}>
-              Create Ticket
+              {pt.actions.createTicket}
             </button>
           </div>
         </>
