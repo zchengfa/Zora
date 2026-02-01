@@ -15,11 +15,17 @@ export const shopifyApiClientInit = (shop:string) => {
   })
 }
 
-export const shopifyCustomerStaffInit = (query:string,email:string,shopOwnerName:string)=>{
+export const shopifyCustomerStaffInit = (query:string,email:string,shopOwnerName:string,shopDomain:string)=>{
   return Post({
     url:`/shopifyCustomerStaffInit${query}`,
     data:{
-      email,shopOwnerName
+      email,shopOwnerName,shopDomain
     }
+  })
+}
+
+export const getChatList = (agentId: string) => {
+  return Get({
+    url: `/chatList?agentId=${agentId}`,
   })
 }

@@ -1,4 +1,4 @@
-
+import {useAppTranslation} from "@hooks/useAppTranslation.ts"
 import React, { useEffect } from 'react';
 import ZoraUniversalModalStyle from '@styles/componentStyles/ZoraUniversalModal.module.scss'
 
@@ -22,18 +22,20 @@ interface ZoraUniversalModalProps {
  const ZoraUniversalModal:React.FC<ZoraUniversalModalProps> = ({
                                  isOpen,
                                  onClose,
-                                 title = "提示",
+                                 title,
                                  content,
                                  type = 'default',
-                                 confirmationText = "您确定要执行此操作吗？",
-                                 successText = "操作成功！",
-                                 errorText = "操作失败，请重试。",
-                                 cancelButtonText = "关闭", confirmButtonText = "确定",
+                                 confirmationText,
+                                 successText,
+                                 errorText,
+                                 cancelButtonText, confirmButtonText,
                                  onConfirm,
                                  confirmLoading = false,
                                  width = '400px',
                                  showCloseButton = true
                                }) => {
+   const { translation } = useAppTranslation();
+   const modalTranslation = translation.components.modal
 
   // 阻止背景滚动
   useEffect(() => {
@@ -70,19 +72,19 @@ interface ZoraUniversalModalProps {
   const renderContent = () => {
     switch (type) {
       case 'confirmation':
-        return <div className={ZoraUniversalModalStyle.modalConfirmationText}>{confirmationText}</div>;
+        return <div className={ZoraUniversalModalStyle.modalConfirmationText}>{confirmationText || modalTranslation.default.confirmationText}</div>;
       case 'success':
         return (
           <div className={ZoraUniversalModalStyle.modalSuccessContent}>
             <div className={ZoraUniversalModalStyle.modalIcon}>✓</div>
-            <div className={ZoraUniversalModalStyle.modalSuccessText}>{successText}</div>
+            <div className={ZoraUniversalModalStyle.modalSuccessText}>{successText || modalTranslation.default.successText}</div>
           </div>
         );
       case 'error':
         return (
           <div className={ZoraUniversalModalStyle.modalErrorContent}>
             <div className={ZoraUniversalModalStyle.modalIcon}>✕</div>
-            <div className={ZoraUniversalModalStyle.modalErrorText}>{errorText}</div>
+            <div className={ZoraUniversalModalStyle.modalErrorText}>{errorText || modalTranslation.default.errorText}</div>
           </div>
         );
       default:
@@ -107,7 +109,7 @@ interface ZoraUniversalModalProps {
               onClick={onConfirm}
               disabled={confirmLoading}
             >
-              {confirmLoading ? '处理中...' : confirmButtonText}
+              {confirmLoading ? translation.components.modal.loading : (confirmButtonText || modalTranslation.default.confirmButtonText)}
             </button>
           </div>
         );
@@ -116,7 +118,7 @@ interface ZoraUniversalModalProps {
         return (
           <div className={ZoraUniversalModalStyle.modalFooter}>
             <button className={`${ZoraUniversalModalStyle.modalBtn} ${ZoraUniversalModalStyle.modalBtnPrimary}`} onClick={onClose}>
-              {cancelButtonText}
+              {cancelButtonText || modalTranslation.default.cancelButtonText}
             </button>
           </div>
         );
@@ -124,7 +126,7 @@ interface ZoraUniversalModalProps {
         return (
           <div className={ZoraUniversalModalStyle.modalFooter}>
             <button className={`${ZoraUniversalModalStyle.modalBtn} ${ZoraUniversalModalStyle.modalBtnPrimary}`} onClick={onClose}>
-              {cancelButtonText}
+              {cancelButtonText || modalTranslation.default.cancelButtonText}
             </button>
           </div>
         );
@@ -144,12 +146,12 @@ interface ZoraUniversalModalProps {
       >
         {/* 头部 */}
         <div className={ZoraUniversalModalStyle.modalHeader}>
-          <h3 id="modal-title" className={ZoraUniversalModalStyle.modalTitle}>{title}</h3>
+          <h3 id="modal-title" className={ZoraUniversalModalStyle.modalTitle}>{title || modalTranslation.default.title}</h3>
           {showCloseButton && (
             <button
               className={ZoraUniversalModalStyle.modalCloseBtn}
               onClick={onClose}
-              aria-label="关闭弹窗"
+              aria-label={modalTranslation.ariaLabel}
             >
               ×
             </button>

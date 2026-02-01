@@ -7,20 +7,12 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    padding: .5rem;
     width: 100%;
     height: 100%;
     overflow-y: scroll;
   }
   .emptyMessageDiv{
-    //position: relative;
-    //top: 50%;
-    //left: 50%;
-    //width: fit-content;
-    //background-color: var(--z-color-primary-light);
-    //color: var(--z-color-text);
-    //padding: var(--z-primary_padding);
-    //border-radius: calc(var(--z-primary_border_radius) /2);
-    //transform: translateX(-50%) translateY(-50%);
     width: 100%;
     height: 100%;
   }

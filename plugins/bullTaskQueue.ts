@@ -64,7 +64,7 @@ export const beginLogger = async ({level,message,meta}:{level:'debug'|'info'|'wa
 /**
  * 离线消息推送队列
  */
-export const offlineMessageQueue = new Queue('offlineMessageQueue',{
+export const messageQueue = new Queue('offlineMessageQueue',{
   connection: redisClient,
   defaultJobOptions:{
     removeOnComplete: 10,
@@ -80,7 +80,7 @@ export const offlineMessageQueue = new Queue('offlineMessageQueue',{
  * @returns 任务ID
  */
 export const addOfflineMessageJob = async (data:any) => {
-  const job = await offlineMessageQueue.add('pushOfflineMessage', {
+  const job = await messageQueue.add('pushOfflineMessage', {
     ...data,
     timestamp: data.timestamp || new Date().toISOString(),
   }, {
@@ -96,6 +96,37 @@ export const addOfflineMessageJob = async (data:any) => {
       taskType: 'create_offline_message_job',
       userId: data.userId,
       messageType: data.messageType,
+    }
+  });
+
+  return job.id;
+}
+
+/**
+ * 添加消息状态更新任务
+ * @param data 消息状态数据
+ * @returns 任务ID
+ */
+export const addMessageStatusUpdateJob = async (data: {
+  msgId: string;
+  conversationId: string;
+  msgStatus: 'SENT' | 'DELIVERED' | 'FAILED' | 'READ' | 'UNREAD';
+}) => {
+  const job = await messageQueue.add('updateMessageStatus', {
+    ...data,
+    timestamp: new Date().toISOString(),
+  }, {
+    attempts: 3,
+    backoff: {type: 'exponential', delay: 2000},
+    removeOnComplete: 10,
+    removeOnFail: 100,
+  });
+
+  logger.info(`已创建消息状态更新任务，任务：${job.id}，消息ID：${data.msgId}，状态：${data.msgStatus}`, {
+    meta: {
+      taskType: 'create_message_status_update_job',
+      msgId: data.msgId,
+      msgStatus: data.msgStatus,
     }
   });
 

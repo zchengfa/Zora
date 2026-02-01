@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NotificationConfig,NotificationType } from '@types';
 import ZoraNotificationStyle from '@styles/componentStyles/ZoraNotification.module.scss';
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 interface ZoraNotificationProps extends NotificationConfig {
   /** 关闭通知 */
@@ -35,6 +36,8 @@ const ZoraNotification: React.FC<ZoraNotificationProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
+  const {translation} = useAppTranslation();
+  const nt = translation.components.notification;
 
   // 自动关闭逻辑
   useEffect(() => {
@@ -104,7 +107,7 @@ const ZoraNotification: React.FC<ZoraNotificationProps> = ({
               e.stopPropagation();
               handleClose();
             }}
-            aria-label="关闭通知"
+            aria-label={nt.ariaLabel}
           >
             ×
           </button>

@@ -3,6 +3,93 @@ const zoraResponse = new ZoraResponse(document.querySelector('.zora-main').datas
 const zoraToast = new ZoraToast()
 const renderMessage = new RenderMessage()
 
+// 未读消息计数
+let unreadMessageCount = 0
+
+// 更新未读消息计数显示
+function updateUnreadCount(count) {
+  unreadMessageCount = count
+  const indicator = document.querySelector('.zora-new-message-indicator')
+  if (indicator) {
+    if (count > 0) {
+      indicator.classList.remove('hidden')
+      // 如果数量大于99，显示99+
+      indicator.textContent = count > 99 ? '99+' : count
+      // 调整indicator样式以显示数字
+      indicator.style.width = count > 9 ? '1rem' : '.8rem'
+      indicator.style.height = count > 9 ? '1rem' : '.8rem'
+    } else {
+      indicator.classList.add('hidden')
+      indicator.textContent = ''
+    }
+  }
+}
+
+function markMessagesAsRead() {
+  const conversationId = sessionStorage.getItem('zora_conversation_id');
+  if (!conversationId) return;
+
+  // 获取所有客服发送的消息
+  const messageItems = document.querySelectorAll('.zora-message-item[data-msg-unique]');
+  const agentMessages = [];
+
+  messageItems.forEach(item => {
+    const msgId = item.getAttribute('data-msg-unique');
+    const isAgentMessage = item.classList.contains('zora-message-left');
+    if (isAgentMessage && msgId) {
+      agentMessages.push(msgId);
+    }
+  });
+  if (agentMessages.length > 0) {
+    // 获取最新的客服消息ID
+    const latestAgentMsgId = agentMessages[agentMessages.length - 1];
+
+    // 发送批量消息已读请求到后端
+    socket.emit('mark_messages_as_read', {
+      conversationId: conversationId,
+      msgId: latestAgentMsgId,
+      senderType: 'AGENT',
+      msgStatus: 'READ',
+      readAllBefore: true
+    });
+  }
+}
+
+// 请求最新消息状态
+function requestLatestMessageStatus() {
+  const conversationId = sessionStorage.getItem('zora_conversation_id');
+  if (!conversationId) return;
+
+  // 获取所有客户发送的消息
+  const messageItems = document.querySelectorAll('.zora-message-item[data-msg-unique]');
+  const unreadCustomerMessages = [];
+
+  messageItems.forEach(item => {
+    const msgId = item.getAttribute('data-msg-unique');
+    const isCustomerMessage = item.classList.contains('zora-message-right');
+    const msgStatus = item.getAttribute('data-status');
+
+    // 只处理客户发送的消息
+    if (isCustomerMessage && msgId) {
+      // 检查消息状态是否为未读（DELIVERED或SENT状态）
+      const isUnread = msgStatus === 'DELIVERED' || msgStatus === 'SENT';
+
+      // 只有未被读取的消息才需要更新状态
+      if (isUnread) {
+        unreadCustomerMessages.push(msgId);
+      }
+    }
+  });
+
+  if (unreadCustomerMessages.length > 0) {
+    // 发送请求获取这些未读消息的最新状态
+    socket.emit('get_message_status', {
+      conversationId: conversationId,
+      msgIds: unreadCustomerMessages
+    });
+  }
+}
+
 // 聊天盒自定义组件
 if(!customElements.get('zora-button')){
     class ZoraButton extends HTMLElement {
@@ -24,9 +111,17 @@ if(!customElements.get('zora-button')){
                this.defaultBtnEl.className = 'zora-default-btn-box btn-box-hidden'
                this.activeBtnEl.className = 'zora-active-btn-box'
                document.querySelector('.' + this.dataset.targetClass).className = this.dataset.activeClass
+               // 打开聊天窗口时，清除未读消息指示器
+               updateUnreadCount(0)
+              //打开内容盒子后，判断当前是否已登录，并且聊天窗口是否处于激活状态，满足条件即可进行发送消息已读回执
+              if(sessionStorage.getItem('zora_token') && document.querySelector('.zora-message-box-active')){
+                markMessagesAsRead()
+                // 请求最新消息状态
+                requestLatestMessageStatus()
+              }
             }
             else{
-               bodyEl.style.overflow = 'scroll'
+               bodyEl.style.overflowY = 'scroll'
                this.defaultBtnEl.className = 'zora-default-btn-box'
                this.activeBtnEl.className = 'zora-active-btn-box btn-box-hidden'
                document.querySelector('.' + this.dataset.activeClass).className = this.dataset.targetClass
@@ -76,7 +171,7 @@ if(!customElements.get('zora-input-component')){
             //监听键盘是否按下enter键
             if(e.keyCode == 13){
                 console.log(this.msg)
-                //发送消息（待开发）
+                //TODO:发送消息（待开发）
                 //清空输入框内容
                 this.inputEl.value = ''
                 this.msg = ''
@@ -131,11 +226,15 @@ if(!customElements.get('zora-chat-btn-component')){
             document.querySelector('.'+ this.dataset.header).classList.add('hidden')
             //显示返回元素
             document.querySelector('.'+ this.dataset.headerActive).classList.remove('hidden')
+
+            // 发送消息已读请求
+            markMessagesAsRead()
           }
           else{
             this.showAuthBox()
           }
         }
+
         showAuthBox = () =>{
             document.querySelector('.'+ this.dataset.container).classList.add('hidden')
             document.querySelector('.'+ this.dataset.authContainer).classList.remove('hidden')
@@ -316,6 +415,11 @@ if(!customElements.get('zora-auth-form-component')){
         sessionStorage.setItem(ZORA_TOKEN, token)
         sessionStorage.setItem('zora_userInfo',JSON.stringify(info))
         socket.emit('online',JSON.stringify(info))
+        // 发送获取未读消息的事件
+        socket.emit('get_unread_messages', {
+          userId: info.userId,
+          shop: info.shop
+        });
         this.querySelector('#zora-auth-form').reset()
         document.querySelector('.zora-auth-container').classList.add('hidden')
         document.querySelector('.zora-container-active').classList.remove('hidden')
@@ -750,5 +854,22 @@ if(!customElements.get('zora-send-component')){
   }
 
   customElements.define('zora-send-component', ZoraSendComponent);
+}
+
+/**
+ * 气泡框
+ */
+if(!customElements.get('zora-bubble')){
+  customElements.define('zora-bubble', class extends HTMLElement {
+    constructor(){
+      super();
+      this.close = this.querySelector(`.${this.dataset['close']}`)
+      this.container = this.querySelector(`.${this.dataset['container']}`)
+      this.close.addEventListener('click',this.closeBubble)
+    }
+    closeBubble = ()=>{
+      this.container.classList.add('hidden')
+    }
+  })
 }
 

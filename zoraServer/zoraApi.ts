@@ -1,5 +1,5 @@
 import type {Express, Response} from "express-serve-static-core"
-import {RegexEmail, validate, validateRequestSender,hashCode,validateHashCode} from "../plugins/validate.ts";
+import {hashCode, RegexEmail, validate, validateHashCode, validateRequestSender} from "../plugins/validate.ts";
 import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
@@ -7,10 +7,11 @@ import bcrypt from 'bcrypt';
 import {handleApiError, handlePrismaError} from "../plugins/handleZoraError.ts";
 import {v4 as uuidv4} from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
-import {executeShopifyId, shopifyHandleResponseData} from "../plugins/shopifyUtils.ts";
 import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
+import {executeShopifyId, shopifyHandleResponseData} from "../plugins/shopifyUtils.ts";
 import {addShopifySyncDataJob, beginLogger} from "../plugins/bullTaskQueue.ts";
 import type {GraphqlCustomerCreateMutationResponse, GraphqlMutationVariables} from "../plugins/shopifyMutation.ts";
+import {generateCustomerProfile} from "../plugins/customerProfile.ts";
 
 interface ZoraApiType {
   app:Express,
@@ -84,7 +85,7 @@ const loginAuth = async ({prisma,paramsObj,shopifyApiClientsManager,redis,res}:{
 
   try{
     const {shop} = await shopifyApiClient.shop()
-    agentInfo = await prisma.customerServiceStaff.findUnique({
+    agentInfo = await prisma.staffProfile.findFirst({
       where: {
         email: shop.email
       },
@@ -552,35 +553,60 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     })
 
   app.post('/shopifyCustomerStaffInit',async (req, res) => {
-    const {email,shopOwnerName} = req.body
-    if(!email || !shopOwnerName){
+    const {email,shopOwnerName,shopDomain} = req.body
+
+    if(!email || !shopOwnerName || !shopDomain){
       return res.status(400).json({errMsg:'missing required parameters'})
     }
     try{
-      const prismaSelect = {
-        id: true,
-        email: true,
-        avatarUrl: true,
-        name: true,
-      }
-      const prismaQuery = await prisma.customerServiceStaff.findUnique({
-        where:{
-          email:email,
-        },
-        select:prismaSelect
+      // 查询商店信息
+      const shop = await prisma.shop.findUnique({
+        where: {
+          shopify_domain: shopDomain
+        }
       })
-      if(!prismaQuery){
-        const prismaCreate = await prisma.customerServiceStaff.create({
-          data:{
+
+      if(!shop){
+        return res.status(404).json({errMsg:'shop not found'})
+      }
+
+      // 查询商店下的所有客户
+      const customers = await prisma.customers.findMany({
+        where: {
+          shop_id:shop.id
+        }
+      })
+
+      if(!customers || customers.length === 0){
+        return res.status(404).json({errMsg:'customer not found'})
+      }
+
+      // 查询是否已存在该email的客服资料
+      let staffProfile = await prisma.staffProfile.findFirst({
+        where: {
+          email: email
+        }
+      })
+
+      // 如果不存在，创建新的客服资料
+      if(!staffProfile){
+        staffProfile = await prisma.staffProfile.create({
+          data: {
             name: shopOwnerName,
             email: email,
-            avatarUrl: process.env.AGENT_DEFAULT_AVATAR,
-          },
-          select:prismaSelect
+            avatarUrl: process.env.AGENT_DEFAULT_AVATAR
+          }
         })
-        return res.json(prismaCreate)
       }
-      res.json(prismaQuery)
+
+      // 在新模型中，我们不再需要创建客服关联，直接返回客服资料信息
+      const result = {
+        id: staffProfile.id,
+        email: staffProfile.email,
+        avatarUrl: staffProfile.avatarUrl,
+        name: staffProfile.name
+      }
+      res.status(200).json(result)
     }
     catch (e) {
       handleApiError(req, e)
@@ -588,4 +614,103 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     }
 
   })
+
+  // 获取客服的聊天列表
+  app.get('/chatList', async (req, res) => {
+    try {
+      const { agentId } = req.query;
+
+      if (!agentId || typeof agentId !== 'string') {
+        return res.status(400).json({ error: '缺少agentId参数' });
+      }
+
+      // 获取客服信息以获取shop
+      const agent = await prisma.staffProfile.findUnique({
+        where: { id: agentId }
+      });
+
+      if (!agent) {
+        return res.status(404).json({ error: '客服不存在' });
+      }
+
+      // 查询该客服的聊天列表
+      const chatListItems = await prisma.chatListItem.findMany({
+        where: {
+          agentId: agentId,
+        },
+        orderBy: {
+          lastTimestamp: 'desc'
+        }
+      });
+
+      // 转换为前端需要的格式，并获取每个对话的部分消息
+      const chatList = await Promise.all(chatListItems.map(async item => {
+        // 获取该对话的最新10条消息
+        const messages = await prisma.message.findMany({
+          where: {
+            conversationId: item.conversationId
+          },
+          orderBy: {
+            timestamp: 'desc'
+          },
+          take: 10
+        });
+
+        // 获取该客服的离线消息列表（用于过滤）
+        const offlineMessages = await prisma.offlineMessage.findMany({
+          where: {
+            conversationId: item.conversationId,
+            isDelivered: false
+          },
+          select: {
+            msgId: true
+          }
+        });
+
+        // 创建离线消息ID的集合，用于快速查找
+        const offlineMsgIdSet = new Set(offlineMessages.map(msg => msg.msgId));
+
+        // 转换消息格式，并过滤掉存在于离线消息表中的消息
+        const formattedMessages = messages
+          .filter(msg => !offlineMsgIdSet.has(msg.msgId))
+          .map(msg => ({
+            contentBody: msg.contentBody,
+            contentType: msg.contentType,
+            conversationId: msg.conversationId,
+            msgId: msg.msgId,
+            msgStatus: msg.msgStatus,
+            recipientType: msg.recipientType,
+            recipientId: msg.recipientId,
+            senderId: msg.senderId,
+            senderType: msg.senderType,
+            timestamp: msg.timestamp.getTime()
+          }));
+
+        // 获取客户画像
+        const customerProfile = await generateCustomerProfile(prisma, item.customerId);
+
+        return {
+          id: item.customerId,
+          firstName: item.customerFirstName,
+          lastName: item.customerLastName,
+          avatar: item.customerAvatar,
+          isOnline: item.isOnline,
+          lastMessage: item.lastMessage,
+          lastTimestamp: item.lastTimestamp?.getTime() || 0,
+          hadRead: item.hadRead,
+          isActive: item.isActive,
+          unreadMessageCount: item.unreadMessageCount,
+          conversationId: item.conversationId,
+          messages: formattedMessages.reverse(), // 按时间正序排列
+          customerProfile // 添加客户画像信息
+        };
+      }));
+
+      res.json({ chatList });
+    } catch (error) {
+      handleApiError(req, error);
+      handlePrismaError(error);
+      res.status(500).json({ error: '服务器错误' });
+    }
+  });
 }

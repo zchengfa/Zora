@@ -1,5 +1,4 @@
 import ZoraLoadingStyle from "@styles/componentStyles/ZoraMessageItem.module.scss";
-import React from "react";
 
 const ZoraLoading = ()=> {
   return <svg className={'icon' + ' ' + ZoraLoadingStyle.loadingIcon + ' ' + ZoraLoadingStyle.loading}

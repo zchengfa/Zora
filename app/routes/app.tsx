@@ -2,6 +2,9 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
+import {useAppBridge} from "@shopify/app-bridge-react";
+import { AppProvider as PolarisAppProvider } from "@shopify/polaris"
+import en from "@shopify/polaris/locales/en.json"
 import { authenticate } from "@/shopify.server.ts";
 import ZoraModalProvider from "@/contexts/ZoraModalProvider.tsx";
 import ZoraNotificationProvider from "@/contexts/ZoraNotificationProvider.tsx";
@@ -24,9 +27,13 @@ function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   const { socket } = useSocketService()
 
-  const {customerStaff} = useMessageStore()
+  const appBridge = useAppBridge()
+
+
+  const {customerStaff, chatList, activeCustomerItem} = useMessageStore()
 
   useEffect(() => {
+    const locale = appBridge.config.locale
     //设置主题
     const setTheme = ()=>{
       const theme = localStorage.getItem('zora_application_theme') || 'light'
@@ -38,16 +45,23 @@ function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      socket.emit('offline',{id:customerStaff.id})
+      // 通过socket发送下线通知
+      socket.emit('offline',{
+        id: customerStaff.id,
+        chatList: chatList,
+        activeCustomerItem: activeCustomerItem
+      })
     }
+
 // 处理 iframe 被卸载（在 Shopify Admin 内切换页面）
     const handleUnload = () => {
       const logoutData = new Blob([JSON.stringify({
         agent: customerStaff?.id,
-        action: 'offline_via_unload'
+        action: 'offline_via_unload',
+        chatList: chatList,
+        activeCustomerItem: activeCustomerItem
       })], { type: 'application/json' });
       navigator.sendBeacon(`${import.meta.env.VITE_BASE_URL}/api/agent-offline`, logoutData);
-
     };
 
     window.addEventListener('unload', handleUnload);
@@ -57,22 +71,23 @@ function App() {
       // 清理时移除两个事件的监听
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('unload', handleUnload);
-
     };
 
-  },[socket,customerStaff])
+  },[socket,customerStaff,chatList,activeCustomerItem])
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      <s-app-nav>
-        <s-link href="/app">Chat</s-link>
-        <s-link href="/app/settings">Settings</s-link>
-      </s-app-nav>
-      <ZoraModalProvider>
-        <ZoraNotificationProvider>
-          <Outlet/>
-        </ZoraNotificationProvider>
-      </ZoraModalProvider>
+      <PolarisAppProvider i18n={en}>
+        <s-app-nav>
+          <s-link href="/app">Chat</s-link>
+          <s-link href="/app/settings">Settings</s-link>
+        </s-app-nav>
+        <ZoraModalProvider>
+          <ZoraNotificationProvider>
+            <Outlet/>
+          </ZoraNotificationProvider>
+        </ZoraModalProvider>
+      </PolarisAppProvider>
     </AppProvider>
   );
 }

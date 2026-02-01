@@ -1,6 +1,5 @@
-import {openDB, getDataByCursorIndex, insertDataToDB, updateDB} from "@/indexedDB/indexedDB.ts";
+import {openDB, getDataByCursorIndex, insertDataToDB, updateDB, updateBatchDB} from "@/indexedDB/indexedDB.ts";
 import {MessageDataType} from "@Utils/socket.ts";
-import {data} from "react-router";
 
 const INDEXED_DB_STORE_NAME='zora_chat'
 
@@ -33,4 +32,9 @@ export const readMessagesFromIndexedDB = async (options:{page:number,pageSize:nu
 export const syncMessageToIndexedDB = async (data:MessageDataType)=>{
   const {db} = await initIndexedDB() as {db:IDBDatabase}
   return updateDB(db,INDEXED_DB_STORE_NAME,data)
+}
+
+export const syncMessagesBatchToIndexedDB = async (dataList:MessageDataType[])=>{
+  const {db} = await initIndexedDB() as {db:IDBDatabase}
+  return updateBatchDB(db,INDEXED_DB_STORE_NAME,dataList)
 }

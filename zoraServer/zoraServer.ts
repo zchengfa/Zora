@@ -41,9 +41,23 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
 
-app.post('/api/agent-offline', (req, res) => {
-  SocketUtils.manualOffline(req.body.agent);
-  res.status(200).json('success');
+app.post('/api/agent-offline', async (req, res) => {
+  try {
+    const { agent, action, chatList, activeCustomerItem } = req.body;
+
+    // 将客服标记为离线
+    SocketUtils.manualOffline(agent);
+
+    // 如果有聊天列表数据，保存到数据库
+    if (chatList.length && Array.isArray(chatList)) {
+      await SocketUtils.saveChatList(agent, chatList, activeCustomerItem);
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('保存聊天列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.use(async (req,res,next)=> {
@@ -148,31 +162,3 @@ const checkWorkerHealth = async ()=>{
 // 检测worker是否开启
 checkWorkerHealth().then();
 
-// 优雅关闭时停止所有健康检查
-process.on('SIGTERM', async () => {
-  workerHealthChecks.forEach((healthCheck, name) => {
-    healthCheck.stopHealthCheck();
-    beginLogger({
-      level: 'info',
-      message: `已停止${name} worker的健康检查`,
-      meta:{
-        taskType: 'worker_health_check_stop',
-        worker: name
-      }
-    }).then();
-  });
-});
-
-process.on('SIGINT', async () => {
-  workerHealthChecks.forEach((healthCheck, name) => {
-    healthCheck.stopHealthCheck();
-    beginLogger({
-      level: 'info',
-      message: `已停止${name} worker的健康检查`,
-      meta:{
-        taskType: 'worker_health_check_stop',
-        worker: name
-      }
-    }).then();
-  });
-});
