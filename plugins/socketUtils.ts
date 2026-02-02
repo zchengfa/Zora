@@ -1,7 +1,9 @@
 import type {Redis} from "ioredis";
 import {$Enums, PrismaClient} from "@prisma/client";
 import {Server, Socket} from "socket.io";
-import {addMessageStatusUpdateJob, beginLogger} from "./bullTaskQueue.ts";
+import {addMessageStatusUpdateJob, beginLogger,addOfflineMessageJob} from "./bullTaskQueue.ts";
+// 导入AI相关模块
+import { chatWithAI } from './openAI.ts';
 
 interface SocketUtilConfigType {
   redis: Redis;
@@ -575,7 +577,7 @@ export class SocketUtils{
           }
         });
 
-        // 获取该用户的未读消息（仅DELIVERED状态且发送者为AGENT的消息）
+        // 获取该用户的未读消息（DELIVERED和SENT状态且发送者为AGENT的消息）
         const unreadMessages = await this.config.prisma.message.findMany({
           where: {
             conversationId: {
@@ -588,7 +590,9 @@ export class SocketUtils{
               }).then(convs => convs.map(c => c.id))
             },
             senderType: 'AGENT',
-            msgStatus: 'DELIVERED'
+            msgStatus: {
+              in: ['DELIVERED','SENT']
+            }
           },
           orderBy: {
             timestamp: 'asc'
@@ -596,6 +600,7 @@ export class SocketUtils{
           take: 100 // 最多返回100条未读消息
         });
 
+        if (!unreadMessages.length) return;
         // 发送未读消息列表给客户端
         this.ws.emit('unread_messages', {
           messages: unreadMessages,
@@ -697,7 +702,6 @@ export class SocketUtils{
       }
 
       // 添加离线消息推送任务到队列
-      const { addOfflineMessageJob } = await import("./bullTaskQueue.ts");
       await addOfflineMessageJob({
         userId: userId,
         messageType: 'system',
@@ -933,6 +937,80 @@ export class SocketUtils{
       }
     })
   }
+  public socketOnAskAi = ()=>{
+    //处理AI问答请求
+    this.ws.on('askAi', async (data) => {
+      try {
+        const { prompt, conversationId, template, tone } = data;
+
+        if (!prompt) {
+          await beginLogger({
+            level: 'warning',
+            message: `收到无效的AI问答请求`,
+            meta: {
+              taskType: 'askAi',
+              data
+            }
+          });
+          return;
+        }
+
+        // 构建提示词工程选项
+        const promptEngineerOptions: any = {};
+        if (template) {
+          promptEngineerOptions.template = template;
+        }
+        if (tone) {
+          promptEngineerOptions.tone = tone;
+        }
+
+        // 调用AI获取回答
+        const aiResponse = await chatWithAI(prompt, {
+          promptEngineerOptions,
+          enableTools: false
+        });
+
+        // 发送AI响应回客户端
+        this.ws.emit('ai_response', {
+          conversationId,
+          response: aiResponse,
+          timestamp: new Date().toISOString()
+        });
+
+        await beginLogger({
+          level: 'info',
+          message: `成功处理AI问答请求`,
+          meta: {
+            taskType: 'askAi',
+            conversationId,
+            template,
+            tone
+          }
+        });
+      } catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `处理AI问答请求失败`,
+          meta: {
+            taskType: 'askAi',
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
+          }
+        });
+
+        // 发送错误响应回客户端
+        this.ws.emit('ai_error', {
+          conversationId: data.conversationId,
+          error: 'AI服务暂时不可用，请稍后再试',
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+  }
+
   public socketUserOffline = ()=>{
     this.ws.on('offline',async ({id}:{id:string})=>{
       //用户或客服下线
