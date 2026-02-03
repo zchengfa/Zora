@@ -8,7 +8,7 @@ import ZoraChat from "@components/ZoraChat.tsx";
 import ZoraCustomerProfile from "@components/ZoraCustomerProfile.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
 import {useSocketNotification} from "@hooks/useSocketNotification.ts";
-import {useEffect} from "react";
+import {useEffect, useState} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {shopifyRequestUserInfo,shopifyCustomerStaffInit,getChatList} from "@/network/request.ts";
 import {SHOP_INFO_QUERY_GQL,PRODUCTS_QUERY_GQL} from "@Utils/graphql.ts";
@@ -20,6 +20,9 @@ import {
   syncMessageToIndexedDB
 } from "@Utils/zustandWithIndexedDB.ts";
 import {useAppTranslation} from "@hooks/useAppTranslation.ts";
+import ZoraAIChatButton from "@components/ZoraAIChatButton.tsx";
+import ZoraAIChat from "@components/ZoraAIChat.tsx";
+import ZoraOnlineStatus from "@components/ZoraOnlineStatus.tsx";
 
 export const loader = async ({request}:LoaderFunctionArgs)=>{
   const {admin} = await authenticate.admin(request)
@@ -246,20 +249,63 @@ function Index(){
       messageStore
     })
   }
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'list' | 'chat' | 'profile'>('chat');
+
+  const toggleAIChat = () => {
+    setIsAIChatOpen(!isAIChatOpen);
+  };
+
   return <div className={indexStyle.container}>
     <div className={indexStyle.content}>
       <div className={indexStyle.statusBox}>
-        <span className={indexStyle.tipSpan}>{ct.status}:</span>
-        <div className={indexStyle.tipBox}>
-          <span className={indexStyle.status}>{ct.status}</span>
-        </div>
+        <button 
+          className={`${indexStyle.viewToggle} ${activeView === 'list' ? indexStyle.active : ''}`}
+          onTouchEnd={() => setActiveView('list')}
+          onClick={() => setActiveView('list')}
+          aria-label="切换到客户列表"
+        >
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="currentColor"/>
+          </svg>
+        </button>
+        <button 
+          className={`${indexStyle.viewToggle} ${activeView === 'chat' ? indexStyle.active : ''}`}
+          onTouchEnd={() => setActiveView('chat')}
+          onClick={() => setActiveView('chat')}
+          aria-label="切换到聊天"
+        >
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/>
+          </svg>
+        </button>
+        <button 
+          className={`${indexStyle.viewToggle} ${activeView === 'profile' ? indexStyle.active : ''}`}
+          onTouchEnd={() => setActiveView('profile')}
+          onClick={() => setActiveView('profile')}
+          aria-label="切换到客户资料"
+        >
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/>
+          </svg>
+        </button>
+        <ZoraAIChatButton 
+          onTouchEnd={toggleAIChat}
+          onClick={toggleAIChat}
+        />
+        <ZoraOnlineStatus isOnline={true} />
       </div>
       <div className={indexStyle.chatContent}>
         <h3 className={indexStyle.chatTitle}>{ct.title}</h3>
         <div className={indexStyle.chatBox}>
-          <div className={indexStyle.chatLeft}>
+          <div className={`${indexStyle.chatLeft} ${activeView !== 'list' ? indexStyle.hidden : ''}`}>
             <ZoraSearch placeholder={ct.searchPlaceholder}></ZoraSearch>
-            <ZoraCustomerList customerData={messageStore.chatList} ItemClick={customerItemClick}></ZoraCustomerList>
+            <ZoraCustomerList 
+              customerData={messageStore.chatList} 
+              ItemClick={customerItemClick}
+              activeView={activeView}
+              setActiveView={setActiveView}
+            ></ZoraCustomerList>
           </div>
           <div className={indexStyle.chatMiddle}>
             <ZoraMessageItems messageData={messageStore.messages}></ZoraMessageItems>
@@ -267,12 +313,16 @@ function Index(){
               messageStore.messages.length || messageStore.activeCustomerItem ? <ZoraChat sendMessage={sendMsg}></ZoraChat> : null
             }
           </div>
-          <div className={indexStyle.chatRight}>
-              <ZoraCustomerProfile></ZoraCustomerProfile>
-            </div>
+          <div className={`${indexStyle.chatRight} ${activeView === 'profile' ? indexStyle.visible : ''}`}>
+            <ZoraCustomerProfile></ZoraCustomerProfile>
+          </div>
         </div>
       </div>
     </div>
+    <ZoraAIChat 
+      isOpen={isAIChatOpen}
+      onToggle={toggleAIChat}
+    />
   </div>
 }
 

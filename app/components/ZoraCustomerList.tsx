@@ -7,16 +7,22 @@ import ZoraEmpty from "@components/common/ZoraEmpty.tsx";
 
 interface ZoraCustomerListProps {
   customerData: CustomerDataType[],
-  ItemClick:(conversationId:string)=> void
+  ItemClick:(conversationId:string)=> void,
+  activeView?: 'list' | 'chat' | 'profile',
+  setActiveView?: (view: 'list' | 'chat' | 'profile') => void
 }
 
 
 const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
-  {customerData,ItemClick}
+  {customerData,ItemClick,activeView,setActiveView}
 ) => {
 
   const handlerClick = (conversationId:string)=>{
     ItemClick(conversationId)
+    // 在移动端，点击客户列表项后切换到聊天视图
+    if (activeView && setActiveView && window.innerWidth <= 768) {
+      setActiveView('chat')
+    }
   }
 
   return <div className={ZoraCustomerListStyle.container}>
@@ -25,7 +31,14 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
         <div className={ZoraCustomerListStyle.customerList}>
           {
             customerData?.map((item: CustomerDataType) => {
-              return <div onClick={()=> handlerClick(item.conversationId)} className={item.isActive ? ZoraCustomerListStyle.customerItem + ' ' + ZoraCustomerListStyle.active : ZoraCustomerListStyle.customerItem} key={item.conversationId}>
+              return <div 
+                onTouchEnd={(e) => {
+                  e.preventDefault()
+                  handlerClick(item.conversationId)
+                }}
+                onClick={()=> handlerClick(item.conversationId)}
+                className={item.isActive ? ZoraCustomerListStyle.customerItem + ' ' + ZoraCustomerListStyle.active : ZoraCustomerListStyle.customerItem}
+                key={item.conversationId}>
                 <div className={item.isOnline ? ZoraCustomerListStyle.leftBox + ' '+ ZoraCustomerListStyle.onlineTip  :  ZoraCustomerListStyle.leftBox}>
                   {
                     item.avatar ? <img className={ZoraCustomerListStyle.avatar} src={item.avatar} alt="avatar" />

@@ -80,3 +80,24 @@ div::-webkit-scrollbar{
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+// 响应式设计
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
+  input {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 13px;
+  }
+  
+  input {
+    font-size: 13px;
+  }
+}

@@ -5,12 +5,29 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-height: 82dvh;
+  max-height: 100%;
   background-color: var(--z-color-surface);
   @include btnRadius(1);
-  padding: var(--z-primary_padding);
-  overflow-y: scroll;
+  padding: 1.25rem;
+  overflow-y: auto;
   overflow-x: hidden;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--z-color-border);
+    border-radius: 3px;
+    
+    &:hover {
+      background-color: var(--z-color-text-light);
+    }
+  }
 }
 
 .profileHeader {
@@ -29,11 +46,17 @@
 }
 
 .avatar {
-  width: 4rem;
-  height: 4rem;
+  width: 4.5rem;
+  height: 4.5rem;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--z-color-primary);
+  border: 3px solid var(--z-color-primary);
+  box-shadow: 0 4px 12px rgba(92, 106, 196, 0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: scale(1.05);
+  }
 }
 
 .defaultAvatar {
@@ -191,6 +214,27 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 0.75rem;
   margin-bottom: 1.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  min-height: fit-content;
+  
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--z-color-border);
+    border-radius: 3px;
+    
+    &:hover {
+      background-color: var(--z-color-text-light);
+    }
+  }
 }
 
 .scoreCard {
@@ -200,6 +244,8 @@
   text-align: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
+  min-height: fit-content;
+  height: auto;
 
   &:hover {
     transform: translateY(-2px);
@@ -419,4 +465,214 @@
   justify-content: space-between;
   font-size: 0.75rem;
   color: var(--z-color-text-light);
+}
+
+// 响应式设计
+@media (max-width: 1024px) {
+  .profileContainer {
+    padding: 1rem;
+  }
+
+  .profileHeader {
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .avatar {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .profileInfo {
+    .profileName {
+      font-size: 1.1rem;
+    }
+
+    .profileEmail {
+      font-size: 0.8125rem;
+    }
+  }
+
+  .scoresSection {
+    gap: 0.625rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .scoreCard {
+    padding: 1rem;
+  }
+
+  .scoreValue {
+    font-size: 1.75rem;
+  }
+
+  .scoreLabel {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .profileContainer {
+    padding: 0.75rem;
+  }
+
+  .profileHeader {
+    flex-direction: column;
+    gap: 0.625rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .avatar {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .profileInfo {
+    text-align: center;
+
+    .profileName {
+      font-size: 1rem;
+    }
+
+    .profileEmail {
+      font-size: 0.75rem;
+    }
+  }
+
+  .sectionTitle {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .scoresSection {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .scoreCard {
+    padding: 0.875rem;
+  }
+
+  .scoreValue {
+    font-size: 1.5rem;
+  }
+
+  .scoreLabel {
+    font-size: 0.7rem;
+  }
+
+  .infoItem {
+    padding: 0.75rem;
+
+    .infoLabel {
+      font-size: 0.75rem;
+    }
+
+    .infoValue {
+      font-size: 0.8125rem;
+    }
+  }
+
+  .orderItem {
+    padding: 0.75rem;
+
+    .orderId {
+      font-size: 0.8125rem;
+    }
+
+    .orderDate {
+      font-size: 0.7rem;
+    }
+
+    .orderAmount {
+      font-size: 0.875rem;
+    }
+
+    .orderDetails {
+      font-size: 0.7rem;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .profileContainer {
+    padding: 0.5rem;
+  }
+
+  .profileHeader {
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .avatar {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .profileInfo {
+    .profileName {
+      font-size: 0.9rem;
+    }
+
+    .profileEmail {
+      font-size: 0.7rem;
+    }
+  }
+
+  .sectionTitle {
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .scoresSection {
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .scoreCard {
+    padding: 0.625rem;
+  }
+
+  .scoreValue {
+    font-size: 1.25rem;
+  }
+
+  .scoreLabel {
+    font-size: 0.675rem;
+  }
+
+  .infoItem {
+    padding: 0.5rem;
+
+    .infoLabel {
+      font-size: 0.7rem;
+    }
+
+    .infoValue {
+      font-size: 0.75rem;
+    }
+  }
+
+  .orderItem {
+    padding: 0.5rem;
+
+    .orderId {
+      font-size: 0.75rem;
+    }
+
+    .orderDate {
+      font-size: 0.675rem;
+    }
+
+    .orderAmount {
+      font-size: 0.8125rem;
+    }
+
+    .orderDetails {
+      font-size: 0.675rem;
+    }
+  }
 }
