@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styles from '@styles/components/ZoraAIChat.module.scss';
 import { useAppTranslation } from '@hooks/useAppTranslation.ts';
+import { useSocketService } from '@hooks/useSocketService.ts';
 
 interface AIMessage {
   id: string;
   type: 'user' | 'ai';
   content: string;
   timestamp: number;
+  isStreaming?: boolean; // 标记是否正在流式输出
 }
 
 interface ZoraAIChatProps {
@@ -19,6 +21,7 @@ const ZoraAIChat: React.FC<ZoraAIChatProps> = ({ isOpen: externalIsOpen, onToggl
   const ct = translation.components.chat;
   const aiChatText = ct.aiChat;
   const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const { socket } = useSocketService();
   
   // 使用外部状态或内部状态
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
@@ -47,11 +50,13 @@ const ZoraAIChat: React.FC<ZoraAIChatProps> = ({ isOpen: externalIsOpen, onToggl
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
+    const userContent = inputValue.trim();
+
     // 添加用户消息
     const userMessage: AIMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputValue,
+      content: userContent,
       timestamp: Date.now()
     };
 
@@ -59,17 +64,11 @@ const ZoraAIChat: React.FC<ZoraAIChatProps> = ({ isOpen: externalIsOpen, onToggl
     setInputValue('');
     setIsTyping(true);
 
-    // 模拟AI回复（这里应该替换为实际的AI API调用）
-    setTimeout(() => {
-      const aiMessage: AIMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: aiChatText.messages.demoResponse,
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
+    // 通过socket发送AI消息请求
+    socket.emit('askAi', {
+      prompt: userContent,
+      timestamp: Date.now()
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -78,6 +77,131 @@ const ZoraAIChat: React.FC<ZoraAIChatProps> = ({ isOpen: externalIsOpen, onToggl
       handleSendMessage().then();
     }
   };
+
+  // 监听AI回复
+  useEffect(() => {
+    const handleAIResponse = (data: { message: string; timestamp: number }) => {
+      const aiMessage: AIMessage = {
+        id: Date.now().toString(),
+        type: 'ai',
+        content: data.message || aiChatText.messages.demoResponse,
+        timestamp: data.timestamp || Date.now()
+      };
+      
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        
+        if (lastMessage && lastMessage.type === 'ai' && lastMessage.isStreaming) {
+          // 更新流式消息为完整消息
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...lastMessage,
+              content: data.message || aiChatText.messages.demoResponse,
+              timestamp: data.timestamp || Date.now(),
+              isStreaming: false
+            }
+          ];
+        } else {
+          // 添加新的完整消息
+          return [...prev, aiMessage];
+        }
+      });
+      setIsTyping(false);
+    };
+
+    const handleAIError = (error: { message: string }) => {
+      console.error('AI回复失败:', error);
+      
+      const errorMessage: AIMessage = {
+        id: Date.now().toString(),
+        type: 'ai',
+        content: aiChatText.messages.demoResponse,
+        timestamp: Date.now()
+      };
+      
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        
+        if (lastMessage && lastMessage.type === 'ai' && lastMessage.isStreaming) {
+          // 更新流式消息为错误消息
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...lastMessage,
+              content: aiChatText.messages.demoResponse,
+              timestamp: Date.now(),
+              isStreaming: false
+            }
+          ];
+        } else {
+          // 添加新的错误消息
+          return [...prev, errorMessage];
+        }
+      });
+      setIsTyping(false);
+    };
+
+    // 处理流式输出
+    const handleAIStream = (data: { chunk: string; timestamp: number }) => {
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        
+        if (lastMessage && lastMessage.type === 'ai' && lastMessage.isStreaming) {
+          // 更新正在流式输出的消息
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...lastMessage,
+              content: lastMessage.content + data.chunk,
+              timestamp: data.timestamp || Date.now()
+            }
+          ];
+        } else {
+          // 创建新的流式消息
+          return [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: 'ai',
+              content: data.chunk,
+              timestamp: data.timestamp || Date.now(),
+              isStreaming: true
+            }
+          ];
+        }
+      });
+    };
+
+    // 流式输出结束时，标记消息完成
+    const handleStreamEnd = () => {
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        
+        if (lastMessage && lastMessage.type === 'ai' && lastMessage.isStreaming) {
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...lastMessage,
+              isStreaming: false
+            }
+          ];
+        }
+        return prev;
+      });
+      setIsTyping(false);
+    };
+
+    socket.on('ai_chat_error', handleAIError);
+    socket.on('ai_chat_stream', handleAIStream);
+    socket.on('ai_stream_end', handleStreamEnd);
+
+    return () => {
+      socket.off('ai_chat_error', handleAIError);
+      socket.off('ai_chat_stream', handleAIStream);
+      socket.off('ai_stream_end', handleStreamEnd);
+    };
+  }, [socket, aiChatText.messages.demoResponse]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -156,10 +280,13 @@ const ZoraAIChat: React.FC<ZoraAIChatProps> = ({ isOpen: externalIsOpen, onToggl
             >
               <div className={styles.messageBubble}>
                 {message.content}
+                {message.type === 'ai' && message.isStreaming && (
+                  <span className={styles.typingCursor}>|</span>
+                )}
               </div>
             </div>
           ))}
-          {isTyping && (
+          {isTyping && !messages.some(m => m.type === 'ai' && m.isStreaming) && (
             <div className={`${styles.message} ${styles.ai}`}>
               <div className={styles.messageBubble}>
                 <div className={styles.typingIndicator}>

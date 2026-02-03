@@ -187,6 +187,8 @@ export async function streamChatWithAI(
       temperature = DEFAULT_CONFIG.TEMPERATURE,
       maxTokens = DEFAULT_CONFIG.MAX_TOKENS,
       tools,
+      enableTools = false,
+      toolCallContext,
       promptEngineerOptions,
       systemPrompt: customSystemPrompt,
     } = options;
@@ -201,21 +203,102 @@ export async function streamChatWithAI(
       { role: 'user', content: userPrompt },
     ];
 
-    const stream = await ai.chat.completions.create({
-      model,
-      messages: allMessages,
-      temperature,
-      max_completion_tokens: maxTokens,
-      stream: true,
-      ...(tools && { tools }),
-    });
+    // 如果启用工具调用且提供了工具定义
+    const availableTools = enableTools ? aiToolsManager.getToolDefinitions() : [];
+    const toolsToUse = tools || (availableTools.length > 0 ? availableTools : undefined);
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        onChunk(content);
-      }
+    // 如果启用了工具调用但没有提供上下文，给出警告
+    if (enableTools && !toolCallContext) {
+      console.warn('工具调用已启用但未提供 toolCallContext，工具调用可能失败');
     }
+
+    // 循环处理可能的工具调用
+    const maxIterations = 5;
+    let iteration = 0;
+    let currentToolCalls: ChatCompletionMessage.ToolCall[] = [];
+
+    while (iteration < maxIterations) {
+      const stream = await ai.chat.completions.create({
+        model,
+        messages: allMessages,
+        temperature,
+        max_completion_tokens: maxTokens,
+        stream: true,
+        ...(toolsToUse && { tools: toolsToUse }),
+      });
+
+      let assistantMessage: ChatCompletionMessageParam | null = null;
+      let hasToolCalls = false;
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        
+        // 处理内容流
+        if (delta?.content) {
+          onChunk(delta.content);
+          if (!assistantMessage) {
+            assistantMessage = { role: 'assistant', content: delta.content };
+          } else {
+            assistantMessage.content = (assistantMessage.content || '') + delta.content;
+          }
+        }
+        
+        // 处理工具调用流
+        if (delta?.tool_calls) {
+          hasToolCalls = true;
+          for (const toolCall of delta.tool_calls) {
+            if (toolCall.index !== undefined) {
+              if (!currentToolCalls[toolCall.index]) {
+                currentToolCalls[toolCall.index] = {
+                  id: toolCall.id || `call_${Date.now()}_${toolCall.index}`,
+                  type: 'function' as const,
+                  function: {
+                    name: toolCall.function?.name || '',
+                    arguments: toolCall.function?.arguments || '',
+                  },
+                };
+              } else {
+                // 追加参数
+                if (toolCall.function?.arguments) {
+                  currentToolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 如果没有工具调用，直接返回
+      if (!hasToolCalls) {
+        return;
+      }
+
+      // 如果有工具调用但没有上下文，返回错误
+      if (!toolCallContext) {
+        throw new Error('工具调用需要提供 toolCallContext');
+      }
+
+      // 处理工具调用
+      const toolResults = await handleToolCalls(currentToolCalls, toolCallContext);
+
+      // 添加助手消息和工具结果到消息历史
+      if (assistantMessage) {
+        assistantMessage.tool_calls = currentToolCalls;
+        allMessages.push(assistantMessage);
+      } else {
+        allMessages.push({
+          role: 'assistant',
+          tool_calls: currentToolCalls,
+        });
+      }
+      allMessages.push(...toolResults);
+
+      // 重置工具调用状态
+      currentToolCalls = [];
+      iteration++;
+    }
+
+    throw new Error('达到最大工具调用迭代次数');
   } catch (error) {
     console.error('AI stream chat error:', error);
     throw new Error(`AI流式请求失败: ${error instanceof Error ? error.message : 'Unknown error'}`);

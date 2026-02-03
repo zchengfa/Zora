@@ -153,6 +153,25 @@
   border-bottom-right-radius: 0.25rem;
 }
 
+.typingCursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background: currentColor;
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
 .typingIndicator {
   display: flex;
   gap: 4px;

@@ -58,7 +58,9 @@ const customerProfileTool: AITool = {
   },
   handler: async ({ prisma, customerId }: ToolFunctionParams) => {
     try {
-      const profile = await generateCustomerProfile(prisma, customerId);
+      // 将customerId转换为字符串类型
+      const customerIdStr = typeof customerId === 'string' ? customerId : String(customerId);
+      const profile = await generateCustomerProfile(prisma, customerIdStr);
       if (!profile) {
         return {
           success: false,
@@ -111,11 +113,13 @@ const queryOrdersTool: AITool = {
       const where: any = {};
 
       if (customerId) {
-        where.customerId = BigInt(customerId);
+        // 将customerId转换为字符串类型
+        where.customerId = typeof customerId === 'string' ? customerId : String(customerId);
       }
 
       if (orderId) {
-        where.id = BigInt(orderId);
+        // 将orderId转换为字符串类型
+        where.id = typeof orderId === 'string' ? orderId : String(orderId);
       }
 
       const orders = await prisma.order.findMany({
@@ -126,7 +130,7 @@ const queryOrdersTool: AITool = {
         },
         include: {
           lineItems: true,
-          customer: {
+          customers: {
             select: {
               email: true,
               first_name: true,
@@ -146,10 +150,11 @@ const queryOrdersTool: AITool = {
           currencyCode: order.currencyCode,
           createdAt: order.createdAt,
           itemCount: order.lineItems.reduce((sum, item) => sum + item.quantity, 0),
-          customerEmail: order.customer?.email
+          customerEmail: order.customers?.email
         }))
       };
     } catch (error) {
+      console.log(error)
       return {
         success: false,
         error: error instanceof Error ? error.message : '查询订单失败'
@@ -191,7 +196,8 @@ const queryProductsTool: AITool = {
       const where: any = {};
 
       if (productId) {
-        where.id = BigInt(productId);
+        // 将productId转换为字符串类型
+        where.id = typeof productId === 'string' ? productId : String(productId);
       }
 
       if (sku) {
