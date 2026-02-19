@@ -2,6 +2,49 @@
 
 This document records all important changes to the Zora project.
 
+## [1.1.0] - 2025-01-21
+
+### New Features
+
+#### AI Integration
+- Implemented AI-powered chat assistant for intelligent customer service
+- Added custom AI tools for customer service operations
+- Implemented prompt engineering for optimized AI responses
+- Added streaming AI response support
+- Integrated AI with customer profile and order data for context-aware responses
+
+#### Customer Profile Enhancements
+- Added comprehensive customer profiling system
+- Implemented customer value scoring (0-100)
+- Implemented customer loyalty scoring (0-100)
+- Implemented customer engagement scoring (0-100)
+- Added customer behavior analytics
+- Added purchase pattern analysis
+- Added product preference tracking
+- Added shipping location analysis
+
+#### UI/UX Improvements
+- Enhanced customer profile display with detailed analytics
+- Improved message status indicators
+- Added real-time typing indicators
+- Enhanced mobile responsiveness
+- Added loading states for better UX
+
+### Technical Improvements
+
+- Added IndexedDB persistence for offline capability
+- Improved error handling and logging
+- Enhanced Socket.IO connection stability
+- Optimized AI response caching
+- Improved database query performance
+
+### Bug Fixes
+
+- Fixed AI streaming response issues
+- Fixed customer profile data synchronization
+- Fixed message status updates
+- Improved WebSocket reconnection logic
+
 ## [1.0.0] - 2025-01-20
 
 ### New Features
@@ -25,12 +68,16 @@ This document records all important changes to the Zora project.
 - Added customer search functionality
 - Implemented customer tagging system
 - Added customer order viewing functionality
+- Implemented comprehensive customer profiling with value, loyalty, and engagement scores
+- Added customer analytics for behavior, preferences, and purchase patterns
 
 #### Security & Authentication
 - Implemented JWT authentication
 - Added email verification code login
 - Used bcrypt for password encryption
 - Implemented multi-level request rate limiting
+- Added HMAC signature verification for all Shopify webhook events
+- Implemented secure session management with Redis
 
 #### API Endpoints
 - Implemented user authentication endpoints
@@ -44,15 +91,18 @@ This document records all important changes to the Zora project.
 - Implemented Shopify Worker for handling Shopify-related tasks
 - Added Worker health check mechanism
 - Implemented task queue management (BullMQ)
+- Added message Worker for offline message processing
 
 ### Technical Improvements
 
 - Refactored application routing using React Router 7
 - Fully adopted TypeScript for enhanced type safety
-- Used Zustand for state management
+- Used Zustand for state management with IndexedDB persistence
 - Used Prisma as ORM tool
 - Used PostgreSQL as primary database
 - Used Redis for caching and session management
+- Integrated OpenAI SDK for AI-powered customer service
+- Implemented Winston logging system with daily rotation
 
 ### Performance Optimizations
 
@@ -67,3 +117,5 @@ This document records all important changes to the Zora project.
 - Fixed Webhook validation failures
 - Fixed offline message push issues
 - Fixed customer session state synchronization issues
+- Fixed Worker health check failures
+- Fixed AI integration issues with streaming responses
