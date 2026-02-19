@@ -33,6 +33,8 @@ export async function startSocketServer({server,redis,prisma}:{server:Server,red
 
         socketUtils.socketOnSendMessage()
 
+        socketUtils.socketOnAskAi()
+
         socketUtils.socketUserOffline()
 
         // 订阅该socket的Redis消息通道
