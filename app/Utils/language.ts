@@ -99,9 +99,37 @@ export default {
         "title": "Chat",
         "searchPlaceholder": "Search",
         "noResult": "No results found",
+        "onlineStatus": {
+          "online": "Online",
+          "offline": "Offline"
+        },
         "messageStatus":{
           "read": "Read",
           "unread": "Unread"
+        },
+        "aiChatButton": {
+          "text": "AI Chat",
+          "tooltip": "Start AI-powered conversation"
+        },
+        "aiChat": {
+          "title": "AI Assistant",
+          "status": {
+            "online": "Online",
+            "typing": "Typing..."
+          },
+          "messages": {
+            "welcome": "Hello! I'm your AI assistant. How can I help you today?",
+            "demoResponse": "I understand your message. This is a demo response. Please integrate your AI service here."
+          },
+          "input": {
+            "placeholder": "Type a message..."
+          },
+          "ariaLabels": {
+            "openChat": "Open AI Chat",
+            "closeChat": "Close AI Chat",
+            "messageInput": "Message input",
+            "sendMessage": "Send message"
+          }
         }
       },
       "product":{
@@ -339,9 +367,37 @@ export default {
         "title": "聊天",
         "searchPlaceholder": "搜索",
         "noResult": "未找到结果",
+        "onlineStatus": {
+          "online": "在线",
+          "offline": "离线"
+        },
         "messageStatus":{
           "read": "已读",
           "unread": "未读"
+        },
+        "aiChatButton": {
+          "text": "AI 聊天",
+          "tooltip": "开始 AI 智能对话"
+        },
+        "aiChat": {
+          "title": "AI 助手",
+          "status": {
+            "online": "在线",
+            "typing": "正在输入..."
+          },
+          "messages": {
+            "welcome": "你好！我是你的AI助手。今天有什么可以帮你的吗？",
+            "demoResponse": "我理解你的消息。这是一个演示回复。请在此处集成你的AI服务。"
+          },
+          "input": {
+            "placeholder": "输入消息..."
+          },
+          "ariaLabels": {
+            "openChat": "打开AI聊天",
+            "closeChat": "关闭AI聊天",
+            "messageInput": "消息输入框",
+            "sendMessage": "发送消息"
+          }
         }
       },
       "product":{

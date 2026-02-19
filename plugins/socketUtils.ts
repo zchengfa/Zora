@@ -1,7 +1,9 @@
 import type {Redis} from "ioredis";
 import {$Enums, PrismaClient} from "@prisma/client";
 import {Server, Socket} from "socket.io";
-import {addMessageStatusUpdateJob, beginLogger} from "./bullTaskQueue.ts";
+import {addMessageStatusUpdateJob, beginLogger,addOfflineMessageJob} from "./bullTaskQueue.ts";
+// 导入AI相关模块
+import { chatWithAI, streamChatWithAI } from './openAI.ts';
 
 interface SocketUtilConfigType {
   redis: Redis;
@@ -55,6 +57,11 @@ export class SocketUtils{
     SocketUtils.agentMapInstance = this.agent
     SocketUtils.usersMapInstance = this.users
     this.repostMessageAck()
+    this.handleAIChatRequest()
+    this.handleOfflineMessageAck()
+    this.handleMarkMessagesAsRead()
+    this.handleGetMessageStatus()
+    this.handleGetUnreadMessages()
   }
 
   /**
@@ -175,8 +182,73 @@ export class SocketUtils{
 
       this.sendMessageAck(receiver,payload.msgId,payload.msgStatus,10004,payload.conversationId)
     })
+  }
 
-    // 处理离线消息确认回执
+  /**
+   * 处理AI聊天请求
+   */
+  private handleAIChatRequest = () => {
+    this.ws.on('ai_chat_request', async (payload) => {
+      try {
+        const { message, timestamp } = payload;
+
+        if (!message || typeof message !== 'string') {
+          this.ws.emit('ai_chat_error', {
+            message: 'Invalid message format',
+            timestamp: Date.now()
+          });
+          return;
+        }
+
+        // 调用AI服务获取回复
+        const aiResponse = await chatWithAI(message, {
+          enableTools: true,
+          toolCallContext: {
+            prisma: this.config.prisma
+          }
+        });
+
+        // 发送AI回复给客户端
+        this.ws.emit('ai_chat_response', {
+          message: aiResponse,
+          timestamp: Date.now()
+        });
+
+        await beginLogger({
+          level: 'info',
+          message: `AI聊天请求处理成功`,
+          meta: {
+            taskType: 'ai_chat_request',
+            userMessage: message,
+            aiResponse: aiResponse
+          }
+        });
+      } catch (error) {
+        console.error('AI聊天请求处理失败:', error);
+
+        this.ws.emit('ai_chat_error', {
+          message: error instanceof Error ? error.message : 'AI request failed',
+          timestamp: Date.now()
+        });
+
+        await beginLogger({
+          level: 'error',
+          message: `AI聊天请求处理失败`,
+          meta: {
+            taskType: 'ai_chat_request',
+            error: {
+              name: error?.name,
+              message: error?.message,
+              stack: error?.stack
+            }
+          }
+        });
+      }
+    });
+  }
+
+  // 处理离线消息确认回执
+  private handleOfflineMessageAck = () => {
     this.ws.on('offline_message_ack', async (payload) => {
       // 在try块外部声明变量，确保在catch块中可以访问
       let userId = null;
@@ -310,8 +382,12 @@ export class SocketUtils{
         });
       }
     });
+  }
 
-    // 处理消息已读请求
+  /**
+   * 处理消息已读请求
+   */
+  private handleMarkMessagesAsRead = () => {
     this.ws.on('mark_messages_as_read', async (payload) => {
       console.log('收到mark_messages_as_read:', payload);
       try {
@@ -458,8 +534,12 @@ export class SocketUtils{
         });
       }
     });
+  }
 
-    // 处理获取消息状态请求
+  /**
+   * 处理获取消息状态请求
+   */
+  private handleGetMessageStatus = () => {
     this.ws.on('get_message_status', async (payload) => {
       try {
         const { conversationId, msgIds } = payload;
@@ -538,8 +618,12 @@ export class SocketUtils{
         });
       }
     });
+  }
 
-    // 处理获取未读消息数请求
+  /**
+   * 处理获取未读消息数请求
+   */
+  private handleGetUnreadMessages = () => {
     this.ws.on('get_unread_messages', async (payload) => {
       try {
         const { userId, shop } = payload;
@@ -575,7 +659,7 @@ export class SocketUtils{
           }
         });
 
-        // 获取该用户的未读消息（仅DELIVERED状态且发送者为AGENT的消息）
+        // 获取该用户的未读消息（DELIVERED和SENT状态且发送者为AGENT的消息）
         const unreadMessages = await this.config.prisma.message.findMany({
           where: {
             conversationId: {
@@ -588,7 +672,9 @@ export class SocketUtils{
               }).then(convs => convs.map(c => c.id))
             },
             senderType: 'AGENT',
-            msgStatus: 'DELIVERED'
+            msgStatus: {
+              in: ['DELIVERED','SENT']
+            }
           },
           orderBy: {
             timestamp: 'asc'
@@ -596,6 +682,7 @@ export class SocketUtils{
           take: 100 // 最多返回100条未读消息
         });
 
+        if (!unreadMessages.length) return;
         // 发送未读消息列表给客户端
         this.ws.emit('unread_messages', {
           messages: unreadMessages,
@@ -697,7 +784,6 @@ export class SocketUtils{
       }
 
       // 添加离线消息推送任务到队列
-      const { addOfflineMessageJob } = await import("./bullTaskQueue.ts");
       await addOfflineMessageJob({
         userId: userId,
         messageType: 'system',
@@ -933,6 +1019,93 @@ export class SocketUtils{
       }
     })
   }
+  public socketOnAskAi = ()=>{
+    //处理AI问答请求
+    this.ws.on('askAi', async (data) => {
+      try {
+        const { prompt, conversationId, template, tone } = data;
+
+        if (!prompt) {
+          await beginLogger({
+            level: 'warning',
+            message: `收到无效的AI问答请求`,
+            meta: {
+              taskType: 'askAi',
+              data
+            }
+          });
+          return;
+        }
+
+        // 构建提示词工程选项
+        const promptEngineerOptions: any = {};
+        if (template) {
+          promptEngineerOptions.template = template;
+        }
+        if (tone) {
+          promptEngineerOptions.tone = tone;
+        }
+
+        // 使用流式AI回复
+        await streamChatWithAI(
+          prompt,
+          (chunk) => {
+            // 每收到一个数据块就发送给客户端
+            this.ws.emit('ai_chat_stream', {
+              conversationId,
+              chunk,
+              timestamp: new Date().toISOString()
+            });
+          },
+          {
+            promptEngineerOptions,
+            enableTools: true,
+            toolCallContext: {
+              prisma: this.config.prisma
+            }
+          }
+        );
+
+        // 流式输出结束，发送结束事件
+        this.ws.emit('ai_stream_end', {
+          conversationId,
+          timestamp: new Date().toISOString()
+        });
+
+        await beginLogger({
+          level: 'info',
+          message: `成功处理AI问答请求`,
+          meta: {
+            taskType: 'askAi',
+            conversationId,
+            template,
+            tone
+          }
+        });
+      } catch (e) {
+        await beginLogger({
+          level: 'error',
+          message: `处理AI问答请求失败`,
+          meta: {
+            taskType: 'askAi',
+            error: {
+              name: e?.name,
+              message: e?.message,
+              stack: e?.stack
+            }
+          }
+        });
+
+        // 发送错误响应回客户端
+        this.ws.emit('ai_error', {
+          conversationId: data.conversationId,
+          error: 'AI服务暂时不可用，请稍后再试',
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+  }
+
   public socketUserOffline = ()=>{
     this.ws.on('offline',async ({id}:{id:string})=>{
       //用户或客服下线

@@ -1,6 +1,6 @@
 # Zora - Shopify Customer Service System
 
-Zora is a powerful customer service system for Shopify, providing comprehensive customer service solutions including real-time customer communication, order management, and customer management for Shopify merchants. Built with React Router and Socket.IO, it supports real-time message push and Webhook event notifications.
+Zora is a powerful customer service system for Shopify, providing comprehensive customer service solutions including real-time customer communication, order management, customer management, and AI-powered intelligent customer service for Shopify merchants. Built with React Router and Socket.IO, it supports real-time message push, Webhook event notifications, and integrates AI capabilities to enhance customer service efficiency.
 
 ## Features
 
@@ -10,6 +10,7 @@ Zora is a powerful customer service system for Shopify, providing comprehensive 
 - **Message Status Tracking**: Real-time tracking of message sending, delivery, and read status
 - **Offline Messages**: Store messages when customers are offline and automatically push them when they come online
 - **Session Management**: Automatically create and manage customer sessions with status switching support
+- **AI-powered Chat**: Integrated AI assistant for intelligent customer service support and automated responses
 
 ### Data Synchronization
 - **Order Sync**: Real-time synchronization of Shopify order data including create, update, and delete events
@@ -22,12 +23,16 @@ Zora is a powerful customer service system for Shopify, providing comprehensive 
 - **Customer Tags**: Add tags to customers for easy categorization and management
 - **Customer Order Viewing**: Quickly view customer order history
 - **Customer Search**: Search customers by multiple criteria
+- **Customer Profile**: Comprehensive customer profiling with value, loyalty, and engagement scores
+- **Customer Analytics**: Detailed analytics of customer behavior, preferences, and purchase patterns
 
 ### Security & Authentication
 - **JWT Authentication**: User authentication using JWT tokens
 - **Email Verification**: Email verification code login support
 - **Password Encryption**: Password encryption storage using bcrypt
 - **Rate Limiting**: Multi-level request rate limiting to prevent API abuse
+- **Webhook Validation**: HMAC signature verification for all Shopify webhook events
+- **Secure Session Management**: Secure session storage with Redis and automatic expiration
 
 ## Tech Stack
 
@@ -36,22 +41,34 @@ Zora is a powerful customer service system for Shopify, providing comprehensive 
 - **React Router 7**: Routing management based on React Router
 - **TypeScript**: Comprehensive TypeScript type support
 - **Socket.IO Client**: Real-time messaging
-- **Zustand**: Lightweight state management
+- **Zustand**: Lightweight state management with IndexedDB persistence
 - **SCSS**: Style preprocessor
+- **Shopify Polaris**: UI component library for Shopify apps
+- **Shopify App Bridge**: Embedded app integration
 
 ### Backend
-- **Node.js**: Runtime environment
+- **Node.js**: Runtime environment (>=20.19 <22 || >=22.12)
 - **Express**: Web server framework
-- **Socket.IO**: WebSocket server
+- **Socket.IO**: WebSocket server with Redis adapter for scaling
 - **Prisma**: ORM database access layer
 - **PostgreSQL**: Primary database
 - **Redis**: Cache and session storage
 - **BullMQ**: Task queue management
+- **OpenAI SDK**: AI integration for intelligent customer service
+- **Winston**: Comprehensive logging system with daily rotation
 
 ### Shopify Integration
 - **Shopify Admin API**: Interact with Shopify backend
-- **Shopify Webhooks**: Listen to Shopify events
+- **Shopify Webhooks**: Listen to Shopify events (orders, customers, products)
 - **Shopify App Bridge**: Embedded app integration
+- **Shopify CLI**: Development and deployment tooling
+- **Shopify Polaris**: UI component library
+
+### AI Integration
+- **OpenAI-compatible API**: Support for multiple AI providers
+- **Custom AI Tools**: Specialized tools for customer service operations
+- **Prompt Engineering**: Optimized prompts for better AI responses
+- **Streaming Responses**: Real-time AI response streaming
 
 ## Quick Start
 
@@ -68,6 +85,7 @@ Before starting, you need:
 ```shell
 npm install -g @shopify/cli@latest
 ```
+7. **AI API Key**: Get an API key from your preferred AI provider (OpenAI, Alibaba Cloud Qwen, etc.)
 
 ### Installation
 
@@ -111,6 +129,16 @@ SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your_email@example.com
 SMTP_PASS=your_email_password
+
+# AI Configuration
+OPENAI_API_KEY=your_ai_api_key
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_API_MODEL=gpt-4
+
+# Worker Health Check Keys
+LOGGER_WORKER_HEALTH_KEY=logger
+OFFLINE_MESSAGE_WORKER_HEALTH_KEY=message
+SHOPIFY_WORKER_HEALTH_KEY=shopify
 ```
 
 4. **Initialize database**
@@ -123,9 +151,24 @@ npm run setup
 # Start main app
 npm run dev
 
-# Start Zora server and workers
+# Start Zora server and workers (in a separate terminal)
 npm run zoraServer-worker
 ```
+
+### Development Workflow
+
+The project consists of two main parts:
+1. **Main App**: Shopify embedded app (runs on port 3000)
+2. **Zora Server**: Backend server with Socket.IO and workers (runs on port 3001)
+
+Both servers need to be running for full functionality. The Zora server includes:
+- Socket.IO server for real-time messaging
+- API endpoints for customer service operations
+- Background workers for:
+  - Logging
+  - Shopify data synchronization
+  - Message processing
+  - Health monitoring
 
 ## Deployment
 
@@ -135,6 +178,7 @@ npm run zoraServer-worker
 2. Set `NODE_ENV=production`
 3. Configure production database and Redis connections
 4. Configure HTTPS and domain
+5. Set up proper CORS origins in SERVER_ORIGIN
 
 ### Deployment Steps
 
@@ -158,11 +202,52 @@ npm run start
 npm run zora-server
 ```
 
+### Using PM2 for Process Management
+
+For production deployment, it's recommended to use PM2 to manage the processes:
+```shell
+# Install PM2
+npm install -g pm2
+
+# Start all processes using ecosystem.config.js
+pm2 start ecosystem.config.js
+
+# View logs
+pm2 logs
+
+# Monitor processes
+pm2 monit
+```
+
 ### Recommended Cloud Providers
 
 - **App Hosting**: [Heroku](https://www.heroku.com/), [Fly.io](https://fly.io/), [Vercel](https://vercel.com/)
 - **Database**: [DigitalOcean Managed Databases](https://www.digitalocean.com/products/managed-databases/), [Amazon RDS](https://aws.amazon.com/rds/)
 - **Redis**: [DigitalOcean Managed Redis](https://www.digitalocean.com/products/managed-databases-redis), [Amazon MemoryDB](https://aws.amazon.com/memorydb/)
+
+## Project Structure
+
+```
+Zora/
+├── app/                    # Frontend application
+│   ├── components/          # React components
+│   ├── routes/             # Route handlers
+│   ├── hooks/              # Custom React hooks
+│   ├── Utils/              # Utility functions
+│   └── styles/             # SCSS stylesheets
+├── zoraServer/             # Backend server
+│   ├── socketServer.ts      # Socket.IO server
+│   ├── webhooks.ts         # Shopify webhook handlers
+│   └── zoraApi.ts          # API endpoints
+├── plugins/                # Backend plugins and utilities
+│   ├── aiTools.ts          # AI tool functions
+│   ├── customerProfile.ts   # Customer profiling
+│   ├── shopifyUtils.ts     # Shopify API utilities
+│   └── socketUtils.ts      # Socket utilities
+├── prisma/                 # Database schema and migrations
+├── tests/                  # Test files
+└── extensions/             # Shopify app extensions
+```
 
 ## Contributing
 
@@ -173,6 +258,14 @@ Contributions are welcome! Please follow these steps:
 3. Commit your changes (`git commit -m 'Add some AmazingFeature')`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow TypeScript best practices
+- Write meaningful commit messages
+- Add tests for new features
+- Update documentation as needed
+- Follow the existing code style
 
 ## License
 
@@ -185,8 +278,13 @@ For questions or suggestions, please contact:
 - Submit an Issue
 - Email: support@example.com
 
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details
+
 ## Resources
 
+### Documentation
 - [React Router Docs](https://reactrouter.com/home)
 - [Shopify App Development](https://shopify.dev/docs/apps/getting-started)
 - [Shopify App React Router Docs](https://shopify.dev/docs/api/shopify-app-react-router)
@@ -194,9 +292,84 @@ For questions or suggestions, please contact:
 - [Prisma Docs](https://www.prisma.io/docs)
 - [Shopify CLI Docs](https://shopify.dev/docs/apps/tools/cli)
 
+### AI Integration
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+- [Alibaba Cloud Qwen](https://help.aliyun.com/zh/dashscope/)
+
+### Tools & Libraries
+- [Zustand](https://github.com/pmndrs/zustand)
+- [BullMQ](https://docs.bullmq.io/)
+- [Winston](https://github.com/winstonjs/winston)
+
+## Architecture Overview
+
+### Frontend Architecture
+
+- **Component-based**: Modular React components for UI elements
+- **State Management**: Zustand with IndexedDB persistence for offline capability
+- **Routing**: React Router 7 for client-side routing
+- **Real-time Updates**: Socket.IO client for instant message updates
+- **Internationalization**: Multi-language support with custom translation system
+
+### Backend Architecture
+
+- **Microservices-like**: Separate services for different concerns
+  - Main API server (Express)
+  - Socket.IO server for real-time communication
+  - Background workers for async tasks
+- **Data Layer**: Prisma ORM with PostgreSQL
+- **Caching**: Redis for session management and data caching
+- **Task Queue**: BullMQ for background job processing
+- **Logging**: Winston with daily log rotation
+
+### Data Flow
+
+1. **Customer Messages**:
+   - Customer sends message via Socket.IO
+   - Server processes and stores in database
+   - Message pushed to assigned agent in real-time
+   - Agent responds via Socket.IO
+   - Response delivered to customer
+
+2. **Shopify Events**:
+   - Webhook received from Shopify
+   - Event validated and processed
+   - Data synchronized to local database
+   - Notification pushed to online agents
+
+3. **AI Interactions**:
+   - User or agent sends query to AI
+   - AI processes with context (customer data, orders, etc.)
+   - Response streamed back in real-time
+   - Optional tool calls for data retrieval
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Socket.IO Connection Issues**
+   - Ensure Redis is running
+   - Check CORS configuration in SERVER_ORIGIN
+   - Verify firewall settings
+
+2. **Database Connection Issues**
+   - Verify DATABASE_URL is correct
+   - Check PostgreSQL is running
+   - Ensure migrations have been run
+
+3. **Worker Health Checks Failing**
+   - Check if worker processes are running
+   - Verify Redis connection
+   - Check worker logs for errors
+
+4. **AI Integration Issues**
+   - Verify OPENAI_API_KEY is valid
+   - Check OPENAI_API_BASE_URL is correct
+   - Ensure model name matches provider
+
 ## Upgrading from Remix
 
-If you have an existing Remix app that you want to upgrade to React Router, please follow the [upgrade guide](https://github.com/Shopify/shopify-app-template-react-router/wiki/Upgrading-from-Remix).  Otherwise, please follow the quick start guide below.
+If you have an existing Remix app that you want to upgrade to React Router, please follow the [upgrade guide](https://github.com/Shopify/shopify-app-template-react-router/wiki/Upgrading-from-Remix). Otherwise, please follow the quick start guide above.
 
 ## Quick start
 

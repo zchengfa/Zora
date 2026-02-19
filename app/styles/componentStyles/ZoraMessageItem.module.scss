@@ -2,95 +2,174 @@
   display: flex;
   justify-content: flex-start;
   align-items: flex-start;
-  padding: 1rem .5rem;
+  padding: 0.5rem;
   width: 100%;
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
   &.zoraMessageLeft{
     flex-direction: row;
+    
     .zoraMsg{
-      background-color: var(--z-color-info);
-      color: var(--z-chat-bubble-text-other);
+      background: linear-gradient(135deg, var(--z-color-surface), var(--z-color-primary-light));
+      color: var(--z-color-text);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
   }
+  
   &.zoraMessageRight{
-    .zoraMsg{
-      background-color: var(--z-chat-bubble-me);
-      color: var(--z-chat-bubble-text-me);
-    }
     flex-direction: row-reverse;
+    
+    .zoraMsg{
+      background: linear-gradient(135deg, var(--z-color-shimmer-start), var(--z-color-shimmer-mid));
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(92, 106, 196, 0.2);
+    }
+    
     .zoraMsgContent{
       flex-direction: row-reverse;
     }
   }
 }
+
 .zoraMsgBox{
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  color: #000;
-  max-width: 80%;
+  color: var(--z-color-text);
+  max-width: 75%;
 }
+
 .zoraUser{
-  font-size: small;
-  color: rgb(133 137 140);
+  font-size: 0.8125rem;
+  color: var(--z-color-text-secondary);
+  margin-bottom: 0.25rem;
+  font-weight: 500;
 }
+
 .zoraMessageLeft .zoraMsgBox{
   align-items: flex-start;
-  margin-left: .5rem;
+  margin-left: 0.75rem;
 }
+
 .zoraMessageRight .zoraMsgBox{
   align-items: flex-end;
-  margin-right: .5rem;
+  margin-right: 0.75rem;
 }
+
 .zoraMessageAvatar{
   display: flex;
   justify-content: center;
   align-items: center;
   width: fit-content;
   height: fit-content;
+  flex-shrink: 0;
 }
+
 .zoraAvatar{
-  width: 2rem;
-  height: 2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: scale(1.05);
+  }
 }
+
 .zoraMsgContent{
   display: flex;
   justify-content: flex-start;
   align-items: flex-end;
+  gap: 0.5rem;
 }
+
 .zoraMsg{
   flex: 1;
-  margin-top: .3rem;
-  padding: .5rem 1rem;
-  border-radius: .5rem;
+  margin-top: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
   color: var(--z-color-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  word-wrap: break-word;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
 }
+
 .zoraMsgReadState{
-  margin-right: .3rem;
+  margin-right: 0.5rem;
   color: var(--z-color-success);
-  font-size: small;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
+
 .msgStatusSvgBox{
   display: flex;
   text-align: center;
-  font-size: 2rem;
+  font-size: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  
   .failedIcon{
-    transform: scale(.7);
+    transform: scale(0.6);
+    filter: drop-shadow(0 2px 4px rgba(255, 117, 117, 0.3));
   }
 }
+
 .loadingIcon{
-  transform: scale(.7)
+  transform: scale(0.6);
 }
+
 .loading{
   animation: loading 1.5s infinite linear;
 }
 
+.imageMsg {
+  max-width: 100%;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes loading {
   0%{
-    transform: scale(.7) rotate(0deg);
+    transform: scale(0.6) rotate(0deg);
   }
   100%{
-    transform: scale(.7) rotate(360deg);
+    transform: scale(0.6) rotate(360deg);
+  }
+}
+
+// 暗色主题下增强左侧消息的可见性
+[data-theme="dark"] {
+  .zoraMessageLeft {
+    .zoraMsg {
+      background: linear-gradient(135deg, rgba(47, 47, 58, 0.95), rgba(60, 60, 70, 0.95));
+      border: 1px solid rgba(92, 106, 196, 0.3);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
   }
 }

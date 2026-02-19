@@ -1,0 +1,106 @@
+.statusContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  background-color: var(--z-color-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
+  }
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+.statusIndicator.online {
+  .statusDot {
+    background-color: var(--z-color-success);
+
+    &::after {
+      border-color: var(--z-color-success);
+    }
+  }
+
+  .statusText {
+    color: var(--z-color-success);
+  }
+}
+
+.statusIndicator.offline {
+  .statusDot {
+    background-color: var(--z-color-text-light);
+
+    &::after {
+      border-color: var(--z-color-text-light);
+      animation: none;
+    }
+  }
+
+  .statusText {
+    color: var(--z-color-text-light);
+  }
+}
+
+.statusText {
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// 响应式设计
+@media (max-width: 480px) {
+  .statusIndicator {
+    padding: 0.375rem 0.75rem;
+  }
+
+  .statusDot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .statusText {
+    font-size: 0.8125rem;
+  }
+}
