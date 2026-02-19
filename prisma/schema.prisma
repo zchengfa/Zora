@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:19961212@localhost:5432/mall"
+  url      = env("POSTGRES_URL")
 }
 
 model customer_tag_relations {
