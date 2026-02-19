@@ -56,8 +56,59 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
+    rollupOptions: {
+      output: {
+        // 手动分包配置
+        manualChunks: {
+          // 核心框架和基础库
+          "react-vendor": ["react", "react-dom", "react-router"],
+          // Shopify 相关库
+          "shopify-vendor": [
+            "@shopify/app-bridge-react",
+            "@shopify/polaris",
+            "@shopify/polaris-icons",
+            "@shopify/shopify-app-react-router",
+            "@shopify/shopify-app-session-storage-prisma"
+          ],
+          // 状态管理和数据存储
+          "state-vendor": ["zustand"],
+          // 网络请求和通信
+          "network-vendor": ["axios", "socket.io-client"],
+          // 工具库
+          "utils-vendor": [
+            "uuid",
+            "i18next",
+            "i18next-browser-languagedetector"
+          ]
+        },
+        // 分包大小警告阈值
+        chunkSizeWarningLimit: 1000
+      }
+    },
+    // 分包策略配置
+    chunkSizeWarningLimit: 1000,
+    // 启用代码压缩
+    minify: "terser",
+    // 压缩配置
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ["console.log"],
+      },
+    },
   },
   optimizeDeps: {
-    include: ["@shopify/app-bridge-react"],
+    include: [
+      "@shopify/app-bridge-react",
+      "@shopify/polaris",
+      "@shopify/polaris-icons",
+      "react",
+      "react-dom",
+      "react-router",
+      "axios",
+      "socket.io-client",
+      "zustand"
+    ],
   },
 }) satisfies UserConfig;
