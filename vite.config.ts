@@ -58,29 +58,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
     rollupOptions: {
       output: {
-        // 手动分包配置
-        manualChunks: {
-          // 核心框架和基础库
-          "react-vendor": ["react", "react-dom", "react-router"],
-          // Shopify 相关库
-          "shopify-vendor": [
-            "@shopify/app-bridge-react",
-            "@shopify/polaris",
-            "@shopify/polaris-icons",
-            "@shopify/shopify-app-react-router",
-            "@shopify/shopify-app-session-storage-prisma"
-          ],
-          // 状态管理和数据存储
-          "state-vendor": ["zustand"],
-          // 网络请求和通信
-          "network-vendor": ["axios", "socket.io-client"],
-          // 工具库
-          "utils-vendor": [
-            "uuid",
-            "i18next",
-            "i18next-browser-languagedetector"
-          ]
-        },
+
         // 分包大小警告阈值
         chunkSizeWarningLimit: 1000
       }
