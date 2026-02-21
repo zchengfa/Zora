@@ -25,7 +25,7 @@
       "@styles/*": ["./app/styles/*"],
       "@components/*": ["./app/components/*"],
       "@hooks/*": ["./app/hooks/*"],
-      "@Utils/*": ["./app/utils/*"]
+      "@Utils/*": ["./app/Utils/*"]
     }
   }
 }
