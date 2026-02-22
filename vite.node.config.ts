@@ -99,15 +99,13 @@ export default defineConfig({
     terserOptions: {
       compress: {
         // 删除 console
-        drop_console: true,
+        drop_console: false,
         // 删除 debugger
         drop_debugger: true,
         // 删除无用代码
         dead_code: true,
         // 删除未使用的函数
         unused: true,
-        // 删除不可达代码
-        dead_code: true,
         // 内联函数
         inline: 2,
         // 移除 if-return 和 if-else 中的冗余代码
