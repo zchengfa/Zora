@@ -510,6 +510,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
         }
         catch (e) {
           handleApiError(req, e)
+          console.log(e,'验证码错误')
           res.status(500).send({server_error: true,message:'server error'})
         }
     })
