@@ -47,6 +47,20 @@ export const RegexEmail = (email:string):boolean=> {
 
 }
 
+export const generateVerifyCode = ()=> {
+  const string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  const stringArr = string.split('')
+
+  let randomString = ''
+  //创建循环，随机生成一个与letterArray长度一致字符串
+  for (let i = 0; i<=5; i++) {
+    const randomNumber = parseInt((Math.random()*stringArr.length).toString())
+
+    randomString += stringArr[randomNumber]
+  }
+  return randomString
+}
+
 /**
  * 发送验证码给指定邮箱
  * @param email {string} 邮箱接收者
@@ -72,24 +86,9 @@ export function validate ({ email, subject, content, code, expired }:ValidateCon
 
   const smtpTransport = nodemailer.createTransport(config)
 
-  const string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-  const generateVerifyCode = ()=> {
-    const stringArr = string.split('')
-
-    let randomString = ''
-    //创建循环，随机生成一个与letterArray长度一致字符串
-    for (let i = 0; i<=5; i++) {
-      const randomNumber = parseInt((Math.random()*stringArr.length).toString())
-
-      randomString += stringArr[randomNumber]
-    }
-    return randomString
-  }
-
   const verifyCodeExpired = expired !== undefined ? expired : 60
   const defaultSub = 'Zora email verification'
-  const verifyCode = generateVerifyCode()
+  const verifyCode = code ? code : generateVerifyCode()
   const html = generateEmailHtml(code ? code : verifyCode,expired ? expired : verifyCodeExpired,subject ? subject : defaultSub)
 
 
