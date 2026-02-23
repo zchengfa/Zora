@@ -1,5 +1,12 @@
 import type {Express, Response} from "express-serve-static-core"
-import {hashCode, RegexEmail, validate, validateHashCode, validateRequestSender} from "../plugins/validate.ts";
+import {
+  generateVerifyCode,
+  hashCode,
+  RegexEmail,
+  validate,
+  validateHashCode,
+  validateRequestSender
+} from "../plugins/validate.ts";
 import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
@@ -436,20 +443,23 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
        return res.status(400).send({result:false,message: 'Invalid request'})
      }
      try {
-       const data = await validate({email,expired:EXPIRED})
+       const code = generateVerifyCode()
        //发送成功保存验证码到redis中，并设置过期时间，并清除之前验证的次数，防止用户在验证次数时间未过期时重新获取验证码却还是提示验证次数过多
        if(!isAuth){
          await redis.multi()
-           .setex(getRedisStorageKey(email),EXPIRED,hashCode(data.code))
+           .setex(getRedisStorageKey(email),EXPIRED,hashCode(code))
            .setex(getRedisStorageKey(email,REDIS_ATTEMPT_KEY),EXPIRED,0)
            .exec()
        }
        else{
          await redis.multi()
-           .setex(getRedisStorageKey(email,REDIS_AUTH_CODE_APPEND),EXPIRED,hashCode(data.code))
+           .setex(getRedisStorageKey(email,REDIS_AUTH_CODE_APPEND),EXPIRED,hashCode(code))
            .setex(getRedisStorageKey(email,REDIS_AUTH_ATTEMPT_KEY),EXPIRED,0)
            .exec()
        }
+
+       validate({email,code,expired:EXPIRED}).then()
+
        res.status(200).send({success:true,code_expired:EXPIRED,message:'code send successfully'})
      }
      catch (e) {
@@ -510,7 +520,6 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
         }
         catch (e) {
           handleApiError(req, e)
-          console.log(e,'验证码错误')
           res.status(500).send({server_error: true,message:'server error'})
         }
     })

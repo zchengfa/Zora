@@ -99,7 +99,7 @@ export default defineConfig({
     terserOptions: {
       compress: {
         // 删除 console
-        drop_console: false,
+        drop_console: true,
         // 删除 debugger
         drop_debugger: true,
         // 删除无用代码
