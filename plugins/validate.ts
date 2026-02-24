@@ -275,9 +275,9 @@ export async function validateRequestSender(req:Request){
 
 
 export const hashCode = (code:string)=>{
-  return createHash('sha256').update(code,'utf8').digest('hex')
+  return process.env.HASHCODE === '1' ? createHash('sha256').update(code,'utf8').digest('hex') : code
 }
 
 export const validateHashCode = (code:string,storeHashCode:string)=>{
-  return timingSafeEqual(Buffer.from(hashCode(code),'hex'),Buffer.from(storeHashCode,'hex'))
+  return process.env.HASHCODE === '1' ? timingSafeEqual(Buffer.from(hashCode(code),'hex'),Buffer.from(storeHashCode,'hex')) : code === storeHashCode
 }
