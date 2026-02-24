@@ -61,6 +61,23 @@ export const generateVerifyCode = ()=> {
   return randomString
 }
 
+export function getSMTPPool(type: 'gmail' | 'qq'){
+  const target = type === 'gmail' ? 'GMAIL' : 'MAILER'
+  const config: SMTPPool.Options = {
+    pool:true,
+    host:process.env[`${target}_HOST`],
+    port:Number(process.env[`${target}_PORT`]),
+    secure:true,
+    auth: {
+      user:process.env[`${target}_USER`],
+      pass:process.env[`${target}_PASS`]
+    }
+  }
+ return {
+    config,
+    smtpTransport:nodemailer.createTransport(config)
+ }
+}
 /**
  * 发送验证码给指定邮箱
  * @param email {string} 邮箱接收者
@@ -72,41 +89,27 @@ export const generateVerifyCode = ()=> {
  * @example 使用示例：
  * validate({email:'xxx@qq.com'}).then(res=>{}).catch(err=>{})
  */
-export function validate ({ email, subject, content, code, expired }:ValidateConfigType): Promise<MailResultType> {
-  const config: SMTPPool.Options = {
-    pool:true,
-    host:process.env.MAILER_HOST,
-    port:Number(process.env.MAILER_PORT),
-    secure:true,
-    auth: {
-      user:process.env.MAILER_USER,
-      pass:process.env.MAILER_PASS
-    }
-  }
-
-  const smtpTransport = nodemailer.createTransport(config)
+export async function validate ({ email, subject, content, code, expired }:ValidateConfigType): Promise<SMTPPool.SentMessageInfo & any> {
+  const mailerPool = getSMTPPool(process.env.NODEMAILER_PROVIDER as 'gmail' | 'qq')
+  const smtpTransport = mailerPool.smtpTransport
 
   const verifyCodeExpired = expired !== undefined ? expired : 60
   const defaultSub = 'Zora email verification'
   const verifyCode = code ? code : generateVerifyCode()
   const html = generateEmailHtml(code ? code : verifyCode,expired ? expired : verifyCodeExpired,subject ? subject : defaultSub)
 
-
-  return new Promise((resolve, reject)=>{
-    smtpTransport.sendMail({
-      from:config?.auth?.user,
+  try{
+    return await smtpTransport.sendMail({
+      from:mailerPool.config?.auth?.user,
       to:email,
       subject: subject || defaultSub,
       html: content || html
-    }).then((res:SMTPPool.SentMessageInfo)=>{
-      resolve({
-        result: res,
-        code:code ? code : verifyCode
-      })
-    }).catch(err=>{
-      reject(err)
     })
-  })
+  }
+  catch (e) {
+    return e
+  }
+
 }
 
 export interface ShopifyUrlQueryType {
