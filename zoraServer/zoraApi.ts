@@ -458,7 +458,26 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
            .exec()
        }
 
-       validate({email,code,expired:EXPIRED}).then()
+       validate({email,code,expired:EXPIRED}).then(async (res)=>{
+         await beginLogger({
+           level: 'info',
+           message: `email:${email} send code success`,
+           meta:{
+             type: 'nodemailer_send_code',
+             result: res
+           }
+         })
+       })
+         .catch(async (e)=>{
+           await beginLogger({
+             level: 'error',
+             message: `email:${email} send code failed`,
+             meta:{
+               type: 'nodemailer_send_code',
+               error: e
+             }
+           })
+         })
 
        res.status(200).send({success:true,code_expired:EXPIRED,message:'code send successfully'})
      }
