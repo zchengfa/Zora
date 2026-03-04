@@ -15,6 +15,7 @@ import  '@styles/base.scss'
 import {useEffect} from "react";
 import {useSocketService} from "@hooks/useSocketService.ts";
 import {useMessageStore} from "@/zustand/zustand.ts";
+import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -28,7 +29,8 @@ function App() {
   const { socket } = useSocketService()
 
   const appBridge = useAppBridge()
-
+  const {translation} = useAppTranslation();
+  const t = translation.sidebar;
 
   const {customerStaff, chatList, activeCustomerItem} = useMessageStore()
 
@@ -79,8 +81,9 @@ function App() {
     <AppProvider embedded apiKey={apiKey}>
       <PolarisAppProvider i18n={en}>
         <s-app-nav>
-          <s-link href="/app">Chat</s-link>
-          <s-link href="/app/settings">Settings</s-link>
+          <s-link href="/app">{t.chat}</s-link>
+          <s-link href="/app/orders">{t.orders}</s-link>
+          <s-link href="/app/settings">{t.settings}</s-link>
         </s-app-nav>
         <ZoraModalProvider>
           <ZoraNotificationProvider>

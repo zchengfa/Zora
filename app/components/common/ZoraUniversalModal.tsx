@@ -76,14 +76,14 @@ interface ZoraUniversalModalProps {
       case 'success':
         return (
           <div className={ZoraUniversalModalStyle.modalSuccessContent}>
-            <div className={ZoraUniversalModalStyle.modalIcon}>✓</div>
+            <div className={ZoraUniversalModalStyle.modalIcon}>✅</div>
             <div className={ZoraUniversalModalStyle.modalSuccessText}>{successText || modalTranslation.default.successText}</div>
           </div>
         );
       case 'error':
         return (
           <div className={ZoraUniversalModalStyle.modalErrorContent}>
-            <div className={ZoraUniversalModalStyle.modalIcon}>✕</div>
+            <div className={ZoraUniversalModalStyle.modalIcon}>❌</div>
             <div className={ZoraUniversalModalStyle.modalErrorText}>{errorText || modalTranslation.default.errorText}</div>
           </div>
         );

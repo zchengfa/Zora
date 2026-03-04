@@ -29,3 +29,35 @@ export const getChatList = (agentId: string) => {
     url: `/chatList?agentId=${agentId}`,
   })
 }
+
+export const getOrders = (shopDomain:string)=>{
+  return Post({
+    url: '/orders',
+    data:{
+      shopDomain
+    }
+  })
+}
+
+export const getTrackingInfo = (trackingNumber: string, carrier: string) => {
+  return Post({
+    url: '/orders/tracking',
+    data: {
+      trackingNumber,
+      carrier
+    }
+  })
+}
+
+export const getCarriers = (shopDomain?: string) => {
+  const url = shopDomain ? `/orders/carriers?shopDomain=${shopDomain}` : '/orders/carriers';
+  return Get({
+    url
+  })
+}
+
+export const getParcelTemplates = (carrier: string) => {
+  return Get({
+    url:`/orders/parcel-templates?carrier=${carrier}`
+  })
+}

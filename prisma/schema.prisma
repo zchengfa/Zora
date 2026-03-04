@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_URL")
+  url      = env("DATABASE_URL")
 }
 
 model customer_tag_relations {
@@ -248,7 +248,7 @@ enum CurrencyCode {
 // 地址模型
 model address {
   id         String   @id @default(cuid())
-  customerId String
+  customerId String?
   name       String
   address1   String
   address2   String?
@@ -259,8 +259,8 @@ model address {
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
 
-  customer customers @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
-  Order    Order[]   @relation("OrderShippingAddress")
+  customer customers? @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
+  Order    Order[]    @relation("OrderShippingAddress")
 
   Orders Order[]
 
@@ -296,7 +296,7 @@ model Order {
   totalReceived      Decimal      @db.Decimal(10, 2) // 194.79
 
   // 渠道信息
-  channelInformation String  @default("Online Store") // 如 "Online Store"
+  channelInformation String? @default("Online Store") // 如 "Online Store"
   statusPageUrl      String?
 
   // 外部支付信息
@@ -305,8 +305,10 @@ model Order {
   shopifyOrderId        String? @unique // gid://shopify/Order/6149102141628
 
   // 关系
-  customerId        String?
-  shippingAddressId String?
+  customerId         String?
+  shippingAddressId  String?
+  //待履约订单id
+  fulfillmentOrderId String?
 
   customers       customers?           @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
   shippingAddress address?             @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id])
@@ -315,6 +317,8 @@ model Order {
   additionalFees  OrderAdditionalFee[]
   order_address   address?             @relation(fields: [order_addressId], references: [id])
   order_addressId String?
+  shipments       Shipment[]
+  fulfillmentOrders FulfillmentOrder[]
 
   @@index([customerId])
   @@index([status])
@@ -323,6 +327,77 @@ model Order {
   @@index([confirmationNumber])
   @@index([shopifyOrderId])
   @@map("orders")
+}
+
+// 待履约订单模型
+model FulfillmentOrder {
+  id                String  @id @default(cuid())
+  shopifyOrderId    String  @unique // Shopify FulfillmentOrder ID
+  orderId           String  // 关联的Order ID
+  
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineItems         FulfillmentOrderLineItem[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([orderId])
+  @@index([shopifyOrderId])
+  @@map("fulfillment_orders")
+}
+
+// 待履约订单行项目模型
+model FulfillmentOrderLineItem {
+  id                     String  @id @default(cuid())
+  shopifyLineItemId      String  // Shopify LineItem ID
+  fulfillmentOrderId      String  // 关联的FulfillmentOrder ID
+  
+  // 重量信息
+  weightUnit             String  // g, kg, lb, oz
+  weightValue            Decimal @db.Decimal(10, 2)
+  
+  // 数量信息
+  totalQuantity          Int
+  
+  fulfillmentOrder       FulfillmentOrder @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  @@index([fulfillmentOrderId])
+  @@index([shopifyLineItemId])
+  @@map("fulfillment_order_line_items")
+}
+
+// 运单信息模型
+model Shipment {
+  id               String  @id @default(cuid())
+  orderId          String  @unique
+  trackingNumber   String?
+  carrier          String // USPS, FedEx, UPS 等
+  status           String // CREATED, IN_TRANSIT, DELIVERED 等
+  labelUrl         String? // 运单标签URL
+  trackingUrl      String? // 追踪页面URL
+  shippoShipmentId String? // Shippo运单ID
+  shippoLabelId    String? // Shippo标签ID
+
+  // 包裹信息
+  weight       Decimal? @db.Decimal(10, 2)
+  length       Decimal? @db.Decimal(10, 2)
+  width        Decimal? @db.Decimal(10, 2)
+  height       Decimal? @db.Decimal(10, 2)
+  distanceUnit String? // in, cm
+  massUnit     String? // lb, kg
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([trackingNumber])
+  @@index([status])
+  @@map("shipments")
 }
 
 // 订单商品行模型

@@ -28,7 +28,7 @@ export interface CustomerCreateInput {
 }
 
 export interface GraphqlMutationVariables {
-  input?:CustomerCreateInput
+  input?:CustomerCreateInput | FulfillmentInput
 }
 
 export const CUSTOMER_CREATE_MUTATION = `
@@ -88,6 +88,72 @@ export const CUSTOMER_CREATE_MUTATION = `
             provinceCode
             countryCodeV2
           }
+      }
+    }
+  }
+`
+
+export interface GraphqlFulfillmentCreateMutationResponse {
+  fulfillmentCreate: {
+    userErrors: Array<{
+      field: string[];
+      message: string;
+    }>;
+    fulfillment: {
+      id: string;
+      status: string;
+      trackingInfo: {
+        company: string;
+        number: string;
+        url: string;
+      }[];
+    };
+  };
+}
+
+export interface FulfillmentInput {
+  trackingInfo: {
+    number?: string;
+    url?: string;
+    company: string;
+    numbers?: string[];
+    urls?: string[];
+  };
+  notifyCustomer?: boolean;
+  lineItemsByFulfillmentOrder: Array<{
+    fulfillmentOrderId: string;
+    fulfillmentOrderLineItems: Array<{
+      id: string;
+      quantity: number;
+    }>;
+  }>;
+  originAddress?: {
+    address1: string;
+    address2?: string;
+    city: string;
+    zip?: number | string;
+    provinceCode: string;
+    countryCode: string;
+  };
+  message?: string;
+}
+
+
+export const FULFILLMENT_CREATE_MUTATION = `
+  mutation fulfillmentCreate($input: FulfillmentInput!) {
+    fulfillmentCreate(fulfillment: $input) {
+      userErrors {
+        field
+        message
+      }
+      fulfillment {
+        id
+        status
+        trackingInfo {
+          company
+          number
+          url
+        }
       }
     }
   }
