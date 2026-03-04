@@ -11,6 +11,7 @@ import {webhooks} from './webhooks.ts';
 import interceptors from "../plugins/interceptors.ts";
 import {ShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
 import {beginLogger} from "../plugins/bullTaskQueue.ts";
+import {shippoClientManager} from "../plugins/shippoClient.ts";
 import {WorkerHealth} from "../plugins/workerHealth.ts";
 import {SocketUtils} from "../plugins/socketUtils.ts";
 
@@ -20,6 +21,14 @@ const redis = redisClient
 const prisma = prismaClient
 const shopifyApiClientsManager = new ShopifyApiClientsManager({redis,prisma})
 const router = express.Router();
+
+// 初始化 Shippo 客户端
+const shippoApiKey = process.env.SHIPPO_API_KEY;
+if (shippoApiKey) {
+  shippoClientManager.initialize(shippoApiKey);
+} else {
+  console.warn('SHIPPO_API_KEY not found in environment variables. Shippo functionality will be disabled.');
+}
 
 const app = express()
 
@@ -105,13 +114,15 @@ startSocketServer({redis,prisma,server}).then(async (res)=>{
   })
 
 syncRedis({prisma,redis}).then(async (res)=>{
-  await beginLogger({
-    level:'info',
-    message:res.message,
-    meta:{
-      ...res.meta
-    }
-  })
+  if(res){
+    await beginLogger({
+      level:'info',
+      message:res.message,
+      meta:{
+        ...res.meta
+      }
+    })
+  }
 })
 
 

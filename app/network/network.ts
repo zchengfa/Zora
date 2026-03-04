@@ -1,7 +1,7 @@
 import axios, {AxiosError, AxiosRequestConfig, AxiosResponse} from 'axios'
 
 const baseURL = import.meta.env.VITE_BASE_URL;
-const timeout = 5000
+const timeout = 10000
 
 const instance = axios.create({
   baseURL,

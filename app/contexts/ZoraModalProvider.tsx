@@ -12,6 +12,7 @@ export interface ModalConfig {
   type?: 'default' | 'confirmation' | 'success' | 'error';
   /** 确认按钮文本 */
   confirmButtonText?: string;
+  errorText?: string | ReactNode;
   /** 确认按钮加载状态 */
   confirmLoading?: boolean;
   /** 确认回调函数 */
