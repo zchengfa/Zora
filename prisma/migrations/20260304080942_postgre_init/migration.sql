@@ -208,7 +208,7 @@ CREATE TABLE "chat_list_items" (
 -- CreateTable
 CREATE TABLE "addresses" (
     "id" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "name" TEXT NOT NULL,
     "address1" TEXT NOT NULL,
     "address2" TEXT,
@@ -241,16 +241,65 @@ CREATE TABLE "orders" (
     "totalShippingPrice" DECIMAL(10,2) NOT NULL,
     "totalPrice" DECIMAL(10,2) NOT NULL,
     "totalReceived" DECIMAL(10,2) NOT NULL,
-    "channelInformation" TEXT NOT NULL DEFAULT 'Online Store',
+    "channelInformation" TEXT DEFAULT 'Online Store',
     "statusPageUrl" TEXT,
     "stripePaymentIntentId" TEXT,
     "stripeSessionId" TEXT,
     "shopifyOrderId" TEXT,
     "customerId" TEXT,
     "shippingAddressId" TEXT,
+    "fulfillmentOrderId" TEXT,
     "order_addressId" TEXT,
 
     CONSTRAINT "orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fulfillment_orders" (
+    "id" TEXT NOT NULL,
+    "shopifyOrderId" TEXT NOT NULL,
+    "orderId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fulfillment_orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fulfillment_order_line_items" (
+    "id" TEXT NOT NULL,
+    "shopifyLineItemId" TEXT NOT NULL,
+    "fulfillmentOrderId" TEXT NOT NULL,
+    "weightUnit" TEXT NOT NULL,
+    "weightValue" DECIMAL(10,2) NOT NULL,
+    "totalQuantity" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fulfillment_order_line_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "shipments" (
+    "id" TEXT NOT NULL,
+    "orderId" TEXT NOT NULL,
+    "trackingNumber" TEXT,
+    "carrier" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "labelUrl" TEXT,
+    "trackingUrl" TEXT,
+    "shippoShipmentId" TEXT,
+    "shippoLabelId" TEXT,
+    "weight" DECIMAL(10,2),
+    "length" DECIMAL(10,2),
+    "width" DECIMAL(10,2),
+    "height" DECIMAL(10,2),
+    "distanceUnit" TEXT,
+    "massUnit" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "shipments_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -494,6 +543,33 @@ CREATE INDEX "orders_confirmationNumber_idx" ON "orders"("confirmationNumber");
 CREATE INDEX "orders_shopifyOrderId_idx" ON "orders"("shopifyOrderId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "fulfillment_orders_shopifyOrderId_key" ON "fulfillment_orders"("shopifyOrderId");
+
+-- CreateIndex
+CREATE INDEX "fulfillment_orders_orderId_idx" ON "fulfillment_orders"("orderId");
+
+-- CreateIndex
+CREATE INDEX "fulfillment_orders_shopifyOrderId_idx" ON "fulfillment_orders"("shopifyOrderId");
+
+-- CreateIndex
+CREATE INDEX "fulfillment_order_line_items_fulfillmentOrderId_idx" ON "fulfillment_order_line_items"("fulfillmentOrderId");
+
+-- CreateIndex
+CREATE INDEX "fulfillment_order_line_items_shopifyLineItemId_idx" ON "fulfillment_order_line_items"("shopifyLineItemId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "shipments_orderId_key" ON "shipments"("orderId");
+
+-- CreateIndex
+CREATE INDEX "shipments_orderId_idx" ON "shipments"("orderId");
+
+-- CreateIndex
+CREATE INDEX "shipments_trackingNumber_idx" ON "shipments"("trackingNumber");
+
+-- CreateIndex
+CREATE INDEX "shipments_status_idx" ON "shipments"("status");
+
+-- CreateIndex
 CREATE INDEX "order_line_items_orderId_idx" ON "order_line_items"("orderId");
 
 -- CreateIndex
@@ -582,6 +658,15 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_shippingAddressId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_order_addressId_fkey" FOREIGN KEY ("order_addressId") REFERENCES "addresses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fulfillment_orders" ADD CONSTRAINT "fulfillment_orders_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fulfillment_order_line_items" ADD CONSTRAINT "fulfillment_order_line_items_fulfillmentOrderId_fkey" FOREIGN KEY ("fulfillmentOrderId") REFERENCES "fulfillment_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "shipments" ADD CONSTRAINT "shipments_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "order_line_items" ADD CONSTRAINT "order_line_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;

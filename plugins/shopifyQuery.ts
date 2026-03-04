@@ -179,6 +179,31 @@ interface DisplayAddress {
     nodes: LineItem[];
   };
 
+  fulfillments: Array<{
+    id: string;
+    status: string;
+    trackingInfo: {
+      company: string;
+      number: string;
+      url: string;
+    }[];
+    createdAt: string;
+  }>;
+  fulfillmentOrders:{
+    nodes:Array<{
+      id:string,
+      lineItems:{
+        nodes:Array<{
+          id:string,
+          weight:{
+            unit:string,
+            value:number
+          },
+          totalQuantity:number
+        }>
+      }
+    }>
+  }
   channelInformation: ChannelInformation;
   confirmationNumber: string;
   currencyCode: string;
@@ -457,6 +482,46 @@ export const ORDERS_COUNT_QUERY = `
   }
  `
 
+export type GraphqlLocationsResponse = {
+  locations: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      address: {
+        address1: string;
+        address2: string;
+        zip: string;
+        country: string;
+        city: string;
+        countryCode: string;
+        province: string;
+      };
+      isFulfillmentService: boolean;
+    }>;
+  };
+}
+
+export const LOCATIONS_QUERY = `
+query GetShopLocations {
+  locations(first: 10){
+    nodes{
+      id
+      name
+      address{
+        address1
+        address2
+        zip
+        country
+        city
+        countryCode
+        province
+      }
+      isFulfillmentService
+    }
+  }
+}
+`
+
 export const SHOP_QUERY = `
   query shopQuery {
     shop{
@@ -473,7 +538,7 @@ export const SHOP_QUERY = `
     }
     myshopifyDomain
   }
-  }
+}
 `
 
 export const ORDERS_QUERY = `
@@ -637,6 +702,31 @@ export const ORDERS_QUERY = `
         province
         country
         zip
+      }
+      fulfillments(first: 10) {
+        id
+        status
+        trackingInfo {
+          company
+          number
+          url
+        }
+        createdAt
+      }
+      fulfillmentOrders(first:10){
+        nodes{
+          id
+          lineItems(first:10){
+            nodes{
+              id
+              weight{
+                unit
+                value
+              }
+              totalQuantity
+            }
+          }
+        }
       }
     }
     pageInfo{
@@ -818,6 +908,22 @@ export const PRODUCT_QUERY = `
   }
 `
 
+export const ORDERS_IDS_QUERY = `
+  query ordersIds($limit:Int,$afterCursor:String){
+    orders(first:$limit,after:$afterCursor){
+      nodes{
+        id
+      }
+      pageInfo{
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`
+
 export const ORDER_QUERY = `
   query getOrder($orderId:ID!){
     order(id:$orderId){
@@ -960,6 +1066,16 @@ export const ORDER_QUERY = `
         province
         country
         zip
+      }
+      fulfillments(first: 10) {
+        id
+        status
+        trackingInfo {
+          company
+          number
+          url
+        }
+        createdAt
       }
       additionalFees{
         id

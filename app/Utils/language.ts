@@ -1,5 +1,94 @@
 export default {
   "en": {
+    "sidebar": {
+      "chat": "Chat",
+      "orders": "Orders",
+      "settings": "Settings"
+    },
+    "orders": {
+      "title": "Orders",
+      "subtitle": "Manage your store orders",
+      "searchPlaceholder": "Search orders...",
+      "filterLabel": "Filter",
+      "refresh": "Refresh",
+      "showing": "Showing",
+      "of": "of",
+      "orders": "orders",
+      "orderDetails": "Order Details",
+      "trackPackage": "Track Package",
+      "notAvailable": "N/A",
+      "pagination": {
+        "currentPage": "Page",
+        "totalPages": "of",
+        "page": "pages"
+      },
+      "empty": {
+        "title": "No orders found",
+        "description": "Once you have orders, they will appear here."
+      },
+      "filter": {
+        "all": "All Orders",
+        "fulfilled": "Fulfilled",
+        "unfulfilled": "Unfulfilled",
+        "processing": "Processing"
+      },
+      "order": {
+        "id": "Order ID",
+        "customer": "Customer",
+        "date": "Date",
+        "total": "Total",
+        "status": "Status",
+        "fulfill": "Fulfill Order",
+        "viewDetails": "View Details",
+        "tracking": {
+          "title": "Tracking Information",
+          "carrier": "Carrier",
+          "trackingNumber": "Tracking Number",
+          "timeline": "Timeline",
+          "loading": "Loading tracking information...",
+          "noInfo": "No tracking information available",
+          "noHistory": "No tracking history available"
+        },
+        "timeline": {
+          "created": "Order created",
+          "paid": "Payment received",
+          "fulfilled": "Order fulfilled",
+          "shipped": "Order shipped",
+          "delivered": "Order delivered"
+        }
+      },
+      "fulfillment": {
+        "title": "Fulfill Order",
+        "trackingNumber": "Tracking Number",
+        "carrier": "Carrier",
+        "carrierPlaceholder": "Select carrier",
+        "notifyCustomer": "Notify customer",
+        "cancel": "Cancel",
+        "fulfill": "Fulfill",
+        "selectWarehouse": "Select Warehouse Address",
+        "warehouseDetails": "Warehouse Details",
+        "address": "Address",
+        "address2": "Address 2",
+        "city": "City",
+        "state": "State/Province",
+        "zip": "Zip Code",
+        "country": "Country",
+        "countryCode": "Country Code",
+        "selectCarrier": "Select Carrier",
+        "confirmFulfill": "Confirm Fulfillment",
+        "selectedCarrier": "Selected carrier",
+        "notSelected": "Not selected",
+        "trackingPlaceholder": "Enter tracking number",
+        "selectInstructions": "Please select a carrier and warehouse to fulfill the order.",
+        "carriers": {
+          "fedex": "FedEx",
+          "ups": "UPS",
+          "dhl": "DHL",
+          "usps": "USPS",
+          "other": "Other"
+        }
+      }
+    },
     "components":{
       "empty":{
         "profile":{
@@ -269,6 +358,95 @@ export default {
     }
   },
   "zh-CN": {
+    "sidebar": {
+      "chat": "聊天",
+      "orders": "订单",
+      "settings": "设置"
+    },
+    "orders": {
+      "title": "订单管理",
+      "subtitle": "管理您的商店订单",
+      "searchPlaceholder": "搜索订单...",
+      "filterLabel": "筛选",
+      "refresh": "刷新",
+      "showing": "显示",
+      "of": "共",
+      "orders": "个订单",
+      "orderDetails": "订单详情",
+      "trackPackage": "追踪包裹",
+      "notAvailable": "不可用",
+      "pagination": {
+        "currentPage": "第",
+        "totalPages": "，共",
+        "page":"页"
+      },
+      "empty": {
+        "title": "未找到订单",
+        "description": "当您有订单时，它们将显示在这里。"
+      },
+      "filter": {
+        "all": "全部订单",
+        "fulfilled": "已发货",
+        "unfulfilled": "未发货",
+        "processing": "处理中"
+      },
+      "order": {
+        "id": "订单编号",
+        "customer": "客户",
+        "date": "日期",
+        "total": "总计",
+        "status": "状态",
+        "fulfill": "发货",
+        "viewDetails": "查看详情",
+        "tracking": {
+          "title": "物流信息",
+          "carrier": "承运商",
+          "trackingNumber": "追踪号",
+          "timeline": "时间线",
+          "loading": "正在加载物流信息...",
+          "noInfo": "暂无物流信息",
+          "noHistory": "暂无物流记录"
+        },
+        "timeline": {
+          "created": "订单创建",
+          "paid": "收到付款",
+          "fulfilled": "订单已发货",
+          "shipped": "订单已出库",
+          "delivered": "订单已送达"
+        }
+      },
+      "fulfillment": {
+        "title": "订单发货",
+        "trackingNumber": "追踪号",
+        "carrier": "承运商",
+        "carrierPlaceholder": "选择承运商",
+        "notifyCustomer": "通知客户",
+        "cancel": "取消",
+        "fulfill": "确认发货",
+        "selectWarehouse": "选择仓库地址",
+        "warehouseDetails": "仓库详细信息",
+        "address": "地址",
+        "address2": "地址2",
+        "city": "城市",
+        "state": "州/省",
+        "zip": "邮编",
+        "country": "国家",
+        "countryCode": "国家代码",
+        "selectCarrier": "选择承运商",
+        "confirmFulfill": "确认发货",
+        "selectedCarrier": "已选择承运商",
+        "notSelected": "未选择",
+        "trackingPlaceholder": "请输入追踪号",
+        "selectInstructions": "请选择承运商和发货仓库以发货订单。",
+        "carriers": {
+          "fedex": "联邦快递",
+          "ups": "联合包裹",
+          "dhl": "敦豪",
+          "usps": "美国邮政",
+          "other": "其他"
+        }
+      }
+    },
     "components":{
       "empty":{
         "profile":{
