@@ -1,21 +1,20 @@
 import { Page, Layout, Card, Text, BlockStack, InlineStack, TextField, Button, Select, Divider, Badge, Banner } from "@shopify/polaris";
 import '@shopify/polaris/build/esm/styles.css';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { usePersistStorage } from '@hooks/usePersistStorage';
 import { useAppTranslation } from '@hooks/useAppTranslation';
+import { getAgentSettings, updateAgentSettings } from '@/network/request.ts';
+import { useMessageStore } from '@/zustand/zustand';
 
 function AppSettings() {
   const LOCALSTORAGE_KEY = 'zora_application_theme';
   const {translation} = useAppTranslation()
   const [theme, setPersistTheme] = usePersistStorage(LOCALSTORAGE_KEY, 'light');
   const settingTranslation = translation.setting;
-
-  const changeTheme = useCallback(() => {
-    const newState = theme === 'dark' ? 'light' : 'dark';
-    setPersistTheme(newState);
-    const htmlEl = document.getElementsByTagName('html')[0];
-    htmlEl.setAttribute('data-theme', newState);
-  }, [theme, setPersistTheme]);
+  const messageStore = useMessageStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -34,6 +33,101 @@ function AppSettings() {
   const [typingIndicator, setTypingIndicator] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
   const [maxChatHistory, setMaxChatHistory] = useState('30');
+
+  const changeTheme = useCallback(() => {
+    const newState = theme === 'dark' ? 'light' : 'dark';
+    setPersistTheme(newState);
+    const htmlEl = document.getElementsByTagName('html')[0];
+    htmlEl.setAttribute('data-theme', newState);
+  }, [theme, setPersistTheme]);
+
+  // 加载设置数据
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (messageStore.customerStaff?.id) {
+        try {
+          const response = await getAgentSettings(messageStore.customerStaff.id);
+          if (response?.data?.settings) {
+            const settings = response.data.settings;
+            // 更新所有设置状态
+            setEmailNotifications(settings.emailNotifications ?? true);
+            setPushNotifications(settings.pushNotifications ?? true);
+            setSoundEnabled(settings.soundEnabled ?? true);
+            setNotificationSound(settings.notificationSound ?? 'default');
+            setAutoReplyEnabled(settings.autoReplyEnabled ?? true);
+            setAutoReplyMessage(settings.autoReplyMessage ?? '');
+            setAutoReplyDelay(settings.autoReplyDelay?.toString() ?? '30');
+            setWorkHoursEnabled(settings.workHoursEnabled ?? true);
+            setWorkStartHour(settings.workStartHour ?? '09:00');
+            setWorkEndHour(settings.workEndHour ?? '18:00');
+            setWorkDays(settings.workDays?.toString() ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].toString());
+            setTypingIndicator(settings.typingIndicator ?? true);
+            setReadReceipts(settings.readReceipts ?? true);
+            setMaxChatHistory(settings.maxChatHistory?.toString() ?? '30');
+          }
+        } catch (error) {
+          console.error('加载设置失败:', error);
+        }
+      }
+    };
+
+    loadSettings().then();
+  }, [messageStore.customerStaff?.id]);
+
+  // 保存设置数据
+  const handleSaveSettings = useCallback(async () => {
+    if (!messageStore.customerStaff?.id) {
+      console.error('未找到客服信息');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const settingsData = {
+        staffProfileId: messageStore.customerStaff.id,
+        theme,
+        emailNotifications,
+        pushNotifications,
+        soundEnabled,
+        notificationSound,
+        autoReplyEnabled,
+        autoReplyMessage,
+        autoReplyDelay: parseInt(autoReplyDelay, 10),
+        workHoursEnabled,
+        workStartHour,
+        workEndHour,
+        workDays: workDays.split(',').map((day: string) => day.trim()),
+        typingIndicator,
+        readReceipts,
+        maxChatHistory: parseInt(maxChatHistory, 10),
+      };
+
+      await updateAgentSettings(settingsData);
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('保存设置失败:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    messageStore.customerStaff?.id,
+    theme,
+    emailNotifications,
+    pushNotifications,
+    soundEnabled,
+    notificationSound,
+    autoReplyEnabled,
+    autoReplyMessage,
+    autoReplyDelay,
+    workHoursEnabled,
+    workStartHour,
+    workEndHour,
+    workDays,
+    typingIndicator,
+    readReceipts,
+    maxChatHistory,
+  ]);
 
   const soundOptions = [
     { label: 'Default sound', value: 'default' },
@@ -57,10 +151,17 @@ function AppSettings() {
       title={settingTranslation.app.title}
       subtitle={settingTranslation.app.subtitle}
       primaryAction={{
-        content: settingTranslation.app.primaryAction.content,
-        onAction: () => {},
+        content: isSaving ? 'Saving...' : settingTranslation.app.primaryAction.content,
+        onAction: handleSaveSettings,
+        loading: isSaving,
+        disabled: isSaving,
       }}
     >
+      {showSaveSuccess && (
+        <Banner status="success" onDismiss={() => setShowSaveSuccess(false)}>
+          Settings saved successfully!
+        </Banner>
+      )}
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
@@ -94,6 +195,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.notification.label.email}
                     checked={emailNotifications}
+                    onChange={setEmailNotifications}
                   />
                 </InlineStack>
                 <Divider />
@@ -105,6 +207,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.notification.label.push}
                     checked={pushNotifications}
+                    onChange={setPushNotifications}
                   />
                 </InlineStack>
                 <Divider />
@@ -116,6 +219,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.sound.label.sound}
                     checked={soundEnabled}
+                    onChange={setSoundEnabled}
                   />
                 </InlineStack>
                 {soundEnabled && (
@@ -144,6 +248,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.reply.label.reply}
                     checked={autoReplyEnabled}
+                    onChange={setAutoReplyEnabled}
                   />
                 </InlineStack>
                 {autoReplyEnabled && (
@@ -181,6 +286,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.working.label.online}
                     checked={workHoursEnabled}
+                    onChange={setWorkHoursEnabled}
                   />
                 </InlineStack>
                 {workHoursEnabled && (
@@ -228,6 +334,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.chat.label.typingIndicator}
                     checked={typingIndicator}
+                    onChange={setTypingIndicator}
                   />
                 </InlineStack>
                 <Divider />
@@ -239,6 +346,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.chat.label.readReceipts}
                     checked={readReceipts}
+                    onChange={setReadReceipts}
                   />
                 </InlineStack>
                 <Divider />

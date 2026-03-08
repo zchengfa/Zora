@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import {uninstallApp} from "@/network/request.ts";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, session, topic } = await authenticate.webhook(request);
@@ -11,6 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // If this webhook already ran, the session may have been deleted previously.
   if (session) {
     await db.session.deleteMany({ where: { shop } });
+    uninstallApp(shop).then()
   }
 
   return new Response();

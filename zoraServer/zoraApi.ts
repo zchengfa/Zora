@@ -17,7 +17,7 @@ import {v4 as uuidv4} from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
 import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
 import {executeShopifyId, shopifyHandleResponseData} from "../plugins/shopifyUtils.ts";
-import {addShopifySyncDataJob, beginLogger} from "../plugins/bullTaskQueue.ts";
+import {addShopifySyncDataJob, beginLogger, addShopDataCleanupJob} from "../plugins/bullTaskQueue.ts";
 import type {GraphqlCustomerCreateMutationResponse, GraphqlMutationVariables} from "../plugins/shopifyMutation.ts";
 import {generateCustomerProfile} from "../plugins/customerProfile.ts";
 
@@ -47,6 +47,61 @@ const REDIS_ATTEMPT_KEY = '_attempt_count'
 const REDIS_AUTH_ATTEMPT_KEY = '_auth_attempt_count'
 const EXPIRED = 300
 const SESSION_EXPIRED_DURATION = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * 从Shopify API获取商店信息并同步到数据库
+ * @param shopDomain 商店域名
+ * @param prisma Prisma客户端实例
+ * @param shopifyApiClientsManager Shopify API客户端管理器
+ * @returns 返回同步后的商店信息，如果同步失败则返回null
+ */
+const syncShopData = async (
+  shopDomain: string,
+  prisma: PrismaClient,
+  shopifyApiClientsManager: IShopifyApiClientsManager
+) => {
+  try {
+    const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shopDomain)
+    const shopResult = await shopifyApiClient.shop()
+
+    const data = {
+      id: executeShopifyId(shopResult.shop.id),
+      name: shopResult.shop.name,
+      email: shopResult.shop.email,
+      shop_owner_name: shopResult.shop.shopOwnerName,
+      shopify_plus: shopResult.shop.plan.shopifyPlus,
+      shopify_domain: shopResult.shop.myshopifyDomain,
+      partner_development: shopResult.shop.plan.partnerDevelopment,
+      public_display_name: shopResult.shop.plan.publicDisplayName,
+      createdAt: shopResult.shop.createdAt,
+      updatedAt: shopResult.shop.updatedAt,
+      is_installed: true
+    }
+
+    const shop = await prisma.shop.upsert({
+      where:{
+        shopify_domain: shopDomain
+      },
+      update:data,
+      create:data
+    })
+
+    await beginLogger({
+      level: "info",
+      message:`${shopDomain}数据同步完成`,
+      meta:{
+        taskType: `sync_shopify_shop_data_prisma`,
+        shop: shopDomain
+      }
+    })
+
+    return shop
+  } catch (e) {
+    console.log(e)
+    handlePrismaError(e)
+    return null
+  }
+}
 
 const getRedisStorageKey = (target: string, append: string = REDIS_EMAIL_APPEND) => `${target}${append}`
 
@@ -226,41 +281,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       })
 
       //获取商店数据
-      const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
-      const shopResult = await shopifyApiClient.shop()
-
       try{
-        const data = {
-          id: executeShopifyId(shopResult.shop.id),
-          name: shopResult.shop.name,
-          email: shopResult.shop.email,
-          shop_owner_name: shopResult.shop.shopOwnerName,
-          shopify_plus: shopResult.shop.plan.shopifyPlus,
-          shopify_domain: shopResult.shop.myshopifyDomain,
-          partner_development: shopResult.shop.plan.partnerDevelopment,
-          public_display_name: shopResult.shop.plan.publicDisplayName,
-          createdAt: shopResult.shop.createdAt,
-          updatedAt: shopResult.shop.updatedAt,
-          is_installed: true
-        }
-        const prismaShop = await prisma.shop.upsert({
-          where:{
-            shopify_domain: shop
-          },
-          update:data,
-          create:data
-        })
-
-        if(prismaShop){
-          await beginLogger({
-            level: "info",
-            message:`${shop}数据同步完成`,
-            meta:{
-              taskType: `sync_shopify_shop_data_prisma`,
-              shop
-            }
-          })
-        }
+        await syncShopData(shop, prisma, shopifyApiClientsManager)
       }
       catch (e) {
         console.log(e)
@@ -590,25 +612,18 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     }
     try{
       // 查询商店信息
-      const shop = await prisma.shop.findUnique({
+      let shop = await prisma.shop.findUnique({
         where: {
           shopify_domain: shopDomain
         }
       })
 
+      // 如果商店不存在，尝试从Shopify API获取商店信息并同步到数据库
       if(!shop){
-        return res.status(404).json({errMsg:'shop not found'})
-      }
-
-      // 查询商店下的所有客户
-      const customers = await prisma.customers.findMany({
-        where: {
-          shop_id:shop.id
+        shop = await syncShopData(shopDomain, prisma, shopifyApiClientsManager)
+        if(!shop){
+          return res.status(500).json({errMsg:'failed to sync shop data'})
         }
-      })
-
-      if(!customers || customers.length === 0){
-        return res.status(404).json({errMsg:'customer not found'})
       }
 
       // 查询是否已存在该email的客服资料
@@ -622,9 +637,10 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       if(!staffProfile){
         staffProfile = await prisma.staffProfile.create({
           data: {
-            name: shopOwnerName,
-            email: email,
-            avatarUrl: process.env.AGENT_DEFAULT_AVATAR
+            name: shop.shop_owner_name,
+            email: shop.email,
+            avatarUrl: process.env.AGENT_DEFAULT_AVATAR,
+            shop_id: shop.id.toString()
           }
         })
       }
@@ -744,13 +760,362 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     }
   });
 
+  // 搜索客户
+  app.get('/customers/search', RATE_LIMITS.NORMAL, async (req, res) => {
+    try {
+      const { keyword } = req.query;
+
+      if (!keyword || typeof keyword !== 'string') {
+        return res.status(400).json({ error: '缺少搜索关键词' });
+      }
+
+      // 获取客服信息
+      const agent = await prisma.staffProfile.findFirst();
+      if (!agent) {
+        return res.status(404).json({ error: '客服不存在' });
+      }
+
+      // 获取商店信息
+      const shop = await prisma.shop.findFirst();
+      if (!shop) {
+        return res.status(404).json({ error: '商店不存在' });
+      }
+
+      // 搜索客户（支持姓名和邮箱搜索）
+      const customers = await prisma.customers.findMany({
+        where: {
+          shop_id: shop.id,
+          OR: [
+            {
+              first_name: {
+                contains: keyword,
+                mode: 'insensitive'
+              }
+            },
+            {
+              last_name: {
+                contains: keyword,
+                mode: 'insensitive'
+              }
+            },
+            {
+              email: {
+                contains: keyword,
+                mode: 'insensitive'
+              }
+            }
+          ]
+        },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          image_url: true,
+          phone: true
+        },
+        take: 10 // 限制返回数量
+      });
+
+      // 将BigInt转换为字符串，避免JSON.stringify序列化错误
+      const serializedCustomers = customers.map(customer => ({
+        ...customer,
+        id: customer.id.toString()
+      }));
+
+      res.json({
+        success: true,
+        customers: serializedCustomers
+      });
+    } catch (error) {
+      handleApiError(req, error);
+      handlePrismaError(error);
+      res.status(500).json({ error: '服务器错误' });
+    }
+  });
+
+  // 添加客户到聊天列表
+  app.post('/chatList/add', RATE_LIMITS.NORMAL, async (req, res) => {
+    try {
+      const { agentId, customerId } = req.body;
+
+      if (!agentId || !customerId) {
+        return res.status(400).json({ error: '缺少必要参数' });
+      }
+
+      // 检查客服是否存在
+      const agent = await prisma.staffProfile.findUnique({
+        where: { id: agentId }
+      });
+
+      if (!agent) {
+        return res.status(404).json({ error: '客服不存在' });
+      }
+
+      // 检查客户是否存在
+      const customer = await prisma.customers.findUnique({
+        where: { id: BigInt(customerId) }
+      });
+
+      if (!customer) {
+        return res.status(404).json({ error: '客户不存在' });
+      }
+
+      // 检查是否已存在该客户的聊天列表项
+      const existingChat = await prisma.chatListItem.findFirst({
+        where: {
+          agentId: agentId,
+          customerId: customerId
+        }
+      });
+
+      if (existingChat) {
+        // 如果已存在，激活该对话
+        await prisma.chatListItem.updateMany({
+          where: { agentId },
+          data: { isActive: false }
+        });
+
+        await prisma.chatListItem.update({
+          where: { id: existingChat.id },
+          data: {
+            isActive: true,
+            lastTimestamp: new Date()
+          }
+        });
+
+        // 获取更新后的聊天列表
+        const updatedChatList = await prisma.chatListItem.findMany({
+          where: { agentId: agentId },
+          orderBy: { lastTimestamp: 'desc' }
+        });
+
+        return res.json({
+          success: true,
+          conversationId: existingChat.conversationId,
+          chatList: updatedChatList,
+          message: '对话已激活'
+        });
+      }
+
+      // 创建新的对话
+      const conversation = await prisma.conversation.create({
+        data: {
+          shop_id: customer.shop_id || '',
+          customer: customerId.toString(),
+          status: 'ACTIVE'
+        }
+      });
+
+      // 创建聊天列表项
+      const chatListItem = await prisma.chatListItem.create({
+        data: {
+          conversationId: conversation.id,
+          customerId: customerId.toString(),
+          customerFirstName: customer.first_name || '',
+          customerLastName: customer.last_name || '',
+          customerAvatar: customer.image_url || '/assets/default_avatar.jpg',
+          agentId: agentId,
+          isActive: true,
+          lastTimestamp: new Date(),
+          shop: customer.shop_id || ''
+        }
+      });
+
+      // 将其他对话设置为非激活状态
+      await prisma.chatListItem.updateMany({
+        where: {
+          agentId: agentId,
+          id: { not: chatListItem.id }
+        },
+        data: { isActive: false }
+      });
+
+      // 获取更新后的聊天列表
+      const updatedChatList = await prisma.chatListItem.findMany({
+        where: { agentId: agentId },
+        orderBy: { lastTimestamp: 'desc' }
+      });
+
+      res.json({
+        success: true,
+        conversationId: conversation.id,
+        chatList: updatedChatList,
+        message: '已添加到聊天列表'
+      });
+    } catch (error) {
+      handleApiError(req, error);
+      handlePrismaError(error);
+      res.status(500).json({ error: '服务器错误' });
+    }
+  });
+
+  // 获取客服设置
+  app.get('/agent/settings', RATE_LIMITS.NORMAL, async (req, res) => {
+    try {
+      const { staffProfileId } = req.query;
+
+      if (!staffProfileId || typeof staffProfileId !== 'string') {
+        return res.status(400).json({ error: '缺少staffProfileId参数' });
+      }
+
+      // 检查客服是否存在
+      const staff = await prisma.staffProfile.findUnique({
+        where: { id: staffProfileId },
+        include: {
+          agentSettings: true
+        }
+      });
+
+      if (!staff) {
+        return res.status(404).json({ error: '客服不存在' });
+      }
+
+      // 如果没有设置，返回默认值
+      if (!staff.agentSettings) {
+        const defaultSettings = {
+          theme: 'light',
+          emailNotifications: true,
+          pushNotifications: true,
+          soundEnabled: true,
+          notificationSound: 'default',
+          autoReplyEnabled: true,
+          autoReplyMessage: '',
+          autoReplyDelay: 30,
+          workHoursEnabled: true,
+          workStartHour: '09:00',
+          workEndHour: '18:00',
+          workDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+          typingIndicator: true,
+          readReceipts: true,
+          maxChatHistory: 30
+        };
+
+        return res.json({
+          success: true,
+          settings: defaultSettings
+        });
+      }
+
+      res.json({
+        success: true,
+        settings: staff.agentSettings
+      });
+    } catch (error) {
+      handleApiError(req, error);
+      handlePrismaError(error);
+      res.status(500).json({ error: '服务器错误' });
+    }
+  });
+
+  // 更新客服设置
+  app.post('/agent/settings/update', RATE_LIMITS.NORMAL, async (req, res) => {
+    try {
+      const {
+        staffProfileId,
+        theme,
+        emailNotifications,
+        pushNotifications,
+        soundEnabled,
+        notificationSound,
+        autoReplyEnabled,
+        autoReplyMessage,
+        autoReplyDelay,
+        workHoursEnabled,
+        workStartHour,
+        workEndHour,
+        workDays,
+        typingIndicator,
+        readReceipts,
+        maxChatHistory
+      } = req.body;
+
+      if (!staffProfileId) {
+        return res.status(400).json({ error: '缺少staffProfileId参数' });
+      }
+
+      // 检查客服是否存在
+      const staff = await prisma.staffProfile.findUnique({
+        where: { id: staffProfileId }
+      });
+
+      if (!staff) {
+        return res.status(404).json({ error: '客服不存在' });
+      }
+
+      // 更新或创建设置
+      const settings = await prisma.agentSettings.upsert({
+        where: { staffProfileId },
+        update: {
+          theme,
+          emailNotifications,
+          pushNotifications,
+          soundEnabled,
+          notificationSound,
+          autoReplyEnabled,
+          autoReplyMessage,
+          autoReplyDelay,
+          workHoursEnabled,
+          workStartHour,
+          workEndHour,
+          workDays,
+          typingIndicator,
+          readReceipts,
+          maxChatHistory
+        },
+        create: {
+          staffProfileId,
+          shop_id: staff.shop_id,
+          theme: theme || 'light',
+          emailNotifications: emailNotifications ?? true,
+          pushNotifications: pushNotifications ?? true,
+          soundEnabled: soundEnabled ?? true,
+          notificationSound: notificationSound || 'default',
+          autoReplyEnabled: autoReplyEnabled ?? true,
+          autoReplyMessage: autoReplyMessage || '',
+          autoReplyDelay: autoReplyDelay || 30,
+          workHoursEnabled: workHoursEnabled ?? true,
+          workStartHour: workStartHour || '09:00',
+          workEndHour: workEndHour || '18:00',
+          workDays: workDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+          typingIndicator: typingIndicator ?? true,
+          readReceipts: readReceipts ?? true,
+          maxChatHistory: maxChatHistory || 30
+        }
+      });
+
+      res.json({
+        success: true,
+        settings,
+        message: '设置已保存'
+      });
+    } catch (error) {
+      handleApiError(req, error);
+      handlePrismaError(error);
+      res.status(500).json({ error: '服务器错误' });
+    }
+  });
+
   // 获取订单列表
   app.post('/orders', RATE_LIMITS.NORMAL, async (req, res) => {
     try {
 
       const { shopDomain, page = 1, limit = 50 } = req.body;
-
-      const {id} = await redis.hgetall(`shop:installed:${shopDomain}`);
+      let id = undefined
+      let needSync = false
+      let syncCount = 0
+      const shopRedis = await redis.hgetall(`shop:installed:${shopDomain}`);
+      if(!shopRedis){
+        const shopPrisma = await prisma.shop.findUnique({
+          where:{
+            shopify_domain:shopDomain
+          }
+        })
+        id = shopPrisma?.id
+      }
+      else{
+        id = shopRedis.id
+      }
 
       // 获取Shopify API客户端
       const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shopDomain);
@@ -781,8 +1146,14 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
 
       // 同步缺失的订单数据
       if (missingOrderIds.length > 0) {
-        console.log(`发现 ${missingOrderIds.length} 个缺失的订单，开始同步...`);
-
+        await beginLogger({
+          level:'info',
+          message:`发现 ${missingOrderIds.length} 个缺失的订单，开始同步...`,
+          meta:{
+            type:'order_need_sync',
+          }
+        })
+        needSync = true
         // 分批获取缺失的订单数据
         const batchSize = 50;
         for (let i = 0; i < missingOrderIds.length; i += batchSize) {
@@ -802,7 +1173,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
             }
 
             if (ordersToSync.length > 0) {
-              await shopifyHandleResponseData(ordersToSync, 'orders', prisma, ordersToSync.length);
+              await shopifyHandleResponseData(ordersToSync, 'orders', prisma, ordersToSync.length,id);
+              syncCount += ordersToSync.length
             }
 
             // 添加延迟避免请求过快
@@ -813,114 +1185,117 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
         }
       }
 
-      // 获取该商店的订单数据（分页）
-      const skip = (page - 1) * limit;
-      const orders = await prisma.order.findMany({
-        where: {
-          customers: {
-            shop_id: id
-          },
-          customerId: {
-            not: null
-          }
-        },
-        skip,
-        include: {
-          customers: {
-            select: {
-              id: true,
-              first_name: true,
-              last_name: true,
-              email: true,
-              image_url: true
+      const returnOrder =async ()=>{
+        // 获取该商店的订单数据（分页）
+        const skip = (page - 1) * limit;
+        const orders = await prisma.order.findMany({
+          where: {
+            customers: {
+              shop_id: id
+            },
+            customerId: {
+              not: null
             }
           },
-          lineItems: {
-            select: {
-              id: true,
-              title: true,
-              quantity: true,
-              sku: true,
-              originalUnitPrice: true,
-              price: true,
-              variantTitle: true
+          skip,
+          include: {
+            customers: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                email: true,
+                image_url: true
+              }
+            },
+            lineItems: {
+              select: {
+                id: true,
+                title: true,
+                quantity: true,
+                sku: true,
+                originalUnitPrice: true,
+                price: true,
+                variantTitle: true
+              }
+            },
+            shippingAddress: true,
+            shipments: {
+              orderBy: {
+                createdAt: 'desc'
+              }
             }
           },
-          shippingAddress: true,
-          shipments: {
-            orderBy: {
-              createdAt: 'desc'
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        take: 50
-      });
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 50
+        });
 
-      // 格式化订单数据
-      const formattedOrders = orders.map(order => ({
-        id: order.id,
-        orderNumber: order.name,
-        processedAt: order.processedAt || order.createdAt,
-        financialStatus: order.fullyPaid ? 'PAID' : (order.unpaid ? 'PENDING' : 'PARTIALLY_PAID'),
-        fulfillmentStatus: order.status === 'SHIPPED' ? 'FULFILLED' :
-                           order.status === 'DELIVERED' ? 'FULFILLED' :
-                           (order.status === 'PROCESSING' ? 'IN_PROGRESS' : 'UNFULFILLED'),
-        totalPriceSet: {
-          shopMoney: {
-            amount: order.totalPrice.toString(),
-            currencyCode: order.currencyCode
-          }
-        },
-        customer: order.customers ? {
-          id: order.customers.id.toString(),
-          firstName: order.customers.first_name || '',
-          lastName: order.customers.last_name || '',
-          email: order.customers.email || '',
-          displayName: `${order.customers.first_name || ''} ${order.customers.last_name || ''}`.trim() || order.customers.email
-        } : null,
-        fulfillments: order.shipments.map(shipment => ({
-          id: shipment.id,
-          status: shipment.status === 'DELIVERED' ? 'DELIVERED' : 'IN_TRANSIT',
-          trackingInfo: {
-            company: shipment.carrier,
-            number: shipment.trackingNumber,
-            url: shipment.trackingUrl
+        // 格式化订单数据
+        const formattedOrders = orders.map(order => ({
+          id: order.id,
+          orderNumber: order.name,
+          processedAt: order.processedAt || order.createdAt,
+          financialStatus: order.fullyPaid ? 'PAID' : (order.unpaid ? 'PENDING' : 'PARTIALLY_PAID'),
+          fulfillmentStatus: order.status === 'SHIPPED' ? 'FULFILLED' :
+            order.status === 'DELIVERED' ? 'FULFILLED' :
+              (order.status === 'PROCESSING' ? 'IN_PROGRESS' : 'UNFULFILLED'),
+          totalPriceSet: {
+            shopMoney: {
+              amount: order.totalPrice.toString(),
+              currencyCode: order.currencyCode
+            }
           },
-          createdAt: shipment.createdAt
-        })),
-        lineItems: order.lineItems.map(item => ({
-          id: item.id,
-          title: item.title,
-          quantity: item.quantity,
-          variant: {
+          customer: order.customers ? {
+            id: order.customers.id.toString(),
+            firstName: order.customers.first_name || '',
+            lastName: order.customers.last_name || '',
+            email: order.customers.email || '',
+            displayName: `${order.customers.last_name || ''} ${order.customers.first_name || ''}`.trim() || order.customers.email
+          } : null,
+          fulfillments: order.shipments.map(shipment => ({
+            id: shipment.id,
+            status: shipment.status === 'DELIVERED' ? 'DELIVERED' : 'IN_TRANSIT',
+            trackingInfo: {
+              company: shipment.carrier,
+              number: shipment.trackingNumber,
+              url: shipment.trackingUrl
+            },
+            createdAt: shipment.createdAt
+          })),
+          lineItems: order.lineItems.map(item => ({
             id: item.id,
-            title: item.variantTitle || '',
-            price: item.price.toString()
-          }
-        }))
-      }));
+            title: item.title,
+            quantity: item.quantity,
+            variant: {
+              id: item.id,
+              title: item.variantTitle || '',
+              price: item.price.toString()
+            }
+          }))
+        }));
 
-      // 获取订单总数
-      const totalCount = await prisma.order.count({
-        where: {
-          customers: {
-            shop_id: id
+        // 获取订单总数
+        const totalCount = await prisma.order.count({
+          where: {
+            customers: {
+              shop_id: id
+            }
           }
-        }
-      });
+        });
 
-      res.json({
-        data: formattedOrders,
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages: Math.ceil(totalCount / limit)
-        }
-      });
+        res.json({
+          data: formattedOrders,
+          pagination: {
+            page,
+            limit,
+            totalCount,
+            totalPages: Math.ceil(totalCount / limit)
+          }
+        });
+      }
+      if (!needSync || syncCount) await returnOrder();
     } catch (error) {
       handleApiError(req, error);
       handlePrismaError(error);
@@ -1411,6 +1786,49 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
     } catch (error) {
       handleApiError(req, error);
       res.status(500).json({ result: false, message: '获取物流信息失败', error: error.message });
+    }
+  });
+
+  // 卸载应用，清理商店数据
+  app.post('/uninstall', RATE_LIMITS.STRICT,async (req, res) => {
+    try {
+      const { shopDomain } = req.body;
+
+      if(await validateRequestSender(req)){
+        return res.status(200).json({ result: false, message: 'Unauthorized' });
+      }
+
+      if (!shopDomain) {
+        return res.status(200).json({ result: false, message: 'shopDomain is required' });
+      }
+
+      // 记录卸载开始日志
+      await beginLogger({
+        level: 'info',
+        message: `开始卸载商店: ${shopDomain}`,
+        meta: {
+          taskType: 'uninstall_app',
+          shop: shopDomain
+        }
+      });
+
+      //清除对应shopifyApiClient缓存，防止重新安装后使用旧的凭证发送shopify请求
+      shopifyApiClientsManager.clearClientCache(shopDomain)
+      // 将数据清理任务提交到队列
+      const jobId = await addShopDataCleanupJob(shopDomain);
+
+      res.json({
+        result: true,
+        message: '商店数据清理任务已创建',
+        jobId: jobId
+      });
+    } catch (error) {
+      handleApiError(req, error);
+      handlePrismaError(error);
+      res.status(200).json({
+        result: false,
+        message: '创建数据清理任务失败'
+      });
     }
   });
 }

@@ -11,16 +11,26 @@ model customer_tag_relations {
   id          BigInt   @id @default(autoincrement())
   customer_id BigInt
   tag_id      Int
+  shop_id     String
   created_at  DateTime @default(now())
+
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@unique([customer_id, tag_id])
   @@index([tag_id], map: "customer_tag_relations_tag_id_fkey")
+  @@index([shop_id])
 }
 
 model customer_tags {
   id         Int      @id @default(autoincrement())
-  tag_name   String   @unique
+  tag_name   String
+  shop_id    String
   created_at DateTime @default(now())
+
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@unique([shop_id, tag_name])
+  @@index([shop_id])
 }
 
 model customers {
@@ -65,7 +75,30 @@ model shop {
   createdAt           DateTime? @default(now())
   updatedAt           DateTime?
 
-  customers customers[]
+  customers                customers[]
+  customer_tags            customer_tags[]
+  customer_tag_relations   customer_tag_relations[]
+  staffProfiles            StaffProfile[]
+  agentSettings            AgentSettings[]
+  customerServiceStaffs    CustomerServiceStaff[]
+  messages                 Message[]
+  offlineMessages          OfflineMessage[]
+  conversations            Conversation[]
+  orders                   Order[]
+  orderLineItems           OrderLineItem[]
+  orderTaxLines            OrderTaxLine[]
+  addresses                address[]
+  shipments                Shipment[]
+  fulfillmentOrders        FulfillmentOrder[]
+  fulfillmentOrderLineItems FulfillmentOrderLineItem[]
+  orderAdditionalFees      OrderAdditionalFee[]
+  products                 Product[]
+  variants                 Variant[]
+  media                    Media[]
+  mediaPreviews            MediaPreview[]
+  productMedias            ProductMedia[]
+  productVariantCounts     ProductVariantCount[]
+  productMediaCounts       ProductMediaCount[]
 }
 
 // 客服基本信息表
@@ -76,13 +109,58 @@ model StaffProfile {
   phone      String?
   avatarUrl  String?
   department String?
+  shop_id    String
   createdAt  DateTime  @default(now())
   updatedAt  DateTime? @updatedAt
 
-  staffs       CustomerServiceStaff[]
-  ChatListItem ChatListItem[]
+  shop          shop                   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  staffs        CustomerServiceStaff[]
+  ChatListItem  ChatListItem[]
+  agentSettings AgentSettings?
 
+  @@index([shop_id])
   @@map("staff_profiles")
+}
+
+// 客服设置模型
+model AgentSettings {
+  id             String       @id @default(uuid())
+  staffProfileId String       @unique
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  shop_id        String
+
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  // 界面设置
+  theme String @default("light")
+
+  // 通知设置
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+  soundEnabled       Boolean @default(true)
+  notificationSound  String  @default("default")
+
+  // 自动回复设置
+  autoReplyEnabled Boolean @default(true)
+  autoReplyMessage String?
+  autoReplyDelay   Int     @default(30)
+
+  // 工作时间设置
+  workHoursEnabled Boolean  @default(true)
+  workStartHour    String   @default("09:00")
+  workEndHour      String   @default("18:00")
+  workDays         String[] @default(["Mon", "Tue", "Wed", "Thu", "Fri"])
+
+  // 聊天设置
+  typingIndicator Boolean @default(true)
+  readReceipts    Boolean @default(true)
+  maxChatHistory  Int     @default(30)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shop_id])
+  @@map("agent_settings")
 }
 
 model CustomerServiceStaff {
@@ -92,13 +170,16 @@ model CustomerServiceStaff {
 
   profileId String
   profile   StaffProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  shop_id   String
 
+  shop     shop       @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   userId   BigInt
   customer customers? @relation(fields: [userId], references: [id])
 
   chatListItems ChatListItem[]
 
   @@unique([profileId, userId])
+  @@index([shop_id])
   @@map("customer_service_staff")
 }
 
@@ -123,17 +204,18 @@ model session {
 
 model Conversation {
   id        String             @id @default(uuid())
-  shop      String             @db.VarChar(100)
+  shop_id   String             @db.VarChar(100)
   customer  String?            @db.VarChar(100)
   status    ConversationStatus @default(ACTIVE)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
+  shop          shop          @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   messages      Message[]
   chatListItems ChatListItem[]
 
-  @@index([shop, status])
-  @@index([shop, customer])
+  @@index([shop_id, status])
+  @@index([shop_id, customer])
   @@map("conversations")
 }
 
@@ -150,14 +232,17 @@ model Message {
   contentBody    String         @db.Text
   metadata       Json?
   msgId          String?        @db.VarChar(100)
+  shop_id        String
+
+  shop         shop         @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   timestamp DateTime @default(now())
   createdAt DateTime @default(now())
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
   @@index([conversationId, timestamp])
   @@index([senderId, timestamp])
+  @@index([shop_id])
   @@map("messages")
 }
 
@@ -176,9 +261,13 @@ model OfflineMessage {
   isDelivered    Boolean       @default(false)
   deliveredAt    DateTime?
   createdAt      DateTime      @default(now())
+  shop_id        String
+
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([recipientId, isDelivered])
   @@index([conversationId])
+  @@index([shop_id])
   @@map("offline_messages")
 }
 
@@ -258,13 +347,16 @@ model address {
   zip        String
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
+  shop_id    String?
 
   customer customers? @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
   Order    Order[]    @relation("OrderShippingAddress")
+  shop     shop?      @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   Orders Order[]
 
   @@index([customerId])
+  @@index([shop_id])
   @@index([country, province, city])
   @@map("addresses")
 }
@@ -275,6 +367,9 @@ model Order {
   name               String  @unique
   note               String?
   confirmationNumber String  @unique
+  shop_id            String
+
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   // 状态信息
   status       OrderStatus  @default(CREATED)
@@ -310,14 +405,14 @@ model Order {
   //待履约订单id
   fulfillmentOrderId String?
 
-  customers       customers?           @relation(fields: [customerId], references: [shopify_customer_id], onDelete: Cascade)
-  shippingAddress address?             @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id])
-  lineItems       OrderLineItem[]
-  taxLines        OrderTaxLine[]
-  additionalFees  OrderAdditionalFee[]
-  order_address   address?             @relation(fields: [order_addressId], references: [id])
-  order_addressId String?
-  shipments       Shipment[]
+  customers         customers?           @relation(fields: [customerId], references: [shopify_customer_id], onDelete: SetNull)
+  shippingAddress   address?             @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id])
+  lineItems         OrderLineItem[]
+  taxLines          OrderTaxLine[]
+  additionalFees    OrderAdditionalFee[]
+  order_address     address?             @relation(fields: [order_addressId], references: [id])
+  order_addressId   String?
+  shipments         Shipment[]
   fulfillmentOrders FulfillmentOrder[]
 
   @@index([customerId])
@@ -326,45 +421,52 @@ model Order {
   @@index([createdAt])
   @@index([confirmationNumber])
   @@index([shopifyOrderId])
+  @@index([shop_id])
   @@map("orders")
 }
 
 // 待履约订单模型
 model FulfillmentOrder {
-  id                String  @id @default(cuid())
-  shopifyOrderId    String  @unique // Shopify FulfillmentOrder ID
-  orderId           String  // 关联的Order ID
-  
-  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  lineItems         FulfillmentOrderLineItem[]
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  id             String @id @default(cuid())
+  shopifyOrderId String @unique // Shopify FulfillmentOrder ID
+  orderId        String // 关联的Order ID
+  shop_id        String?
+
+  order     Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shop      shop?                      @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  lineItems FulfillmentOrderLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([orderId])
+  @@index([shop_id])
   @@index([shopifyOrderId])
   @@map("fulfillment_orders")
 }
 
 // 待履约订单行项目模型
 model FulfillmentOrderLineItem {
-  id                     String  @id @default(cuid())
-  shopifyLineItemId      String  // Shopify LineItem ID
-  fulfillmentOrderId      String  // 关联的FulfillmentOrder ID
-  
+  id                 String @id @default(cuid())
+  shopifyLineItemId  String // Shopify LineItem ID
+  fulfillmentOrderId String // 关联的FulfillmentOrder ID
+  shop_id            String?
+
   // 重量信息
-  weightUnit             String  // g, kg, lb, oz
-  weightValue            Decimal @db.Decimal(10, 2)
-  
+  weightUnit  String // g, kg, lb, oz
+  weightValue Decimal @db.Decimal(10, 2)
+
   // 数量信息
-  totalQuantity          Int
-  
-  fulfillmentOrder       FulfillmentOrder @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
-  
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  
+  totalQuantity Int
+
+  fulfillmentOrder FulfillmentOrder @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
+  shop             shop?             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([fulfillmentOrderId])
+  @@index([shop_id])
   @@index([shopifyLineItemId])
   @@map("fulfillment_order_line_items")
 }
@@ -380,6 +482,7 @@ model Shipment {
   trackingUrl      String? // 追踪页面URL
   shippoShipmentId String? // Shippo运单ID
   shippoLabelId    String? // Shippo标签ID
+  shop_id          String?
 
   // 包裹信息
   weight       Decimal? @db.Decimal(10, 2)
@@ -393,8 +496,10 @@ model Shipment {
   updatedAt DateTime @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shop  shop? @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@index([shop_id])
   @@index([trackingNumber])
   @@index([status])
   @@map("shipments")
@@ -407,6 +512,9 @@ model OrderLineItem {
   title    String // 如 "感恩密码"
   quantity Int     @default(1)
   sku      String? // 如 "4223-407-360"
+  shop_id  String
+
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   // 价格信息
   originalUnitPrice Decimal @db.Decimal(10, 2) // 189.84
@@ -419,6 +527,7 @@ model OrderLineItem {
 
   @@index([orderId])
   @@index([sku])
+  @@index([shop_id])
   @@map("order_line_items")
 }
 
@@ -431,10 +540,13 @@ model OrderTaxLine {
   ratePercentage Int // 13
   price          Decimal @db.Decimal(10, 2) // 21.84
   source         String?
+  shop_id        String
 
+  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@index([shop_id])
   @@map("order_tax_lines")
 }
 
@@ -444,10 +556,13 @@ model OrderAdditionalFee {
   orderId String
   title   String
   price   Decimal @db.Decimal(10, 2)
+  shop_id String?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shop  shop? @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@index([shop_id])
   @@map("order_additional_fees")
 }
 
@@ -492,11 +607,13 @@ model Product {
   tags            String[]
   vendor          String
   featuredMediaId String?
+  shop_id         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   featuredMedia Media?               @relation("ProductFeaturedMedia", fields: [featuredMediaId], references: [id])
+  shop          shop?                @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   variants      Variant[]
   media         Media[]              @relation("ProductMedia")
   translations  ProductTranslation[]
@@ -509,6 +626,7 @@ model Product {
   maxCompareAtPrice Decimal?       @db.Decimal(10, 2)
   productMedias     ProductMedia[]
 
+  @@index([shop_id])
   @@index([vendor])
   @@index([tags])
   @@map("products")
@@ -521,13 +639,16 @@ model Variant {
   currencyCode String?  @default("USD")
   sku          String?
   position     Int?
+  shop_id      String?
 
   productId String
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop    shop?    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@unique([productId, position])
   @@index([productId])
+  @@index([shop_id])
   @@map("variants")
 }
 
@@ -536,13 +657,16 @@ model Media {
   mediaContentType String
   url              String
   thumbhash        String?
+  shop_id          String?
   featuredProducts Product[] @relation("ProductFeaturedMedia")
   productMedia     Product[] @relation("ProductMedia")
 
   preview       MediaPreview?
   productMedias ProductMedia[]
+  shop          shop?        @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([mediaContentType])
+  @@index([shop_id])
   @@map("media")
 }
 
@@ -550,9 +674,12 @@ model MediaPreview {
   id       String  @id @default(cuid())
   imageUrl String?
   mediaId  String  @unique
+  shop_id  String?
 
   media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  shop  shop? @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
+  @@index([shop_id])
   @@map("media_previews")
 }
 
@@ -560,9 +687,12 @@ model ProductVariantCount {
   id        String @id @default(cuid())
   count     Int
   productId String @unique
+  shop_id   String?
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop    shop?    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
+  @@index([shop_id])
   @@map("product_variant_counts")
 }
 
@@ -570,9 +700,12 @@ model ProductMediaCount {
   id        String @id @default(cuid())
   count     Int
   productId String @unique
+  shop_id   String?
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop    shop?    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
+  @@index([shop_id])
   @@map("product_media_counts")
 }
 
@@ -597,12 +730,43 @@ model ProductMedia {
   mediaId    String
   position   Int?     @default(0)
   isFeatured Boolean? @default(false)
+  shop_id    String?
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   media   Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  shop    shop?   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@unique([productId, mediaId])
   @@index([productId])
+  @@index([shop_id])
   @@index([mediaId])
   @@map("product_media")
+}
+
+//webhook幂等处理模型
+model WebhookLog {
+  id        Int      @id @default(autoincrement())
+  webhookId String
+  shop      String
+  event     String
+  createdAt DateTime @default(now())
+
+  status      WebhookStatus @default(PENDING)
+  processedAt DateTime?
+  retryCount  Int           @default(0)
+  errorMsg    String?
+  payloadHash String
+
+  @@unique([webhookId, shop], name: "webhookId_shop")
+  @@index([shop, event])
+  @@index([shop, status])
+  @@index([webhookId, shop])
+  @@map("webhook_logs")
+}
+
+enum WebhookStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
 }
