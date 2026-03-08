@@ -27,7 +27,8 @@ export interface UseMessageStoreType {
   shopify_Shop_products: GraphqlProductInfoType;
   countedMsgIds: Set<string>;
   initMessages: (target: string) => Promise<void>;
-  initZustandState: (customerStaff: any, products: GraphqlProductInfoType) => void;
+  initGlobalState: (customerStaff: any, products: GraphqlProductInfoType) => void;
+  initChatState: () => void;
   addMessage: (message: MessageDataType | MessageDataType[]) => Promise<void>;
   changeMessages: (params: { conversationId: string; page: number; pageSize: number }) => Promise<void>;
   updateMessageStatus: (ack: MessageAckType) => void;
@@ -71,25 +72,23 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
           }
         })
       },
-      initZustandState:(customerStaff:CustomerStaffType,products)=>{
+      initGlobalState:(customerStaff:CustomerStaffType,products)=>{
+        set(()=>{
+          return {
+            shopify_Shop_products:products,
+            customerStaff
+          }
+        })
+      },
+      initChatState:()=>{
         set(()=>{
           const chatList = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_CHAT_LIST_KEY) as string) || []
           const activeCustomerItem = sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) || undefined
           const activeCustomerInfo = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) || null
-          if(!customerStaff){
-            return {
-              chatList,
-              activeCustomerItem,
-              activeCustomerInfo,
-              shopify_Shop_products:products
-            }
-          }
           return {
             chatList,
             activeCustomerItem,
-            activeCustomerInfo,
-            shopify_Shop_products:products,
-            customerStaff
+            activeCustomerInfo
           }
         })
       },
@@ -289,7 +288,7 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
                 id: item.id,
                 avatar:item.avatar,
                 conversationId:item.conversationId,
-                username:item.firstName + item.lastName
+                username:item.lastName + item.firstName
               }
             }
             else{
@@ -363,6 +362,17 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
           return {
             activeCustomerItem,
             activeCustomerInfo
+          }
+        })
+      },
+      changeActiveChatItem:(status = false)=>{
+        set(()=>{
+          const newActiveCustomerItem = status ? sessionStorage.getItem(SESSION_STORAGE_ACTIVE_ITEM_KEY) : undefined;
+          const newActiveCustomerInfo = status ? JSON.parse(sessionStorage.getItem(SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY) as string) : null;
+
+          return {
+            activeCustomerItem: newActiveCustomerItem,
+            activeCustomerInfo: newActiveCustomerInfo
           }
         })
       }

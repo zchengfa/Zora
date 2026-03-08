@@ -147,3 +147,29 @@ export const addMessageStatusUpdateJob = async (data: {
 
   return job.id;
 }
+
+/**
+ * 添加商店数据清理任务
+ * @param shopDomain 商店域名
+ * @returns 任务ID
+ */
+export const addShopDataCleanupJob = async (shopDomain: string) => {
+  const job = await shopifySyncDataQueue.add('cleanupShopData', {
+    shopDomain,
+    timestamp: new Date().toISOString(),
+  }, {
+    attempts: 3,
+    backoff: {type: 'exponential', delay: 2000},
+    removeOnComplete: 10,
+    removeOnFail: 100,
+  });
+
+  logger.info(`已创建商店数据清理任务，任务：${job.id}，商店：${shopDomain}`, {
+    meta: {
+      taskType: 'create_shop_data_cleanup_job',
+      shopDomain: shopDomain,
+    }
+  });
+
+  return job.id;
+}

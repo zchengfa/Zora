@@ -640,6 +640,17 @@ export class SocketUtils{
           return;
         }
 
+        // 根据shopify_domain查询shop的ID
+        const shopRecord = await this.config.prisma.shop.findUnique({
+          where: {
+            shopify_domain: shop
+          }
+        })
+
+        if (!shopRecord) {
+          throw new Error(`Shop not found for domain: ${shop}`)
+        }
+
         // 统计该用户的未读消息数（状态为SENT或DELIVERED且发送者为AGENT的消息）
         const unreadCount = await this.config.prisma.message.count({
           where: {
@@ -647,7 +658,7 @@ export class SocketUtils{
               in: await this.config.prisma.conversation.findMany({
                 where: {
                   customer: userId,
-                  shop: shop
+                  shop_id: shopRecord.id
                 },
                 select: { id: true }
               }).then(convs => convs.map(c => c.id))
@@ -666,7 +677,7 @@ export class SocketUtils{
               in: await this.config.prisma.conversation.findMany({
                 where: {
                   customer: userId,
-                  shop: shop
+                  shop_id: shopRecord.id
                 },
                 select: { id: true }
               }).then(convs => convs.map(c => c.id))
@@ -894,10 +905,21 @@ export class SocketUtils{
 
       //建立会话
       try{
+        // 根据shopify_domain查询shop的ID
+        const shopRecord = await this.config.prisma.shop.findUnique({
+          where: {
+            shopify_domain: user.shop
+          }
+        })
+
+        if (!shopRecord) {
+          throw new Error(`Shop not found for domain: ${user.shop}`)
+        }
+
         //查看是否建立过会话
         const prismaConversation = await this.config.prisma.conversation.findFirst({
           where:{
-            shop: user.shop,
+            shop_id: shopRecord.id,
             customer: user.userId
           }
         })
@@ -907,7 +929,7 @@ export class SocketUtils{
           const conversation = await this.config.prisma.conversation.create({
             data:{
               customer: user.userId,
-              shop: user.shop,
+              shop_id: shopRecord.id,
             }
           })
           await this.setConversation(conversation, user)
@@ -956,10 +978,26 @@ export class SocketUtils{
             compareAtPriceRange: content.compareAtPriceRange,
           })
         }
+
+        // 从conversation中获取shop_id
+        const conversation = await this.config.prisma.conversation.findUnique({
+          where: {
+            id: payload.conversationId
+          },
+          select: {
+            shop_id: true
+          }
+        })
+
+        if (!conversation) {
+          throw new Error('Conversation not found')
+        }
+
         const saveMessagePrisma = await this.config.prisma.message.create({
           data:{
             ...clonePayload,
-            msgStatus: "SENT"
+            msgStatus: "SENT",
+            shop_id: conversation.shop_id
           }
         })
         //判断消息体中的recipientType,若是AGENT，表示是发给客服的，CUSTOMER表示发给客户的
@@ -986,7 +1024,8 @@ export class SocketUtils{
               contentBody: payload.contentBody,
               metadata: payload.metadata || {},
               msgId: payload.msgId,
-              isDelivered: false
+              isDelivered: false,
+              shop_id: conversation.shop_id
             }
           })
 
@@ -1191,8 +1230,8 @@ export class SocketUtils{
             where: { id: chatList[0].conversationId }
           });
           if (conversation) {
-            shop = await prisma.shop.findFirst({
-              where: { shopify_domain: conversation.shop }
+            shop = await prisma.shop.findUnique({
+              where: { id: conversation.shop_id }
             });
           }
         }

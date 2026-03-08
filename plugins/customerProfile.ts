@@ -265,7 +265,7 @@ export async function generateCustomerProfile(
     return {
       customerId: customer.id.toString(),
       customerEmail: customer.email,
-      customerName: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+      customerName: `${customer.last_name || ''} ${customer.first_name || ''}`.trim(),
       customerPhone: customer.phone || undefined,
       customerImage: customer.image_url || undefined,
       customerSince: customer.created_at || undefined,

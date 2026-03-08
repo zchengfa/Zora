@@ -7,6 +7,89 @@ import type {IShopifyApiClientsManager, IShopifyApiClient} from "../plugins/shop
 import {shopifyHandleResponseData,getWebhookParams,executeShopifyId} from "../plugins/shopifyUtils.ts";
 import {handleApiError} from "../plugins/handleZoraError.ts";
 import {SocketUtils} from "../plugins/socketUtils.ts";
+import crypto from "crypto";
+
+interface WebhookHandlerOptions {
+  prisma: PrismaClient;
+  shop: string;
+  webhookId: string;
+  event: string;
+  handler: () => Promise<void>;
+}
+
+/**
+ * 生成payload的hash值
+ */
+function generatePayloadHash(payload: any): string {
+  const payloadStr = JSON.stringify(payload);
+  return crypto.createHash('sha256').update(payloadStr).digest('hex');
+}
+
+/**
+ * 检查webhook是否已处理过
+ */
+async function checkWebhookProcessed(prisma: PrismaClient, shop: string, webhookId: string): Promise<boolean> {
+  const existingLog = await prisma.webhookLog.findUnique({
+    where: {
+      webhookId_shop: {
+        webhookId,
+        shop
+      }
+    }
+  });
+  return !!existingLog;
+}
+
+/**
+ * 创建webhook处理记录
+ */
+async function createWebhookLog(prisma: PrismaClient, shop: string, webhookId: string, event: string): Promise<void> {
+  const payloadHash = generatePayloadHash({ webhookId, shop, event });
+  await prisma.webhookLog.create({
+    data: {
+      webhookId,
+      shop,
+      event,
+      status: 'PENDING',
+      payloadHash
+    }
+  });
+}
+
+/**
+ * 异步处理webhook业务逻辑
+ */
+async function processWebhookAsync(prisma: PrismaClient, shop: string, webhookId: string, event: string, handler: () => Promise<void>): Promise<void> {
+  try {
+    // 更新状态为处理中
+    await prisma.webhookLog.updateMany({
+      where: { webhookId, shop },
+      data: { status: 'PROCESSING' }
+    });
+
+    // 执行业务处理逻辑
+    await handler();
+
+    // 更新状态为成功
+    await prisma.webhookLog.updateMany({
+      where: { webhookId, shop },
+      data: { status: 'SUCCESS', processedAt: new Date() }
+    });
+  } catch (error) {
+    // 更新状态为失败
+    await prisma.webhookLog.updateMany({
+      where: { webhookId, shop },
+      data: {
+        status: 'FAILED',
+        errorMsg: error instanceof Error ? error.message : 'Unknown error',
+        retryCount: { increment: 1 }
+      }
+    });
+
+    // 记录错误但不抛出，避免影响响应
+    console.error(`Webhook ${webhookId} for ${shop} processing failed:`, error);
+  }
+}
 
 export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app:Express,router:Router,redis:Redis,prisma:PrismaClient,shopifyApiClientsManager:IShopifyApiClientsManager})=>{
   // Webhook验证中间件
@@ -19,9 +102,24 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
 
   // 订单创建webhook
   router.post('/orders/create', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'orders/create');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'orders/create', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {order} = await shopifyApiClient.order(id)
       const orders = []
@@ -34,17 +132,31 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
         data: order,
         shop
       })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 订单更新webhook
   router.post('/orders/updated', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'orders/updated');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'orders/updated', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {order} = await shopifyApiClient.order(id)
       const orders = []
@@ -57,40 +169,68 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
         data: order,
         shop
       })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 订单删除webhook
   router.post('/orders/delete', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'orders/delete');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'orders/delete', async () => {
       // 删除订单相关数据
       await prisma.order.deleteMany({
         where: {
           shopifyOrderId: id
         }
       })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 客户创建webhook
   router.post('/customers/create', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'customers/create');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'customers/create', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
         id
       })
       let shop_id = undefined
-      const redisShopId = await redis.hget(`shop:installed:${shop}`,'id')
+      const redisShopId = await redis.hget(`shop:installed:${shop}`,"id")
       if(redisShopId){
         shop_id = redisShopId
       }
@@ -118,23 +258,37 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
         data: customer,
         shop
       })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req,e)
-    }
+    });
   })
 
   // 客户更新webhook
   router.post('/customers/update', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'customers/update');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'customers/update', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
         id
       })
       let shop_id = undefined
-      const redisShopId = await redis.hget(`shop:installed:${shop}`,'id')
+      const redisShopId = await redis.hget(`shop:installed:${shop}`,"id")
       if(redisShopId){
         shop_id = redisShopId
       }
@@ -161,17 +315,31 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       //   data: customer,
       //   shop
       // })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req,e)
-    }
+    });
   })
 
   // 客户删除webhook
   router.post('/customers/delete', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'customers/delete');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'customers/delete', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
         id
@@ -183,49 +351,91 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
           }
         })
       }
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 产品创建webhook
   router.post('/products/create', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'products/create');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'products/create', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {product} = await shopifyApiClient.product(id)
       const products = []
       products.push(product)
       await shopifyHandleResponseData(products,'products',prisma)
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 产品更新webhook
   router.post('/products/update', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id,shop} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'products/update');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'products/update', async () => {
       const shopifyApiClient:IShopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop)
       const {product} = await shopifyApiClient.product(id)
       const products = []
       products.push(product)
       await shopifyHandleResponseData(products,'products',prisma)
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 产品删除webhook
   router.post('/products/delete', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {id} = getWebhookParams(req)
+    const {id,shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, id);
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, id, 'products/delete');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, id, 'products/delete', async () => {
       // 使用executeShopifyId从Shopify ID中提取数字ID
       const productId = executeShopifyId(id)
       await prisma.product.deleteMany({
@@ -233,17 +443,31 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
           id: productId
         }
       })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   // 应用卸载webhook
   router.post('/app/uninstalled', validateWebhook, async (req:Request, res:Response) => {
-    res.status(200).json('OK')
-    try{
-      const {shop} = getWebhookParams(req)
+    const {shop} = getWebhookParams(req)
+
+    // 检查是否已处理
+    const isProcessed = await checkWebhookProcessed(prisma, shop, 'uninstalled');
+
+    if (isProcessed) {
+      // 已处理，直接返回200
+      return res.status(200).json('OK');
+    }
+
+    // 未处理，先返回200，再异步执行业务逻辑
+    res.status(200).json('OK');
+
+    // 创建webhook记录
+    await createWebhookLog(prisma, shop, 'uninstalled', 'app/uninstalled');
+
+    // 异步执行业务逻辑
+    processWebhookAsync(prisma, shop, 'uninstalled', 'app/uninstalled', async () => {
       // 清理Redis中的会话数据
       await redis.del(`session:${shop}`)
       await redis.del(`shop:installed:${shop}`)
@@ -260,10 +484,9 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
           is_installed: false
         }
       })
-    }
-    catch (e) {
+    }).catch((e) => {
       handleApiError(req, e)
-    }
+    });
   })
 
   app.use('/webhooks', express.raw({type:'application/json'}), router)

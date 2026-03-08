@@ -429,7 +429,7 @@ function OrdersPage() {
   const rows = useMemo(() => {
     return filteredOrders.map((order: Order) => [
       order.orderNumber.toString(),
-      order.customer?.displayName.split('').reverse().join('') || 'N/A',
+      order.customer?.displayName || 'N/A',
       formatDate(order.processedAt),
       formatPrice(order.totalPriceSet.shopMoney.amount, selectedOrder?.totalPriceSet.shopMoney.currencyCode || 'USD'),
       getStatusBadge(order.fulfillmentStatus),
