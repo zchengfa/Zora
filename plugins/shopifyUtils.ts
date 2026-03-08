@@ -280,11 +280,25 @@ export class ShopifyApiClientsManager implements IShopifyApiClientsManager{
       return redisSession;
     }
 
+    //redis发布清除旧shopifyApiClient消息
+    const channelName = `shopify:token:${shopDomain}`
+    const publishLockKey = `publish:lock:${shopDomain}`;
+    const lockResult = await this.redis.set(publishLockKey, 'locked', 'EX', 10, 'NX');
+    if(lockResult){
+      await this.redis.publish(channelName,JSON.stringify({
+        type:'clear_shopify_api_client_old'
+      }))
+    }
+
+    await this.redis.hset(`publish:status:${shopDomain}`, {
+      clear_client_published: 'true',
+      publish_time: Date.now()
+    });
+    await this.redis.expire(`publish:status:${shopDomain}`, this.SESSION_EXPIRED_DURATION);
     // 从数据库获取
     const prismaSession = await this.prisma.session.findFirst({
       where: { shop: shopDomain }
     });
-
     if (prismaSession && prismaSession.accessToken) {
       // 更新Redis缓存
       await this.redis.hset(`session:${shopDomain}`, { ...prismaSession });
@@ -328,12 +342,12 @@ export const getWebhookParams = (req: express.Request):{id:string,shop:string}=>
 }
 
 
-export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'orders' | 'products' | 'shop',prismaClient:PrismaClient,totalCount:number = 1)=>{
+export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'orders' | 'products' | 'shop',prismaClient:PrismaClient,totalCount:number = 1, shop_id?:string)=>{
   let result = null
   if(type === 'customers'){
     const prismaData:any[] = []
 
-    data.map((item:GraphqlCustomersResponse['customers']['nodes'][0] & {shop_id?:string})=>{
+    data.map((item:GraphqlCustomersResponse['customers']['nodes'][0])=>{
       prismaData.push({
         id: executeShopifyId(item.id),
         shopify_customer_id: item.id,
@@ -348,7 +362,7 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
         currency_code: item.amountSpent.currencyCode,
         verified_email: item.verifiedEmail,
         market_email: item.defaultEmailAddress.marketingState !== "NOT_SUBSCRIBED",
-        shop_id: item.shop_id,
+        shop_id: shop_id,
         image_url: process.env?.USER_DEFAULT_AVATAR || null
       })
     })
@@ -389,9 +403,9 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
   }
   else if(type === 'orders'){
     const prismaOrders:Partial<Array<GraphqlOrdersResponse['orders']["nodes"][0]> & any[]> = []
-    const prismaOrderTaxLines: Array<{orderId:string,title:string,rate:number,ratePercentage:number,price:number,source: string | null}> = []
-    const prismaOrderLinesItem: Array<{orderId:string,title:string,variantTitle:string,sku:string,quantity:number,price:string,originalUnitPrice:string}> = []
-    const prismaOrderAdditionalFees: Array<{id:string,price:string,title:string,orderId:string}> = []
+    const prismaOrderTaxLines: Array<{orderId:string,title:string,rate:number,ratePercentage:number,price:number,source: string | null, shop_id?:string}> = []
+    const prismaOrderLinesItem: Array<{orderId:string,title:string,variantTitle:string,sku:string,quantity:number,price:string,originalUnitPrice:string, shop_id?:string}> = []
+    const prismaOrderAdditionalFees: Array<{id:string,price:string,title:string,orderId:string, shop_id?:string}> = []
     const prismaOrderAddresses: Array<{
       id: string,
       customerId: string | null,
@@ -402,7 +416,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
       province: string,
       country: string,
       zip: string,
-      isDefault: boolean
+      isDefault: boolean,
+      shop_id?:string
     }> = []
     const prismaShipments: Array<{
       id: string,
@@ -411,12 +426,14 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
       carrier: string,
       status: string,
       trackingUrl: string,
-      createdAt: string
+      createdAt: string,
+      shop_id?:string
     }> = []
     const prismaFulfillmentOrders: Array<{
       id: string,
       shopifyOrderId: string,
-      orderId: string
+      orderId: string,
+      shop_id?:string
     }> = []
     const prismaFulfillmentOrderLineItems: Array<{
       id: string,
@@ -424,7 +441,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
       fulfillmentOrderId: string,
       weightUnit: string,
       weightValue: number,
-      totalQuantity: number
+      totalQuantity: number,
+      shop_id?:string
     }> = []
     data.map((item:GraphqlOrdersResponse['orders']["nodes"][0])=>{
       prismaOrders.push({
@@ -448,7 +466,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
         totalReceived: item.totalReceivedSet.shopMoney.amount,
         totalShippingPrice: item.totalShippingPriceSet.shopMoney.amount,
         totalPrice: item.totalPriceSet.shopMoney.amount,
-        subtotalPrice: Number(item.subtotalPriceSet.shopMoney.amount).toFixed(1).toString()
+        subtotalPrice: Number(item.subtotalPriceSet.shopMoney.amount).toFixed(1).toString(),
+        shop_id: shop_id
       })
 
       // 保存收货地址
@@ -463,7 +482,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
           province: item.shippingAddress.province || '',
           country: item.shippingAddress.country || '',
           zip: item.shippingAddress.zip || '',
-          isDefault: false
+          isDefault: false,
+          shop_id: shop_id
         })
       }
 
@@ -475,6 +495,7 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
           ratePercentage: currentTaxLine.ratePercentage,
           price: Number(currentTaxLine.priceSet.shopMoney.amount),
           source: currentTaxLine.source,
+          shop_id: shop_id
         })
       })
 
@@ -487,6 +508,7 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
           quantity: lineItem.quantity,
           originalUnitPrice: lineItem.originalUnitPriceSet.shopMoney.amount,
           price: lineItem.discountedUnitPriceSet.shopMoney.amount,
+          shop_id: shop_id
         })
       })
 
@@ -496,7 +518,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
             id: executeShopifyId(additionalFee.id),
             title: additionalFee.name,
             price: additionalFee.price.shopMoney.amount,
-            orderId: executeShopifyId(item.id)
+            orderId: executeShopifyId(item.id),
+            shop_id: shop_id
           })
         })
       }
@@ -512,7 +535,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
               carrier: trackingInfo.company,
               status: fulfillment.status,
               trackingUrl: trackingInfo.url,
-              createdAt: fulfillment.createdAt
+              createdAt: fulfillment.createdAt,
+              shop_id: shop_id
             })
           })
         })
@@ -525,7 +549,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
           prismaFulfillmentOrders.push({
             id: fulfillmentOrderId,
             shopifyOrderId: fulfillmentOrder.id,
-            orderId: executeShopifyId(item.id)
+            orderId: executeShopifyId(item.id),
+            shop_id: shop_id
           });
 
           // 处理待履约订单行项目
@@ -537,7 +562,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
                 fulfillmentOrderId: fulfillmentOrderId,
                 weightUnit: lineItem.weight.unit,
                 weightValue: lineItem.weight.value,
-                totalQuantity: lineItem.totalQuantity
+                totalQuantity: lineItem.totalQuantity,
+                shop_id: shop_id
               });
             });
           }
@@ -638,12 +664,12 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
   }
   else if(type === 'products'){
     const prismaProducts: Partial<GraphqlProductsResponse['products']['nodes'][0][]> = []
-    const prismaProductMediaCount:Array<{productId:string,count:number}> = []
-    const prismaProductMediaPreview:Array<{imageUrl:string,mediaId:string}> = []
-    const prismaProductVariantCount:Array<{productId:string,count:number}> = []
-    const prismaMedia:Array<{id:string,url:string,thumbhash:string,mediaContentType:string}> = []
-    const prismaProductMedia:Array<{productId:string,mediaId:string}> = []
-    const prismaProductVariant:Array<{ id: string, sku: string, price: string, unitPrice: string | null, currencyCode: string | null, productId: string, position: number }> = []
+    const prismaProductMediaCount:Array<{productId:string,count:number, shop_id?:string}> = []
+    const prismaProductMediaPreview:Array<{imageUrl:string,mediaId:string, shop_id?:string}> = []
+    const prismaProductVariantCount:Array<{productId:string,count:number, shop_id?:string}> = []
+    const prismaMedia:Array<{id:string,url:string,thumbhash:string,mediaContentType:string, shop_id?:string}> = []
+    const prismaProductMedia:Array<{productId:string,mediaId:string, shop_id?:string}> = []
+    const prismaProductVariant:Array<{ id: string, sku: string, price: string, unitPrice: string | null, currencyCode: string | null, productId: string, position: number, shop_id?:string }> = []
     const prismaProductsId:Array<{id:string,featuredMediaId: string | null}> = []
 
     data.map((product:GraphqlProductsResponse['products']['nodes'][0])=>{
@@ -665,36 +691,42 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
         maxPrice: Number(product.priceRangeV2.maxVariantPrice.amount),
         minCompareAtPrice: Number(product.compareAtPriceRange?.minVariantCompareAtPrice?.amount),
         maxCompareAtPrice: Number(product.compareAtPriceRange?.maxVariantCompareAtPrice?.amount),
+        shop_id: shop_id,
       })
       //media数量
       prismaProductMediaCount.push({
         productId: executeShopifyId(product.id),
-        count: product.mediaCount.count
+        count: product.mediaCount.count,
+        shop_id: shop_id
       })
 
       //产品variant数量
       prismaProductVariantCount.push({
         productId: executeShopifyId(product.id),
-        count: product.variantsCount.count
+        count: product.variantsCount.count,
+        shop_id: shop_id
       })
 
       //media preview
       product.media.nodes?.map((mediaPreview)=>{
         prismaProductMediaPreview.push({
           imageUrl: mediaPreview.preview.image.url,
-          mediaId: executeShopifyId(mediaPreview.id)
+          mediaId: executeShopifyId(mediaPreview.id),
+          shop_id: shop_id
         })
 
         prismaMedia.push({
           id: executeShopifyId(mediaPreview.id),
           url: mediaPreview.preview.image.url,
           thumbhash: mediaPreview.preview.image.thumbhash,
-          mediaContentType: mediaPreview.mediaContentType
+          mediaContentType: mediaPreview.mediaContentType,
+          shop_id: shop_id
         })
 
         prismaProductMedia.push({
           productId: executeShopifyId(product.id),
           mediaId: executeShopifyId(mediaPreview.id),
+          shop_id: shop_id
         })
       })
 
@@ -706,7 +738,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
           unitPrice: variant.unitPrice?.amount || null,
           currencyCode: variant.unitPrice?.currencyCode || null,
           productId: executeShopifyId(product.id),
-          position: variant.position
+          position: variant.position,
+          shop_id: shop_id
         })
       })
 

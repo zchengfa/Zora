@@ -19,7 +19,7 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "zora-server": "node zoraServer/zoraServer.ts --tunnel-url  https://d9b6-240e-47e-3260-3654-1177-de27-df6b-76e8.ngrok-free.app:3001",
+    "zora-server": "node zoraServer/zoraServer.ts",
     "shopify-worker": "node plugins/shopifyWorker.ts",
     "logger-worker": "node plugins/loggerWorker.ts",
     "message-worker": "node plugins/messageWorker.ts",

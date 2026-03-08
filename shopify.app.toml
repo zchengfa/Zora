@@ -2,8 +2,7 @@
 
 client_id = "7c06dbc29b4ecca8bbc40f53a5b7dcf9"
 name = "Zora"
-# application_url = "https://shopify-zora.onrender.com"
-application_url = "https://maintenance-assumption-deputy-detroit.trycloudflare.com"
+application_url = "https://shopify-zora.onrender.com"
 embedded = true
 
 [build]
@@ -25,5 +24,4 @@ api_version = "2026-01"
 scopes = "write_products,read_products,read_customers,write_customers,read_orders,write_orders,read_locales,read_locations,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders"
 
 [auth]
-#redirect_urls = [ "https://shopify-zora.onrender.com/api/auth" ]
-redirect_urls = [ "https://maintenance-assumption-deputy-detroit.trycloudflare.com/api/auth" ]
+redirect_urls = [ "https://shopify-zora.onrender.com/api/auth" ]

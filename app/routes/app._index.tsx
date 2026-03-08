@@ -1,5 +1,3 @@
-import {LoaderFunctionArgs, useLoaderData} from "react-router";
-import {authenticate} from "@/shopify.server";
 import indexStyle from '@styles/pages/app_index.module.scss'
 import ZoraSearch from '@components/ZoraSearch'
 import ZoraCustomerList from '@components/ZoraCustomerList'
@@ -7,11 +5,9 @@ import ZoraMessageItems from "@components/ZoraMessageItems";
 import ZoraChat from "@components/ZoraChat.tsx";
 import ZoraCustomerProfile from "@components/ZoraCustomerProfile.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
-import {useSocketNotification} from "@hooks/useSocketNotification.ts";
 import {useEffect, useState} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
-import {shopifyRequestUserInfo,shopifyCustomerStaffInit,getChatList} from "@/network/request.ts";
-import {SHOP_INFO_QUERY_GQL,PRODUCTS_QUERY_GQL} from "@Utils/graphql.ts";
+import {getChatList,searchCustomers,addCustomerToChatList} from "@/network/request.ts";
 import {MessageDataType} from "@Utils/socket.ts";
 import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
 import {
@@ -24,46 +20,35 @@ import ZoraAIChatButton from "@components/ZoraAIChatButton.tsx";
 import ZoraAIChat from "@components/ZoraAIChat.tsx";
 import ZoraOnlineStatus from "@components/ZoraOnlineStatus.tsx";
 
-export const loader = async ({request}:LoaderFunctionArgs)=>{
-  const {admin} = await authenticate.admin(request)
-  let params = request.url.substring(request.url.indexOf('?'),request.url.length)
-  if(!params.includes('hmac')){
-    params = ''
-  }
-  const shopOwnerName = await admin.graphql(SHOP_INFO_QUERY_GQL)
-  const response = await  admin.graphql(PRODUCTS_QUERY_GQL, {variables:{first: 10}})
-  const result = await response.json()
-
-  const {data} = await shopOwnerName.json()
-  let customerStaff;
-  try {
-    const result = await shopifyCustomerStaffInit(params,data.shop.email,data.shop.shopOwnerName,data.shop.myshopifyDomain)
-    customerStaff = result?.data
-  }
-  catch (e) {
-    customerStaff = null
-  }
-
-  return {
-    params,
-    customerStaff,
-    products:result?.data,
-  }
-}
 
 function Index(){
-  const {params,customerStaff,products} = useLoaderData<typeof loader>();
-  const {message,socket,messageAck,offlineMessages} = useSocketService();
-  // 使用通知Hook监听socket通知并显示
-  useSocketNotification();
+  const {socket} = useSocketService();
   const {translation} = useAppTranslation();
   const ct = translation.components.chat;
 
   const messageStore = useMessageStore();
+  const {customerStaff} = messageStore;
+
+  // 监听socket连接事件
+  useEffect(() => {
+    const handleConnect = () => {
+      console.log('✅ 已成功连接到服务器！');
+      if (customerStaff?.id) {
+        socket.emit('agent',{
+          id:customerStaff.id,
+          name:customerStaff.name,
+        })
+      }
+    };
+
+    socket.on('connect', handleConnect);
+
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [customerStaff]);
 
   useEffect(() => {
-    messageStore.initZustandState(customerStaff,products)
-
     // 获取并同步聊天列表
     if (customerStaff?.id) {
       getChatList(customerStaff.id)
@@ -84,7 +69,7 @@ function Index(){
                 lastName: activeItem.lastName,
                 avatar: activeItem.avatar,
                 isOnline: activeItem.isOnline,
-                username: activeItem.firstName + activeItem.lastName
+                username: activeItem.lastName + activeItem.firstName
               }
 
               // 更新zustand中的activeCustomerItem和activeCustomerInfo状态
@@ -133,91 +118,11 @@ function Index(){
         })
     }
 
-    socket.on('connect', () => {
-      console.log('✅ 已成功连接到服务器！');
-      socket.emit('agent',{
-        id:customerStaff.id,
-        name:customerStaff.name,
-      })
-    });
-  }, []);
-
-
-  useEffect(() => {
-    if(messageAck){
-      //收到回执，更新消息状态
-      messageStore.updateMessageStatus(messageAck)
-      messageStore.clearUpTimer(messageAck)
+    return ()=>{
+      //聊天页销毁时清除激活项
+      messageStore.changeActiveChatItem()
     }
-  }, [messageAck]);
-
-  useEffect(() => {
-    if(message){
-      let isExistUser = false
-      const userList = messageStore.chatList
-      if(!userList.length){
-        isExistUser = false
-      }
-      else{
-        userList.forEach(user=>{
-          if(user.id === message.senderId){
-            isExistUser = true
-          }
-        })
-      }
-
-      //列表不存在该客户信息，需要新增客户聊天列表项
-      if(!isExistUser){
-        shopifyRequestUserInfo(params ? params+'&id='+message.senderId : `?id=${message.senderId}`).then(res=>{
-          const {userInfo} = res.data
-          messageStore.pushChatList({
-            id:userInfo.id,
-            firstName: userInfo.first_name,
-            lastName: userInfo.last_name,
-            avatar: userInfo.image_url,
-            lastMessage: message.contentBody,
-            conversationId: message.conversationId,
-            lastTimestamp: message.timestamp
-          })
-          messageStore.addMessage(message).then()
-        }).catch(err=>{
-            console.log(err)
-          })
-      }
-      //存在，只需更新对应列表项的部分数据
-      else{
-        messageStore.updateChatList(message)
-        messageStore.addMessage(message).then()
-      }
-      socket.emit('message_delivered',{
-        type: 'ACK',
-        senderType: 'AGENT',
-        recipientId: message.senderId,
-        msgId: message.msgId,
-        msgStatus: messageStore.activeCustomerItem === message.conversationId ? 'READ' : 'DELIVERED'
-      })
-    }
-  }, [message]);
-
-  useEffect(() => {
-    if(offlineMessages){
-      // 客服端只处理客户发送的离线消息
-      const customerMessages = offlineMessages.messages.filter((msg:MessageDataType) => msg.senderType === 'CUSTOMER')
-
-      // 更新客户消息到聊天列表
-      if(customerMessages.length > 0){
-        messageStore.updateChatList(customerMessages, false)
-      }
-
-      // 添加所有消息到消息列表
-      messageStore.addMessage(offlineMessages.messages).then()
-
-      const msgIds = offlineMessages.messages.map((msg:MessageDataType)=>msg.msgId)
-      socket.emit('offline_message_ack', {
-        msgIds: Array.from(new Set(msgIds))
-      });
-    }
-  }, [offlineMessages]);
+  }, [customerStaff]);
 
   const customerItemClick = async (conversationId:string)=>{
     if(messageStore.activeCustomerItem !== conversationId){
@@ -249,6 +154,71 @@ function Index(){
       messageStore
     })
   }
+
+  // 搜索相关状态
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // 搜索客户处理函数
+  const handleSearch = async (keyword: string) => {
+    if (!keyword.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await searchCustomers(keyword);
+      if (response?.data?.customers) {
+        setSearchResults(response.data.customers);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('搜索客户失败:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // 添加客户到聊天列表
+  const handleAddToChatList = async (customer: any) => {
+    try {
+      const response = await addCustomerToChatList(
+        messageStore.customerStaff?.id,
+        customer.id
+      );
+
+      if (response?.data?.success) {
+        // 使用后端返回的聊天列表更新zustand
+        if (response?.data?.chatList) {
+          messageStore.setChatList(response.data.chatList);
+
+          // 查找新添加的客户
+          const newCustomer = response.data.chatList.find(
+            (item: any) => item.customerId === customer.id
+          );
+
+          // 如果找到新添加的客户，自动选中它
+          if (newCustomer) {
+            await customerItemClick(newCustomer.conversationId);
+            // 在移动端，切换到聊天视图
+            if (window.innerWidth <= 768) {
+              setActiveView('chat');
+            }
+          }
+        }
+
+        // 清空搜索结果
+        setSearchResults([]);
+        // 显示成功提示
+        console.log('已添加客户到聊天列表');
+      }
+    } catch (error) {
+      console.error('添加客户到聊天列表失败:', error);
+    }
+  };
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [activeView, setActiveView] = useState<'list' | 'chat' | 'profile'>('chat');
 
@@ -259,7 +229,7 @@ function Index(){
   return <div className={indexStyle.container}>
     <div className={indexStyle.content}>
       <div className={indexStyle.statusBox}>
-        <button 
+        <button
           className={`${indexStyle.viewToggle} ${activeView === 'list' ? indexStyle.active : ''}`}
           onTouchEnd={() => setActiveView('list')}
           onClick={() => setActiveView('list')}
@@ -269,7 +239,7 @@ function Index(){
             <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="currentColor"/>
           </svg>
         </button>
-        <button 
+        <button
           className={`${indexStyle.viewToggle} ${activeView === 'chat' ? indexStyle.active : ''}`}
           onTouchEnd={() => setActiveView('chat')}
           onClick={() => setActiveView('chat')}
@@ -279,7 +249,7 @@ function Index(){
             <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/>
           </svg>
         </button>
-        <button 
+        <button
           className={`${indexStyle.viewToggle} ${activeView === 'profile' ? indexStyle.active : ''}`}
           onTouchEnd={() => setActiveView('profile')}
           onClick={() => setActiveView('profile')}
@@ -289,7 +259,7 @@ function Index(){
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/>
           </svg>
         </button>
-        <ZoraAIChatButton 
+        <ZoraAIChatButton
           onTouchEnd={toggleAIChat}
           onClick={toggleAIChat}
         />
@@ -299,9 +269,14 @@ function Index(){
         <h3 className={indexStyle.chatTitle}>{ct.title}</h3>
         <div className={indexStyle.chatBox}>
           <div className={`${indexStyle.chatLeft} ${activeView !== 'list' ? indexStyle.hidden : ''}`}>
-            <ZoraSearch placeholder={ct.searchPlaceholder}></ZoraSearch>
-            <ZoraCustomerList 
-              customerData={messageStore.chatList} 
+            <ZoraSearch
+              placeholder={ct.searchPlaceholder}
+              onSearch={handleSearch}
+              searchResult={searchResults}
+              onSearchResultClick={handleAddToChatList}
+            ></ZoraSearch>
+            <ZoraCustomerList
+              customerData={messageStore.chatList}
               ItemClick={customerItemClick}
               activeView={activeView}
               setActiveView={setActiveView}
@@ -319,7 +294,7 @@ function Index(){
         </div>
       </div>
     </div>
-    <ZoraAIChat 
+    <ZoraAIChat
       isOpen={isAIChatOpen}
       onToggle={toggleAIChat}
     />

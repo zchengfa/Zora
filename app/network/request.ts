@@ -61,3 +61,44 @@ export const getParcelTemplates = (carrier: string) => {
     url:`/orders/parcel-templates?carrier=${carrier}`
   })
 }
+
+export const searchCustomers = (keyword: string) => {
+  return Get({
+    url: `/customers/search?keyword=${encodeURIComponent(keyword)}`
+  })
+}
+
+export const addCustomerToChatList = (agentId: string, customerId: string) => {
+  return Post({
+    url: '/chatList/add',
+    data: {
+      agentId,
+      customerId
+    }
+  })
+}
+
+// 获取客服设置
+export const getAgentSettings = (staffProfileId: string) => {
+  return Get({
+    url: `/agent/settings?staffProfileId=${staffProfileId}`
+  })
+}
+
+// 更新客服设置
+export const updateAgentSettings = (settings: any) => {
+  return Post({
+    url: '/agent/settings/update',
+    data: settings
+  })
+}
+
+// 卸载应用，清理商店数据
+export const uninstallApp = (shopDomain: string) => {
+  return Post({
+    url: '/uninstall',
+    data: {
+      shopDomain
+    }
+  })
+}
