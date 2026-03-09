@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("POSTGRES_URL")
 }
 
 model customer_tag_relations {
@@ -75,30 +75,30 @@ model shop {
   createdAt           DateTime? @default(now())
   updatedAt           DateTime?
 
-  customers                customers[]
-  customer_tags            customer_tags[]
-  customer_tag_relations   customer_tag_relations[]
-  staffProfiles            StaffProfile[]
-  agentSettings            AgentSettings[]
-  customerServiceStaffs    CustomerServiceStaff[]
-  messages                 Message[]
-  offlineMessages          OfflineMessage[]
-  conversations            Conversation[]
-  orders                   Order[]
-  orderLineItems           OrderLineItem[]
-  orderTaxLines            OrderTaxLine[]
-  addresses                address[]
-  shipments                Shipment[]
-  fulfillmentOrders        FulfillmentOrder[]
+  customers                 customers[]
+  customer_tags             customer_tags[]
+  customer_tag_relations    customer_tag_relations[]
+  staffProfiles             StaffProfile[]
+  agentSettings             AgentSettings[]
+  customerServiceStaffs     CustomerServiceStaff[]
+  messages                  Message[]
+  offlineMessages           OfflineMessage[]
+  conversations             Conversation[]
+  orders                    Order[]
+  orderLineItems            OrderLineItem[]
+  orderTaxLines             OrderTaxLine[]
+  addresses                 address[]
+  shipments                 Shipment[]
+  fulfillmentOrders         FulfillmentOrder[]
   fulfillmentOrderLineItems FulfillmentOrderLineItem[]
-  orderAdditionalFees      OrderAdditionalFee[]
-  products                 Product[]
-  variants                 Variant[]
-  media                    Media[]
-  mediaPreviews            MediaPreview[]
-  productMedias            ProductMedia[]
-  productVariantCounts     ProductVariantCount[]
-  productMediaCounts       ProductMediaCount[]
+  orderAdditionalFees       OrderAdditionalFee[]
+  products                  Product[]
+  variants                  Variant[]
+  media                     Media[]
+  mediaPreviews             MediaPreview[]
+  productMedias             ProductMedia[]
+  productVariantCounts      ProductVariantCount[]
+  productMediaCounts        ProductMediaCount[]
 }
 
 // 客服基本信息表
@@ -210,7 +210,7 @@ model Conversation {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  shop          shop          @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop          shop           @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   messages      Message[]
   chatListItems ChatListItem[]
 
@@ -235,7 +235,7 @@ model Message {
   shop_id        String
 
   shop         shop         @relation(fields: [shop_id], references: [id], onDelete: Cascade)
-  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   timestamp DateTime @default(now())
   createdAt DateTime @default(now())
@@ -427,8 +427,8 @@ model Order {
 
 // 待履约订单模型
 model FulfillmentOrder {
-  id             String @id @default(cuid())
-  shopifyOrderId String @unique // Shopify FulfillmentOrder ID
+  id             String  @id @default(cuid())
+  shopifyOrderId String  @unique // Shopify FulfillmentOrder ID
   orderId        String // 关联的Order ID
   shop_id        String?
 
@@ -447,7 +447,7 @@ model FulfillmentOrder {
 
 // 待履约订单行项目模型
 model FulfillmentOrderLineItem {
-  id                 String @id @default(cuid())
+  id                 String  @id @default(cuid())
   shopifyLineItemId  String // Shopify LineItem ID
   fulfillmentOrderId String // 关联的FulfillmentOrder ID
   shop_id            String?
@@ -460,7 +460,7 @@ model FulfillmentOrderLineItem {
   totalQuantity Int
 
   fulfillmentOrder FulfillmentOrder @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
-  shop             shop?             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop             shop?            @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -542,7 +542,7 @@ model OrderTaxLine {
   source         String?
   shop_id        String
 
-  shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop  shop  @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
@@ -644,7 +644,7 @@ model Variant {
   productId String
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  shop    shop?    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop    shop?   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@unique([productId, position])
   @@index([productId])
@@ -663,7 +663,7 @@ model Media {
 
   preview       MediaPreview?
   productMedias ProductMedia[]
-  shop          shop?        @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop          shop?          @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([mediaContentType])
   @@index([shop_id])
@@ -684,26 +684,26 @@ model MediaPreview {
 }
 
 model ProductVariantCount {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   count     Int
-  productId String @unique
+  productId String  @unique
   shop_id   String?
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  shop    shop?    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop    shop?   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([shop_id])
   @@map("product_variant_counts")
 }
 
 model ProductMediaCount {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   count     Int
-  productId String @unique
+  productId String  @unique
   shop_id   String?
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  shop    shop?    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop    shop?   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
   @@index([shop_id])
   @@map("product_media_counts")

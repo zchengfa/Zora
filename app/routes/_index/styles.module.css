@@ -205,7 +205,7 @@
   width: 100%;
   padding: 1rem 2rem;
   background: var(--z-color-primary);
-  color: white;
+  color: var(--z-color-primary);
   border: none;
   border-radius: var(--z-primary_border_radius);
   font-size: 1rem;
