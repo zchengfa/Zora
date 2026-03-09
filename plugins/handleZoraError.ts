@@ -26,6 +26,9 @@ export const handlePrismaError = (e:any)=>{
   else if(err.indexOf('PrismaClientValidationError') !== -1){
     errMsg = `检测到您提供的数据中，有不符合model设置的字段类型`
   }
+  else if(err.indexOf('Transaction API error:') !== -1 && err.indexOf('Transaction already closed') !== -1){
+    errMsg = '事务已关闭，请检查事务是否正确开启/事务超时，（注：极大可能为线上网络环境问题）'
+  }
   beginLogger({
     level: "error",
     message: errMsg,
