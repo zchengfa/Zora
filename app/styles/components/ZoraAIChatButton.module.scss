@@ -15,7 +15,7 @@
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(92, 106, 196, 0.2);
   animation: shimmer 3s ease infinite;
-
+  z-index: 99;
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(92, 106, 196, 0.3);
