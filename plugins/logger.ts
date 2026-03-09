@@ -54,7 +54,7 @@ if (process.env.NODE_ENV !== 'production') {
         }
       }),
       winston.format.printf(({level,message,timestamp,meta})=>{
-        return `${timestamp}(❤️) From：[${meta?.taskType}] [${level}] : ${message}`;
+        return `${timestamp}(❤️) From：[${meta?.taskType}] [${level}] : ${message} : Detail: ${meta}`;
       })
     )
   }));
