@@ -9,8 +9,8 @@ export const handlePrismaError = (e:any)=>{
     if(err.indexOf('Authentication failed') !== -1){
       errMsg = '数据库连接失败，env文件中配置的数据库参数是否有误！'
     }
-    else if(err.indexOf("Can't reach database server") !== -1){
-      errMsg = '未检测到数据库服务，请确认数据库服务已开启！'
+    else if(err.indexOf("Can't reach database server") !== -1 || err.indexOf('Please make sure your database server is running') !== -1){
+      errMsg = '数据库连接失败，未检测到数据库服务，请确认数据库服务已开启！'
     }
   }
   else if(err.indexOf('PrismaClientKnownRequestError') !== -1){

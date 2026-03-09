@@ -54,11 +54,18 @@ function Index(){
       getChatList(customerStaff.id)
         .then(async res => {
           if (res?.data?.chatList) {
+            // 转换字段名，统一为前端使用的字段名
+            const transformedChatList = res.data.chatList.map((item: any) => ({
+              ...item,
+              firstName: item.customerFirstName || item.firstName || '',
+              lastName: item.customerLastName || item.lastName || '',
+              avatar: item.customerAvatar || item.avatar || null
+            }));
             // 1. 设置聊天列表
-            messageStore.setChatList(res.data.chatList)
+            messageStore.setChatList(transformedChatList)
 
             // 2. 检查是否有激活的列表项
-            const activeItem = res.data.chatList.find(item => item.isActive)
+            const activeItem = transformedChatList.find(item => item.isActive)
 
             // 3. 如果有激活的列表项，更新zustand状态（内部会处理sessionStorage存储）
             if (activeItem?.conversationId) {
@@ -69,7 +76,7 @@ function Index(){
                 lastName: activeItem.lastName,
                 avatar: activeItem.avatar,
                 isOnline: activeItem.isOnline,
-                username: activeItem.lastName + activeItem.firstName
+                username: `${activeItem.lastName}${activeItem.firstName}`
               }
 
               // 更新zustand中的activeCustomerItem和activeCustomerInfo状态
@@ -193,10 +200,17 @@ function Index(){
       if (response?.data?.success) {
         // 使用后端返回的聊天列表更新zustand
         if (response?.data?.chatList) {
-          messageStore.setChatList(response.data.chatList);
+          // 转换字段名，统一为前端使用的字段名
+          const transformedChatList = response.data.chatList.map((item: any) => ({
+            ...item,
+            firstName: item.customerFirstName || item.firstName || '',
+            lastName: item.customerLastName || item.lastName || '',
+            avatar: item.customerAvatar || item.avatar || null
+          }));
+          messageStore.setChatList(transformedChatList);
 
           // 查找新添加的客户
-          const newCustomer = response.data.chatList.find(
+          const newCustomer = transformedChatList.find(
             (item: any) => item.customerId === customer.id
           );
 

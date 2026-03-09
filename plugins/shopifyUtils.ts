@@ -756,76 +756,67 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
 
       return prismaProducts
     })
+    // 前置优化：过滤+空数据检查
+    const validUpdateItems = prismaProductsId.filter(item => item.featuredMediaId);
+    if (prismaProducts.length === 0) {
+      await beginLogger({ level: 'info', message: `shopify ${type} 无产品数据同步，跳过`, meta: { taskType: `sync_shopify_${type}_data_prisma`, totalCount, products: 0 } });
+      return true;
+    }
 
-    try{
+    try {
+      // 事务1：基础核心表（产品+媒体）
       await prismaClient.$transaction(async (tx) => {
-        // 1. 先创建主产品记录
-        await tx.product.createMany({
-          data: prismaProducts,
-          skipDuplicates: true
-        });
+        await Promise.all([
+          tx.product.createMany({ data: prismaProducts, skipDuplicates: true }),
+          tx.media.createMany({ data: prismaMedia, skipDuplicates: true })
+        ]);
+      }, { timeout: 5000 }); // 小事务5秒足够
 
-        // 2. 创建媒体记录（MediaPreview ）
-        await tx.media.createMany({
-          data: prismaMedia,
-          skipDuplicates: true
-        });
+      // 事务2：关联表+变体表+计数表
+      await prismaClient.$transaction(async (tx) => {
+        await Promise.all([
+          tx.productMedia.createMany({ data: prismaProductMedia, skipDuplicates: true }),
+          tx.variant.createMany({ data: prismaProductVariant, skipDuplicates: true }),
+          tx.productVariantCount.createMany({ data: prismaProductVariantCount, skipDuplicates: true }),
+          tx.productMediaCount.createMany({ data: prismaProductMediaCount, skipDuplicates: true })
+        ]);
+      }, { timeout: 5000 });
 
-        // 3. 创建产品与媒体的关联关系
-        await tx.productMedia.createMany({
-          data: prismaProductMedia,
-          skipDuplicates: true
-        });
+      // 事务3：媒体预览表
+      await prismaClient.$transaction(async (tx) => {
+        await tx.mediaPreview.createMany({ data: prismaProductMediaPreview, skipDuplicates: true });
+      }, { timeout: 3000 }); // 仅1个写入，3秒足够
 
-        // 4. 创建变体记录
-        await tx.variant.createMany({
-          data: prismaProductVariant,
-          skipDuplicates: true
-        });
-
-        // 5. 最后创建 MediaPreview（它依赖 Media 表）
-        await tx.mediaPreview.createMany({
-          data: prismaProductMediaPreview,
-          skipDuplicates: true
-        });
-
-        // 6. 创建计数记录
-        await tx.productVariantCount.createMany({
-          data: prismaProductVariantCount,
-          skipDuplicates: true
-        });
-
-        await tx.productMediaCount.createMany({
-          data: prismaProductMediaCount,
-          skipDuplicates: true
-        });
-        //更新featuredMediaId
-        const updatePromises = prismaProductsId
-          .filter(item => item.featuredMediaId) // 只更新有值的
-          .map(item =>
-            tx.product.update({
+      // 分批更新featuredMediaId
+      if (validUpdateItems.length > 0) {
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < validUpdateItems.length; i += BATCH_SIZE) {
+          const batch = validUpdateItems.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(item =>
+            prismaClient.product.update({
               where: { id: item.id },
-              data: { featuredMediaId: item.featuredMediaId }
+              data: { featuredMediaId: item.featuredMediaId },
+              select: { id: true, featuredMediaId: true }
             })
-          );
-
-        await Promise.all(updatePromises)
-
-        return true;
-      });
+          ));
+        }
+      }
 
       await beginLogger({
         level: 'info',
-        message: `shopify ${type} 数据同步完成，总数据量：${totalCount}条，此次同步数据：${data.length}条`,
-        meta:{
-          taskType: `sync_shopify_${type}_data_prisma`,
-          totalCount,
-          products: data.length
-        }
-      })
-    }
-    catch (e) {
-      handlePrismaError(e)
+        message: `shopify ${type} 数据同步完成（多事务拆分），总数据量：${totalCount}条，此次同步：${data.length}条`,
+        meta: { taskType: `sync_shopify_${type}_data_prisma`, totalCount, products: data.length }
+      });
+      return true;
+
+    } catch (e) {
+      handlePrismaError(e);
+      await beginLogger({
+        level: 'error',
+        message: `shopify ${type} 数据同步失败：${e.message}`,
+        meta: { taskType: `sync_shopify_${type}_data_prisma`, totalCount, products: data.length, error: e.message }
+      });
+      return false;
     }
 
   }
