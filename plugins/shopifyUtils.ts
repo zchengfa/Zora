@@ -341,9 +341,71 @@ export const getWebhookParams = (req: express.Request):{id:string,shop:string}=>
   }
 }
 
+/**
+ * 获取商店ID
+ * @param shop - 商店域名
+ * @param redis - Redis实例
+ * @param prisma - Prisma客户端实例
+ * @param shopifyApiClient - Shopify API客户端实例（可选）
+ * @returns 商店ID
+ */
+export const getShopId = async (
+  shop: string,
+  redis: Redis,
+  prisma: PrismaClient,
+  shopifyApiClient?: IShopifyApiClient
+): Promise<string | undefined> => {
+  // 1. 首先尝试从Redis获取
+  const redisShopId = await redis.hget(`shop:installed:${shop}`, "id");
+  if (redisShopId) {
+    return redisShopId;
+  }
 
-export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'orders' | 'products' | 'shop',prismaClient:PrismaClient,totalCount:number = 1, shop_id?:string)=>{
+  // 2. 从数据库获取
+  const prismaShopResult = await prisma.shop.findUnique({
+    where: {
+      shopify_domain: shop,
+    },
+    select: {
+      id: true
+    }
+  });
+  if (prismaShopResult?.id) {
+    return prismaShopResult.id;
+  }
+
+  // 3. 如果提供了shopifyApiClient，从Shopify获取
+  if (shopifyApiClient) {
+    try {
+      const shopData = await shopifyApiClient.shop();
+      if (shopData?.shop?.id) {
+        return shopData.shop.id;
+      }
+    } catch (error) {
+      console.error('从Shopify获取商店ID失败:', error);
+    }
+  }
+
+  return undefined;
+}
+
+
+export const shopifyHandleResponseData = async (
+  data: any[],
+  type: 'customers' | 'orders' | 'products' | 'shop',
+  prismaClient: PrismaClient,
+  totalCount: number = 1,
+  shop_id?: string,
+  shop?: string,
+  redis?: Redis,
+  shopifyApiClient?: IShopifyApiClient
+)=>{
   let result = null
+
+  // 如果没有提供shop_id，尝试获取
+  if (!shop_id && shop && redis) {
+    shop_id = await getShopId(shop, redis, prismaClient, shopifyApiClient);
+  }
   if(type === 'customers'){
     const prismaData:any[] = []
 
