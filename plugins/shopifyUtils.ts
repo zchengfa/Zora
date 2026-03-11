@@ -27,12 +27,14 @@ import type {
   GraphqlCustomerByIdentifierResponse,
   GraphqlLocationsResponse
 } from './shopifyQuery.ts'
-import {CUSTOMER_CREATE_MUTATION, FULFILLMENT_CREATE_MUTATION} from './shopifyMutation.ts'
+import {CUSTOMER_CREATE_MUTATION, FULFILLMENT_CREATE_MUTATION,FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION} from './shopifyMutation.ts'
 import type {
   GraphqlCustomerCreateMutationResponse,
   GraphqlMutationVariables,
   GraphqlFulfillmentCreateMutationResponse,
-  FulfillmentInput
+  FulfillmentInput,
+  FulfillmentOrderMoveInput,
+  GraphqlFulfillmentOrderMoveMutationResponse
 } from './shopifyMutation.ts'
 import type {PrismaClient} from "@prisma/client";
 import type {Redis} from "ioredis"
@@ -109,6 +111,11 @@ export interface IShopifyApiClient {
    * 创建发货记录
    */
   fulfillmentCreate(input:FulfillmentInput): Promise<GraphqlFulfillmentCreateMutationResponse>,
+
+  /**
+   * 给待履约订单设置新的发货地点
+   */
+  updateFulfillmentOrderLocation(input:FulfillmentOrderMoveInput): Promise<GraphqlFulfillmentOrderMoveMutationResponse>
 }
 export class ShopifyApiClient implements IShopifyApiClient {
   private readonly shopConfig: { apiVersion: string; shopDomain: string; accessToken: string };
@@ -207,6 +214,12 @@ export class ShopifyApiClient implements IShopifyApiClient {
 
   public shopLocations(): Promise<GraphqlLocationsResponse> {
     return this.shopifyApiGraphqlRequest(LOCATIONS_QUERY)
+  }
+
+  public updateFulfillmentOrderLocation = (input:FulfillmentOrderMoveInput):Promise<GraphqlFulfillmentOrderMoveMutationResponse> => {
+    return this.shopifyApiGraphqlRequest(FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION, {
+      input
+    })
   }
 }
 
@@ -341,9 +354,71 @@ export const getWebhookParams = (req: express.Request):{id:string,shop:string}=>
   }
 }
 
+/**
+ * 获取商店ID
+ * @param shop - 商店域名
+ * @param redis - Redis实例
+ * @param prisma - Prisma客户端实例
+ * @param shopifyApiClient - Shopify API客户端实例（可选）
+ * @returns 商店ID
+ */
+export const getShopId = async (
+  shop: string,
+  redis: Redis,
+  prisma: PrismaClient,
+  shopifyApiClient?: IShopifyApiClient
+): Promise<string | undefined> => {
+  // 1. 首先尝试从Redis获取
+  const redisShopId = await redis.hget(`shop:installed:${shop}`, "id");
+  if (redisShopId) {
+    return redisShopId;
+  }
 
-export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'orders' | 'products' | 'shop',prismaClient:PrismaClient,totalCount:number = 1, shop_id?:string)=>{
+  // 2. 从数据库获取
+  const prismaShopResult = await prisma.shop.findUnique({
+    where: {
+      shopify_domain: shop,
+    },
+    select: {
+      id: true
+    }
+  });
+  if (prismaShopResult?.id) {
+    return prismaShopResult.id;
+  }
+
+  // 3. 如果提供了shopifyApiClient，从Shopify获取
+  if (shopifyApiClient) {
+    try {
+      const shopData = await shopifyApiClient.shop();
+      if (shopData?.shop?.id) {
+        return shopData.shop.id;
+      }
+    } catch (error) {
+      console.error('从Shopify获取商店ID失败:', error);
+    }
+  }
+
+  return undefined;
+}
+
+
+export const shopifyHandleResponseData = async (
+  data: any[],
+  type: 'customers' | 'orders' | 'products' | 'shop',
+  prismaClient: PrismaClient,
+  totalCount: number = 1,
+  shop_id?: string,
+  shop?: string,
+  redis?: Redis,
+  shopifyApiClient?: IShopifyApiClient
+)=>{
   let result = null
+
+  // 如果没有提供shop_id，尝试获取
+  if (!shop_id && shop && redis) {
+    shop_id = await getShopId(shop, redis, prismaClient, shopifyApiClient);
+  }
   if(type === 'customers'){
     const prismaData:any[] = []
 
@@ -427,13 +502,15 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
       status: string,
       trackingUrl: string,
       createdAt: string,
-      shop_id?:string
+      shop_id?:string,
+      test: boolean
     }> = []
     const prismaFulfillmentOrders: Array<{
       id: string,
       shopifyOrderId: string,
       orderId: string,
-      shop_id?:string
+      shop_id?:string,
+      status: string
     }> = []
     const prismaFulfillmentOrderLineItems: Array<{
       id: string,
@@ -536,7 +613,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
               status: fulfillment.status,
               trackingUrl: trackingInfo.url,
               createdAt: fulfillment.createdAt,
-              shop_id: shop_id
+              shop_id: shop_id,
+              test: trackingInfo.url.indexOf('shippo') !== -1
             })
           })
         })
@@ -550,7 +628,8 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
             id: fulfillmentOrderId,
             shopifyOrderId: fulfillmentOrder.id,
             orderId: executeShopifyId(item.id),
-            shop_id: shop_id
+            shop_id: shop_id,
+            status: fulfillmentOrder.status,
           });
 
           // 处理待履约订单行项目
@@ -572,90 +651,101 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
     })
 
     try{
-      await prismaClient.$transaction(async (tx) => {
-        const order = await tx.order.createMany({
-          data: prismaOrders,
-          skipDuplicates: true
-        })
+      // 创建订单数据
+      const order = await prismaClient.order.createMany({
+        data: prismaOrders,
+        skipDuplicates: true
+      })
 
-        if(order.count){
-          const orderTaxL = await tx.orderTaxLine.createMany({
-            data: prismaOrderTaxLines
+      if(order.count){
+        // 事务批量创建关联数据
+        await prismaClient.$transaction(async (tx) => {
+          await tx.orderTaxLine.createMany({
+            data: prismaOrderTaxLines,
+            skipDuplicates: true
           })
 
-          const orderLI = await tx.orderLineItem.createMany({
-            data: prismaOrderLinesItem
+          await tx.orderLineItem.createMany({
+            data: prismaOrderLinesItem,
+            skipDuplicates: true
           })
 
-          const orderA = await tx.orderAdditionalFee.createMany({
-            data: prismaOrderAdditionalFees
+          await tx.orderAdditionalFee.createMany({
+            data: prismaOrderAdditionalFees,
+            skipDuplicates: true
           })
 
           // 保存收货地址
-          const orderAddr = await tx.address.createMany({
+          await tx.address.createMany({
             data: prismaOrderAddresses,
             skipDuplicates: true
           })
 
           // 保存运单信息
-          const shipments = await tx.shipment.createMany({
+          await tx.shipment.createMany({
             data: prismaShipments,
             skipDuplicates: true
           })
 
           // 保存待履约订单信息
-          const fulfillmentOrders = await tx.fulfillmentOrder.createMany({
+          await tx.fulfillmentOrder.createMany({
             data: prismaFulfillmentOrders,
             skipDuplicates: true
           })
 
           // 保存待履约订单行项目信息
-          const fulfillmentOrderLineItems = await tx.fulfillmentOrderLineItem.createMany({
+          await tx.fulfillmentOrderLineItem.createMany({
             data: prismaFulfillmentOrderLineItems,
             skipDuplicates: true
           })
+        })
 
-          // 更新订单的收货地址ID
-          for (const item of data) {
-            if (item.shippingAddress) {
-              const addressId = executeShopifyId(item.id) + '_shipping';
-              await tx.order.update({
-                where: { id: executeShopifyId(item.id) },
-                data: { shippingAddressId: addressId }
-              });
-            }
-          }
+        // 批量更新订单的收货地址ID（移出事务）
+        const addressUpdates = data
+          .filter(item => item.shippingAddress)
+          .map(item => ({
+            where: { id: executeShopifyId(item.id) },
+            data: { shippingAddressId: executeShopifyId(item.id) + '_shipping' }
+          }));
 
-          await beginLogger({
-            level: 'info',
-            message: `shopify ${type} 数据同步成功，${type}数据总数量：${totalCount},${type}：${order.count}条,${type}_tax_lines：${orderTaxL.count}条,${type}_line_items：${orderLI.count}条,${type}_additional_fee：${orderA.count}条,${type}_addresses：${orderAddr.count}条,${type}_shipments：${shipments.count}条,fulfillment_orders：${fulfillmentOrders.count}条,fulfillment_order_line_items：${fulfillmentOrderLineItems.count}条
+        if (addressUpdates.length > 0) {
+          // 使用 Promise.all 并行更新，提高性能
+          await Promise.all(
+            addressUpdates.map(update =>
+              prismaClient.order.update(update)
+            )
+          );
+        }
+
+        await beginLogger({
+          level: 'info',
+          message: `shopify ${type} 数据同步成功，${type}数据总数量：${totalCount},${type}：${order.count}条,${type}_tax_lines：${prismaOrderTaxLines.length}条,${type}_line_items：${prismaOrderLinesItem.length}条,${type}_additional_fee：${prismaOrderAdditionalFees.length}条,${type}_addresses：${prismaOrderAddresses.length}条,${type}_shipments：${prismaShipments.length}条,fulfillment_orders：${prismaFulfillmentOrders.length}条,fulfillment_order_line_items：${prismaFulfillmentOrderLineItems.length}条
           `,
-            meta:{
-              taskType: `sync_shopify_${type}_data_prisma`,
-              totalCount,
-              taxLines: orderTaxL.count,
-              additionalFee: orderA.count,
-              lineItems: orderLI.count,
-              orders: order.count,
-              addresses: orderAddr.count,
-              shipments: shipments.count,
-              fulfillmentOrders: fulfillmentOrders.count,
-              fulfillmentOrderLineItems: fulfillmentOrderLineItems.count,
-            }
-          })
-        }
-        else {
-          await beginLogger({
-            level: 'info',
-            message: `shopify ${type}数据已存在数据库，无需同步，${type}数据总数量：${totalCount},${type}无需同步：${order.count}条`,
-            meta:{
-              taskType: `sync_shopify_${type}_data_prisma`,
-              totalCount,
-              orders: order.count,
-            }
-          })
-        }
-      })
+          meta:{
+            taskType: `sync_shopify_${type}_data_prisma`,
+            totalCount,
+            taxLines: prismaOrderTaxLines.length,
+            additionalFee: prismaOrderAdditionalFees.length,
+            lineItems: prismaOrderLinesItem.length,
+            orders: order.count,
+            addresses: prismaOrderAddresses.length,
+            shipments: prismaShipments.length,
+            fulfillmentOrders: prismaFulfillmentOrders.length,
+            fulfillmentOrderLineItems: prismaFulfillmentOrderLineItems.length,
+          }
+        })
+      }
+      else {
+        await beginLogger({
+          level: 'info',
+          message: `shopify ${type}数据已存在数据库，无需同步，${type}数据总数量：${totalCount},${type}无需同步：${order.count}条`,
+          meta:{
+            taskType: `sync_shopify_${type}_data_prisma`,
+            totalCount,
+            orders: order.count,
+          }
+        })
+      }
 
     }
     catch (e) {
@@ -745,76 +835,67 @@ export const shopifyHandleResponseData = async (data:any[],type:'customers' | 'o
 
       return prismaProducts
     })
+    // 前置优化：过滤+空数据检查
+    const validUpdateItems = prismaProductsId.filter(item => item.featuredMediaId);
+    if (prismaProducts.length === 0) {
+      await beginLogger({ level: 'info', message: `shopify ${type} 无产品数据同步，跳过`, meta: { taskType: `sync_shopify_${type}_data_prisma`, totalCount, products: 0 } });
+      return true;
+    }
 
-    try{
+    try {
+      // 事务1：基础核心表（产品+媒体）
       await prismaClient.$transaction(async (tx) => {
-        // 1. 先创建主产品记录
-        await tx.product.createMany({
-          data: prismaProducts,
-          skipDuplicates: true
-        });
+        await Promise.all([
+          tx.product.createMany({ data: prismaProducts, skipDuplicates: true }),
+          tx.media.createMany({ data: prismaMedia, skipDuplicates: true })
+        ]);
+      }, { timeout: 5000 }); // 小事务5秒足够
 
-        // 2. 创建媒体记录（MediaPreview ）
-        await tx.media.createMany({
-          data: prismaMedia,
-          skipDuplicates: true
-        });
+      // 事务2：关联表+变体表+计数表
+      await prismaClient.$transaction(async (tx) => {
+        await Promise.all([
+          tx.productMedia.createMany({ data: prismaProductMedia, skipDuplicates: true }),
+          tx.variant.createMany({ data: prismaProductVariant, skipDuplicates: true }),
+          tx.productVariantCount.createMany({ data: prismaProductVariantCount, skipDuplicates: true }),
+          tx.productMediaCount.createMany({ data: prismaProductMediaCount, skipDuplicates: true })
+        ]);
+      }, { timeout: 5000 });
 
-        // 3. 创建产品与媒体的关联关系
-        await tx.productMedia.createMany({
-          data: prismaProductMedia,
-          skipDuplicates: true
-        });
+      // 事务3：媒体预览表
+      await prismaClient.$transaction(async (tx) => {
+        await tx.mediaPreview.createMany({ data: prismaProductMediaPreview, skipDuplicates: true });
+      }, { timeout: 3000 }); // 仅1个写入，3秒足够
 
-        // 4. 创建变体记录
-        await tx.variant.createMany({
-          data: prismaProductVariant,
-          skipDuplicates: true
-        });
-
-        // 5. 最后创建 MediaPreview（它依赖 Media 表）
-        await tx.mediaPreview.createMany({
-          data: prismaProductMediaPreview,
-          skipDuplicates: true
-        });
-
-        // 6. 创建计数记录
-        await tx.productVariantCount.createMany({
-          data: prismaProductVariantCount,
-          skipDuplicates: true
-        });
-
-        await tx.productMediaCount.createMany({
-          data: prismaProductMediaCount,
-          skipDuplicates: true
-        });
-        //更新featuredMediaId
-        const updatePromises = prismaProductsId
-          .filter(item => item.featuredMediaId) // 只更新有值的
-          .map(item =>
-            tx.product.update({
+      // 分批更新featuredMediaId
+      if (validUpdateItems.length > 0) {
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < validUpdateItems.length; i += BATCH_SIZE) {
+          const batch = validUpdateItems.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(item =>
+            prismaClient.product.update({
               where: { id: item.id },
-              data: { featuredMediaId: item.featuredMediaId }
+              data: { featuredMediaId: item.featuredMediaId },
+              select: { id: true, featuredMediaId: true }
             })
-          );
-
-        await Promise.all(updatePromises)
-
-        return true;
-      });
+          ));
+        }
+      }
 
       await beginLogger({
         level: 'info',
-        message: `shopify ${type} 数据同步完成，总数据量：${totalCount}条，此次同步数据：${data.length}条`,
-        meta:{
-          taskType: `sync_shopify_${type}_data_prisma`,
-          totalCount,
-          products: data.length
-        }
-      })
-    }
-    catch (e) {
-      handlePrismaError(e)
+        message: `shopify ${type} 数据同步完成（多事务拆分），总数据量：${totalCount}条，此次同步：${data.length}条`,
+        meta: { taskType: `sync_shopify_${type}_data_prisma`, totalCount, products: data.length }
+      });
+      return true;
+
+    } catch (e) {
+      handlePrismaError(e);
+      await beginLogger({
+        level: 'error',
+        message: `shopify ${type} 数据同步失败：${e.message}`,
+        meta: { taskType: `sync_shopify_${type}_data_prisma`, totalCount, products: data.length, error: e.message }
+      });
+      return false;
     }
 
   }

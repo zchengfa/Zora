@@ -1238,9 +1238,6 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           orderNumber: order.name,
           processedAt: order.processedAt || order.createdAt,
           financialStatus: order.fullyPaid ? 'PAID' : (order.unpaid ? 'PENDING' : 'PARTIALLY_PAID'),
-          fulfillmentStatus: order.status === 'SHIPPED' ? 'FULFILLED' :
-            order.status === 'DELIVERED' ? 'FULFILLED' :
-              (order.status === 'PROCESSING' ? 'IN_PROGRESS' : 'UNFULFILLED'),
           totalPriceSet: {
             shopMoney: {
               amount: order.totalPrice.toString(),
@@ -1256,7 +1253,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           } : null,
           fulfillments: order.shipments.map(shipment => ({
             id: shipment.id,
-            status: shipment.status === 'DELIVERED' ? 'DELIVERED' : 'IN_TRANSIT',
+            status: shipment.status,
             trackingInfo: {
               company: shipment.carrier,
               number: shipment.trackingNumber,
@@ -1322,12 +1319,8 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
         return res.status(404).json({ result: false, message: "Order not found" });
       }
 
-      let finalCarrier = carrier;
-      let finalTrackingNumber = '';
-
-      // 如果使用 Shippo，生成运单和标签
-      let label: any = null;
-      let fulfillmentOrders: any[] = [];
+      const finalCarrier = carrier;
+      let finalTrackingNumber,finalTrackingUrl,trackingResult ,label,fulfillmentOrders,selectedRate,shipment;
       if (carrier) {
         try {
           const { shippoClientManager } = await import('../plugins/shippoClient.ts');
@@ -1447,41 +1440,42 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
             fulfillmentOrders.forEach(fulfillmentOrder => {
               fulfillmentOrder.lineItems.forEach(lineItem => {
                 // 将所有重量转换为同一单位
-                let itemWeight = lineItem.weightValue;
+                const weightValue = Number(lineItem.weightValue);
+                let itemWeight = weightValue;
 
                 if (lineItem.weightUnit !== firstWeightUnit) {
                   // 需要转换单位
                   if (firstWeightUnit === 'KILOGRAM') {
                     if (lineItem.weightUnit === 'GRAM') {
-                      itemWeight = lineItem.weightValue / 1000;
+                      itemWeight = weightValue / 1000;
                     } else if (lineItem.weightUnit === 'OUNCE') {
-                      itemWeight = lineItem.weightValue * 0.0283495;
+                      itemWeight = weightValue * 0.0283495;
                     } else if (lineItem.weightUnit === 'POUND') {
-                      itemWeight = lineItem.weightValue * 0.453592;
+                      itemWeight = weightValue * 0.453592;
                     }
                   } else if (firstWeightUnit === 'GRAM') {
                     if (lineItem.weightUnit === 'KILOGRAM') {
-                      itemWeight = lineItem.weightValue * 1000;
+                      itemWeight = weightValue * 1000;
                     } else if (lineItem.weightUnit === 'OUNCE') {
-                      itemWeight = lineItem.weightValue * 28.3495;
+                      itemWeight = weightValue * 28.3495;
                     } else if (lineItem.weightUnit === 'POUND') {
-                      itemWeight = lineItem.weightValue * 453.592;
+                      itemWeight = weightValue * 453.592;
                     }
                   } else if (firstWeightUnit === 'OUNCE') {
                     if (lineItem.weightUnit === 'KILOGRAM') {
-                      itemWeight = lineItem.weightValue * 35.274;
+                      itemWeight = weightValue * 35.274;
                     } else if (lineItem.weightUnit === 'GRAM') {
-                      itemWeight = lineItem.weightValue * 0.035274;
+                      itemWeight = weightValue * 0.035274;
                     } else if (lineItem.weightUnit === 'POUND') {
-                      itemWeight = lineItem.weightValue * 16;
+                      itemWeight = weightValue * 16;
                     }
                   } else if (firstWeightUnit === 'POUND') {
                     if (lineItem.weightUnit === 'KILOGRAM') {
-                      itemWeight = lineItem.weightValue * 2.20462;
+                      itemWeight = weightValue * 2.20462;
                     } else if (lineItem.weightUnit === 'GRAM') {
-                      itemWeight = lineItem.weightValue * 0.00220462;
+                      itemWeight = weightValue * 0.00220462;
                     } else if (lineItem.weightUnit === 'OUNCE') {
-                      itemWeight = lineItem.weightValue * 0.0625;
+                      itemWeight = weightValue * 0.0625;
                     }
                   }
                 }
@@ -1495,7 +1489,7 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           const weight = totalWeight  || '1';
 
           // 创建运单
-          const shipment = await shippoService.createShipment({
+          shipment = await shippoService.createShipment({
             addressFrom,
             addressTo: {
               name: shippingAddress.name ,
@@ -1518,7 +1512,6 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
 
           // 获取运费列表
           const rates = await shippoService.getRates(shipment.objectId);
-          console.log(rates)
 
           // 检查运单是否有可用的运费
           if (!rates || rates.length === 0) {
@@ -1551,40 +1544,23 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           }
 
           // 选择第一个可用的运费
-          const selectedRate = carrierRates[0];
+          selectedRate = carrierRates[0];
 
           // 购买标签
           label = await shippoService.purchaseLabel(selectedRate.objectId, `Order-${order.id}`);
 
+          // 创建追踪单
+          trackingResult = await shippoService.createTracking({
+            carrier:label.carrier,
+            trackingNumber:label.trackingNumber,
+            metadata: label.metadata
+          },label.test)
+
+          console.log(trackingResult)
+
           //追踪号
-          finalTrackingNumber = label.trackingNumber;
-
-          console.log('Shippo 标签创建成功:', {
-            labelId: label.objectId,
-            trackingNumber: finalTrackingNumber,
-            carrier: finalCarrier
-          });
-
-          // 创建运单记录
-          await prisma.shipment.create({
-            data: {
-              orderId: order.id,
-              trackingNumber: finalTrackingNumber,
-              carrier: finalCarrier,
-              status: 'CREATED',
-              labelUrl: label.labelUrl,
-              trackingUrl: label.trackingUrlProvider,
-              shippoShipmentId: shipment.objectId,
-              shippoLabelId: label.objectId,
-              weight: new Decimal(selectedRate.estimatedWeight?.value || '1'),
-              length: new Decimal('10'),
-              width: new Decimal('10'),
-              height: new Decimal('10'),
-              distanceUnit: selectedRate.estimatedWeight?.unit || 'in',
-              massUnit: 'lb'
-            }
-          });
-
+          finalTrackingNumber = trackingResult.trackingNumber;
+          finalTrackingUrl = trackingResult.tracking_url
         } catch (error) {
           console.error('Shippo 运单生成失败:', error);
           return res.status(500).json({
@@ -1599,6 +1575,55 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
       try {
         const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop as string);
 
+        // 判断选择的发货仓库是否与订单预设发货仓库一致
+        // 如果不一致，则需要执行修改Shopify订单发货仓库的请求
+        if (warehouseAddress && fulfillmentOrders.length > 0) {
+          // 获取订单的原始履约订单信息
+          const originalFulfillmentOrder = fulfillmentOrders[0];
+
+          // 比较仓库地址是否一致
+          const isWarehouseChanged =
+            warehouseAddress.address?.address1 !== originalFulfillmentOrder.assignedLocation?.address1 ||
+            warehouseAddress.address?.address2 !== originalFulfillmentOrder.assignedLocation?.address2 ||
+            warehouseAddress.address?.city !== originalFulfillmentOrder.assignedLocation?.city ||
+            warehouseAddress.address?.province !== originalFulfillmentOrder.assignedLocation?.province ||
+            warehouseAddress.address?.zip !== originalFulfillmentOrder.assignedLocation?.zip ||
+            warehouseAddress.address?.countryCode !== originalFulfillmentOrder.assignedLocation?.countryCode;
+
+          if (isWarehouseChanged) {
+            try {
+              // 使用Shopify API移动履约订单到新的仓库位置
+              const moveResult = await shopifyApiClient.updateFulfillmentOrderLocation({
+                id: originalFulfillmentOrder.shopifyOrderId,
+                newLocationId: warehouseAddress.locationId,
+                fulfillmentOrderLineItems: originalFulfillmentOrder.lineItems.map(item => ({
+                  id: item.shopifyLineItemId,
+                  quantity: item.totalQuantity
+                }))
+              });
+
+              // 检查移动操作是否成功
+              if (moveResult?.fulfillmentOrderMove?.userErrors?.length > 0) {
+                console.error('移动履约订单到新仓库失败:', moveResult.fulfillmentOrderMove.userErrors);
+                return res.status(400).json({
+                  result: false,
+                  message: '无法将订单移动到指定的发货仓库',
+                  errors: moveResult.fulfillmentOrderMove.userErrors
+                });
+              }
+
+              // 履约订单已通过Shopify API移动到新仓库，无需在本地数据库中更新仓库信息
+            } catch (moveError) {
+              console.error('移动履约订单到新仓库时发生错误:', moveError);
+              return res.status(500).json({
+                result: false,
+                message: '移动订单到指定仓库时发生错误',
+                error: moveError.message
+              });
+            }
+          }
+        }
+
         // 构建lineItemsByFulfillmentOrder参数
         const lineItemsByFulfillmentOrder = fulfillmentOrders.map(fulfillmentOrder => ({
           fulfillmentOrderId: fulfillmentOrder.shopifyOrderId,
@@ -1608,11 +1633,20 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
           }))
         }));
 
+        // 检查lineItemsByFulfillmentOrder是否为空
+        if (!lineItemsByFulfillmentOrder || lineItemsByFulfillmentOrder.length === 0) {
+          console.error('Shopify fulfillment error: No fulfillment orders to fulfill');
+          return res.status(400).json({
+            result: false,
+            message: 'No fulfillment orders to fulfill'
+          });
+        }
+
         const fulfillmentResult = await shopifyApiClient.fulfillmentCreate({
           trackingInfo: {
             company: finalCarrier,
-            numbers: [finalTrackingNumber || order.confirmationNumber],
-            urls: [label?.trackingUrlProvider || '']
+            numbers: [finalTrackingNumber],
+            urls: [finalTrackingUrl]
           },
           notifyCustomer: notifyCustomer !== false,
           lineItemsByFulfillmentOrder,
@@ -1625,29 +1659,43 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
             countryCode: warehouseAddress?.address?.countryCode || 'US'
           }
         });
-        console.log('同步发货结果：'+fulfillmentResult)
+        console.log('同步发货结果：'+fulfillmentResult.fulfillmentCreate)
         if (fulfillmentResult?.fulfillmentCreate?.userErrors.length > 0) {
           console.error('Shopify fulfillment errors:', fulfillmentResult.fulfillmentCreate.userErrors);
         }
         else{
-          //更新订单状态为已发货
+          // 创建运单记录
+          await prisma.shipment.create({
+            data: {
+              orderId: order.id,
+              trackingNumber: trackingResult.trackingNumber,
+              carrier: finalCarrier,
+              status: trackingResult.trackingStatus.status,
+              labelUrl: label.labelUrl,
+              trackingUrl: trackingResult.tracking_url,
+              shippoShipmentId: shipment.objectId,
+              shippoLabelId: label.objectId,
+              weight: new Decimal(selectedRate.estimatedWeight?.value || '1'),
+              length: new Decimal('10'),
+              width: new Decimal('10'),
+              height: new Decimal('10'),
+              distanceUnit: selectedRate.estimatedWeight?.unit || 'in',
+              massUnit: 'lb',
+              test:label.test,
+              eta: trackingResult.eta,
+              original_eta: trackingResult.originalEta
+            }
+          });
+          //更新订单处理时间
           await prisma.order.update({
             where: { id: orderId },
             data: {
-              status: 'SHIPPED',
               processedAt: new Date()
             }
           });
         }
       } catch (error) {
         console.error('Failed to sync fulfillment to Shopify:', error);
-        // 继续执行，不中断整个流程
-      }
-
-      // 如果需要通知客户，可以在这里添加通知逻辑
-      if (notifyCustomer) {
-        // TODO: 实现客户通知逻辑
-        console.log(`Order ${orderId} fulfilled. Customer notification sent.`);
       }
 
       res.json({

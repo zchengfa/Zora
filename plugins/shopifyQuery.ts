@@ -192,6 +192,7 @@ interface DisplayAddress {
   fulfillmentOrders:{
     nodes:Array<{
       id:string,
+      status: string,
       lineItems:{
         nodes:Array<{
           id:string,
@@ -346,7 +347,7 @@ export interface GraphqlOrderResponse {
 export interface GraphqlProductResponse {
   product: GraphqlProductsResponse['products']["nodes"][0]
 }
-
+//查询指定客户信息
 export const CUSTOMER_QUERY_BY_identifier = `
 query getCustomerByEmail($identifier:CustomerIdentifierInput!){
   customerByIdentifier(identifier:$identifier){
@@ -401,7 +402,7 @@ query getCustomerByEmail($identifier:CustomerIdentifierInput!){
         }
   }
 }`
-
+//商店客户信息查询
 export const CUSTOMERS_QUERY = `
   query customersList($limit: Int,$afterCursor:String) {
     customers(first: $limit,after: $afterCursor) {
@@ -464,7 +465,7 @@ export const CUSTOMERS_QUERY = `
     }
   }
 `
-
+//商店客户数量查询
 export const CUSTOMER_COUNT_QUERY = `
   query customerCountQuery {
     customersCount{
@@ -472,7 +473,7 @@ export const CUSTOMER_COUNT_QUERY = `
     }
   }
 `
-
+//商店订单数量查询
 export const ORDERS_COUNT_QUERY = `
   query ordersCountQuery {
     ordersCount(limit:2000) {
@@ -501,6 +502,7 @@ export type GraphqlLocationsResponse = {
   };
 }
 
+//商店仓库地点查询
 export const LOCATIONS_QUERY = `
 query GetShopLocations {
   locations(first: 10){
@@ -521,7 +523,7 @@ query GetShopLocations {
   }
 }
 `
-
+//查询商店信息
 export const SHOP_QUERY = `
   query shopQuery {
     shop{
@@ -540,7 +542,7 @@ export const SHOP_QUERY = `
   }
 }
 `
-
+//商店订单查询
 export const ORDERS_QUERY = `
   query orders($limit:Int,$afterCursor:String){
   orders(first:$limit,after:$afterCursor){
@@ -716,6 +718,7 @@ export const ORDERS_QUERY = `
       fulfillmentOrders(first:10){
         nodes{
           id
+          status
           lineItems(first:10){
             nodes{
               id
@@ -738,7 +741,7 @@ export const ORDERS_QUERY = `
   }
 }
 `
-
+//商店产品查询
 export const PRODUCTS_QUERY = `
 query GetProducts ($limit: Int, $afterCursor: String){
     products(first: $limit,after:$afterCursor) {
@@ -824,7 +827,7 @@ query GetProducts ($limit: Int, $afterCursor: String){
       }
     }
   }`
-
+//商店产品数量查询
 export const PRODUCTS_COUNT_QUERY = `
   query GetProductsCount{
     productsCount{
@@ -832,7 +835,7 @@ export const PRODUCTS_COUNT_QUERY = `
     }
   }
 `
-
+//查询商店指定产品信息
 export const PRODUCT_QUERY = `
   query getProduct($productId:ID!){
     product(id:$productId){
@@ -907,7 +910,7 @@ export const PRODUCT_QUERY = `
     }
   }
 `
-
+//查询商店订单的id
 export const ORDERS_IDS_QUERY = `
   query ordersIds($limit:Int,$afterCursor:String){
     orders(first:$limit,after:$afterCursor){
@@ -923,7 +926,7 @@ export const ORDERS_IDS_QUERY = `
     }
   }
 `
-
+//查询商店指定的订单
 export const ORDER_QUERY = `
   query getOrder($orderId:ID!){
     order(id:$orderId){

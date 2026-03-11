@@ -124,7 +124,7 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       const {order} = await shopifyApiClient.order(id)
       const orders = []
       orders.push(order)
-      await shopifyHandleResponseData(orders,'orders',prisma)
+      await shopifyHandleResponseData(orders,'orders',prisma,orders.length,undefined,shop,redis,shopifyApiClient)
 
       // 向在线客服发送订单创建通知
       await SocketUtils.sendWebhookNotification({
@@ -161,7 +161,7 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       const {order} = await shopifyApiClient.order(id)
       const orders = []
       orders.push(order)
-      await shopifyHandleResponseData(orders,'orders',prisma)
+      await shopifyHandleResponseData(orders,'orders',prisma,orders.length,undefined,shop,redis,shopifyApiClient)
 
       // 向在线客服发送订单更新通知
       await SocketUtils.sendWebhookNotification({
@@ -229,33 +229,14 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
         id
       })
-      let shop_id = undefined
-      const redisShopId = await redis.hget(`shop:installed:${shop}`,"id")
-      if(redisShopId){
-        shop_id = redisShopId
-      }
-      else{
-        const prismaShopResult = await prisma.shop.findUnique({
-          where:{
-            shopify_domain: shop,
-          },
-          select:{
-            id: true
-          }
-        })
-
-        shop_id = prismaShopResult?.id
-      }
-      const customer = JSON.parse(JSON.stringify(customerByIdentifier))
-      customer.shop_id = shop_id
       const customers = []
-      customers.push(customer)
-      await shopifyHandleResponseData(customers,'customers',prisma)
+      customers.push(customerByIdentifier)
+      await shopifyHandleResponseData(customers,'customers',prisma,customers.length,undefined,shop,redis,shopifyApiClient)
 
       // 向在线客服发送客户创建通知
       await SocketUtils.sendWebhookNotification({
         webhookType: 'customers/create',
-        data: customer,
+        data: customerByIdentifier,
         shop
       })
     }).catch((e) => {
@@ -287,27 +268,9 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       const {customerByIdentifier} = await shopifyApiClient.customerByIdentifier({
         id
       })
-      let shop_id = undefined
-      const redisShopId = await redis.hget(`shop:installed:${shop}`,"id")
-      if(redisShopId){
-        shop_id = redisShopId
-      }
-      else{
-        const prismaShopResult = await prisma.shop.findUnique({
-          where:{
-            shopify_domain: shop,
-          },
-          select:{
-            id: true
-          }
-        })
-        shop_id = prismaShopResult?.id
-      }
-      const customer = JSON.parse(JSON.stringify(customerByIdentifier))
-      customer.shop_id = shop_id
       const customers = []
-      customers.push(customer)
-      await shopifyHandleResponseData(customers,'customers',prisma)
+      customers.push(customerByIdentifier)
+      await shopifyHandleResponseData(customers,'customers',prisma,customers.length,undefined,shop,redis,shopifyApiClient)
 
       // 向在线客服发送客户更新通知
       // await SocketUtils.sendWebhookNotification({
@@ -380,7 +343,7 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       const {product} = await shopifyApiClient.product(id)
       const products = []
       products.push(product)
-      await shopifyHandleResponseData(products,'products',prisma)
+      await shopifyHandleResponseData(products,'products',prisma,products.length,undefined,shop,redis,shopifyApiClient)
     }).catch((e) => {
       handleApiError(req, e)
     });
@@ -410,7 +373,7 @@ export const webhooks = ({app,router,redis,prisma,shopifyApiClientsManager}:{app
       const {product} = await shopifyApiClient.product(id)
       const products = []
       products.push(product)
-      await shopifyHandleResponseData(products,'products',prisma)
+      await shopifyHandleResponseData(products,'products',prisma,products.length,undefined,shop,redis,shopifyApiClient)
     }).catch((e) => {
       handleApiError(req, e)
     });
