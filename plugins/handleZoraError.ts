@@ -9,8 +9,8 @@ export const handlePrismaError = (e:any)=>{
     if(err.indexOf('Authentication failed') !== -1){
       errMsg = '数据库连接失败，env文件中配置的数据库参数是否有误！'
     }
-    else if(err.indexOf("Can't reach database server") !== -1){
-      errMsg = '未检测到数据库服务，请确认数据库服务已开启！'
+    else if(err.indexOf("Can't reach database server") !== -1 || err.indexOf('Please make sure your database server is running') !== -1){
+      errMsg = '数据库连接失败，未检测到数据库服务，请确认数据库服务已开启！'
     }
   }
   else if(err.indexOf('PrismaClientKnownRequestError') !== -1){
@@ -25,6 +25,9 @@ export const handlePrismaError = (e:any)=>{
   }
   else if(err.indexOf('PrismaClientValidationError') !== -1){
     errMsg = `检测到您提供的数据中，有不符合model设置的字段类型`
+  }
+  else if(err.indexOf('Transaction API error:') !== -1 && err.indexOf('Transaction already closed') !== -1){
+    errMsg = '事务已关闭，请检查事务是否正确开启/事务超时，（注：极大可能为线上网络环境问题）'
   }
   beginLogger({
     level: "error",

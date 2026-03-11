@@ -28,9 +28,10 @@ export interface CustomerCreateInput {
 }
 
 export interface GraphqlMutationVariables {
-  input?:CustomerCreateInput | FulfillmentInput
+  input?:CustomerCreateInput | FulfillmentInput | FulfillmentOrderMoveInput
 }
 
+//新建客户
 export const CUSTOMER_CREATE_MUTATION = `
   mutation customerCreateMutation($input:CustomerInput!){
     customerCreate(input:$input){
@@ -138,7 +139,7 @@ export interface FulfillmentInput {
   message?: string;
 }
 
-
+//创建履约订单
 export const FULFILLMENT_CREATE_MUTATION = `
   mutation fulfillmentCreate($input: FulfillmentInput!) {
     fulfillmentCreate(fulfillment: $input) {
@@ -155,6 +156,60 @@ export const FULFILLMENT_CREATE_MUTATION = `
           url
         }
       }
+    }
+  }
+`
+type FulfillmentOrderLineItemInput = {
+  id:string,
+  quantity:number
+}
+
+export interface FulfillmentOrderMoveInput {
+  fulfillmentOrderLineItems:FulfillmentOrderLineItemInput[],
+  id:string,
+  newLocationId:string
+}
+
+export interface GraphqlFulfillmentOrderMoveMutationResponse {
+  fulfillmentOrderMove: {
+    movedFulfillmentOrder: {
+      id: string;
+      status: string;
+    };
+    originalFulfillmentOrder: {
+      id: string;
+      status: string;
+    };
+    remainingFulfillmentOrder: {
+      id: string;
+      status: string;
+    };
+    userErrors: Array<{
+      field: string[];
+      message: string;
+    }>;
+  };
+}
+//修改特定待履约订单的发货地点
+export const FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION = `
+  mutation fulfillmentOrderMove($input:FulfillmentOrderLineItemInput!,$id:ID!,$newLocationId:ID!){
+    fulfillmentOrderMove(fulfillmentOrderLineItems:$input,id:$id,newLocationId:$newLocationId){
+      movedFulfillmentOrder {
+      id
+      status
+    }
+    originalFulfillmentOrder {
+      id
+      status
+    }
+    remainingFulfillmentOrder {
+      id
+      status
+    }
+    userErrors {
+      field
+      message
+    }
     }
   }
 `

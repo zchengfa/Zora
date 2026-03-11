@@ -5,6 +5,7 @@ import { usePersistStorage } from '@hooks/usePersistStorage';
 import { useAppTranslation } from '@hooks/useAppTranslation';
 import { getAgentSettings, updateAgentSettings } from '@/network/request.ts';
 import { useMessageStore } from '@/zustand/zustand';
+import { timeFormatting } from '@/Utils/Utils.ts';
 
 function AppSettings() {
   const LOCALSTORAGE_KEY = 'zora_application_theme';
@@ -15,6 +16,7 @@ function AppSettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -41,6 +43,34 @@ function AppSettings() {
     htmlEl.setAttribute('data-theme', newState);
   }, [theme, setPersistTheme]);
 
+  const handleEmailNotificationsChange = useCallback((event: any) => {
+    setEmailNotifications(event.target.checked);
+  }, []);
+
+  const handlePushNotificationsChange = useCallback((event: any) => {
+    setPushNotifications(event.target.checked);
+  }, []);
+
+  const handleSoundEnabledChange = useCallback((event: any) => {
+    setSoundEnabled(event.target.checked);
+  }, []);
+
+  const handleAutoReplyEnabledChange = useCallback((event: any) => {
+    setAutoReplyEnabled(event.target.checked);
+  }, []);
+
+  const handleWorkHoursEnabledChange = useCallback((event: any) => {
+    setWorkHoursEnabled(event.target.checked);
+  }, []);
+
+  const handleTypingIndicatorChange = useCallback((event: any) => {
+    setTypingIndicator(event.target.checked);
+  }, []);
+
+  const handleReadReceiptsChange = useCallback((event: any) => {
+    setReadReceipts(event.target.checked);
+  }, []);
+
   // 加载设置数据
   useEffect(() => {
     const loadSettings = async () => {
@@ -64,6 +94,10 @@ function AppSettings() {
             setTypingIndicator(settings.typingIndicator ?? true);
             setReadReceipts(settings.readReceipts ?? true);
             setMaxChatHistory(settings.maxChatHistory?.toString() ?? '30');
+            // 设置更新时间
+            if (settings.updatedAt) {
+              setLastUpdated(settings.updatedAt);
+            }
           }
         } catch (error) {
           console.error('加载设置失败:', error);
@@ -102,8 +136,12 @@ function AppSettings() {
         maxChatHistory: parseInt(maxChatHistory, 10),
       };
 
-      await updateAgentSettings(settingsData);
+      const response = await updateAgentSettings(settingsData);
       setShowSaveSuccess(true);
+      // 更新最后更新时间
+      if (response?.data?.updatedAt) {
+        setLastUpdated(response.data.updatedAt);
+      }
       setTimeout(() => setShowSaveSuccess(false), 3000);
     } catch (error) {
       console.error('保存设置失败:', error);
@@ -195,7 +233,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.notification.label.email}
                     checked={emailNotifications}
-                    onChange={setEmailNotifications}
+                    onChange={handleEmailNotificationsChange}
                   />
                 </InlineStack>
                 <Divider />
@@ -207,7 +245,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.notification.label.push}
                     checked={pushNotifications}
-                    onChange={setPushNotifications}
+                    onChange={handlePushNotificationsChange}
                   />
                 </InlineStack>
                 <Divider />
@@ -219,7 +257,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.sound.label.sound}
                     checked={soundEnabled}
-                    onChange={setSoundEnabled}
+                    onChange={handleSoundEnabledChange}
                   />
                 </InlineStack>
                 {soundEnabled && (
@@ -248,7 +286,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.reply.label.reply}
                     checked={autoReplyEnabled}
-                    onChange={setAutoReplyEnabled}
+                    onChange={handleAutoReplyEnabledChange}
                   />
                 </InlineStack>
                 {autoReplyEnabled && (
@@ -286,7 +324,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.working.label.online}
                     checked={workHoursEnabled}
-                    onChange={setWorkHoursEnabled}
+                    onChange={handleWorkHoursEnabledChange}
                   />
                 </InlineStack>
                 {workHoursEnabled && (
@@ -334,7 +372,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.chat.label.typingIndicator}
                     checked={typingIndicator}
-                    onChange={setTypingIndicator}
+                    onChange={handleTypingIndicatorChange}
                   />
                 </InlineStack>
                 <Divider />
@@ -346,7 +384,7 @@ function AppSettings() {
                   <s-switch
                     label={settingTranslation.chat.label.readReceipts}
                     checked={readReceipts}
-                    onChange={setReadReceipts}
+                    onChange={handleReadReceiptsChange}
                   />
                 </InlineStack>
                 <Divider />
@@ -375,7 +413,7 @@ function AppSettings() {
                 <BlockStack gap="200">
                   <InlineStack align="space-between">
                     <Text variant="bodySm" tone="subdued" as={'span'}>{settingTranslation.status.text.lastUpdated}</Text>
-                    <Badge>Just Now</Badge>
+                    <Badge>{lastUpdated ? timeFormatting('YYYY/MM/DD hh:mm:ss', lastUpdated) : 'Never'}</Badge>
                   </InlineStack>
                   <InlineStack align="space-between">
                     <Text variant="bodySm" as={'span'} tone="subdued">{settingTranslation.status.text.version}</Text>

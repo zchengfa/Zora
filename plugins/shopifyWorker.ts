@@ -121,128 +121,76 @@ const handleCleanupShopData = async (job: any) => {
     }
   })
 
-  // 使用事务执行删除操作
-  await prismaClient.$transaction(async (tx) => {
-    // 5. 获取商店信息
-    const shop = await tx.shop.findUnique({
-      where: { shopify_domain: shopDomain }
-    });
-
-    if(shop){
-      // 1. 删除商店的 session 数据
-      await tx.session.deleteMany({
-        where: { shop: shopDomain }
-      });
-
-      // 2. 删除商店相关的会话数据
-      await tx.conversation.deleteMany({
-        where: { shop_id:shop.id }
-      });
-
-      // 3. 删除商店相关的聊天列表项
-      await tx.chatListItem.deleteMany({
-        where: { shop: shopDomain }
-      });
-
-      // 4. 删除商店相关的 webhook 日志
-      await tx.webhookLog.deleteMany({
-        where: { shop: shopDomain }
-      });
-      // 6. 删除商店相关的订单数据（包括关联的运单、订单行项目等）
-      // 先获取该商店的所有订单
-      const orders = await tx.order.findMany({
-        where: { shop_id: shop.id },
-        select: { id: true }
-      });
-
-      const orderIds = orders.map(o => o.id);
-
-      // 删除这些订单的关联数据
-      if(orderIds.length > 0){
-        // 删除订单行项目
-        await tx.orderLineItem.deleteMany({
-          where: { orderId: { in: orderIds } }
-        });
-        // 删除订单税费
-        await tx.orderTaxLine.deleteMany({
-          where: { orderId: { in: orderIds } }
-        });
-        // 删除订单附加费用
-        await tx.orderAdditionalFee.deleteMany({
-          where: { orderId: { in: orderIds } }
-        });
-        // 删除运单
-        await tx.shipment.deleteMany({
-          where: { orderId: { in: orderIds } }
-        });
-        // 删除待履约订单
-        await tx.fulfillmentOrder.deleteMany({
-          where: { orderId: { in: orderIds } }
-        });
-        // 删除待履约订单行项目
-        await tx.fulfillmentOrderLineItem.deleteMany({
-          where: { shop_id: shop.id }
-        });
-        // 删除订单
-        await tx.order.deleteMany({
-          where: { id: { in: orderIds } }
-        });
-      }
-
-      // 7. 删除商店相关的客户数据（包括关联的地址、客服关系等）
-      await tx.customers.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 8. 删除商店相关的产品数据
-      await tx.product.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 9. 删除商店相关的客服数据
-      await tx.customerServiceStaff.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 10. 删除商店相关的客服设置
-      await tx.agentSettings.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 11. 删除商店相关的客服资料
-      await tx.staffProfile.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 12. 删除商店相关的标签数据
-      await tx.customer_tags.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 13. 删除商店相关的标签关系数据
-      await tx.customer_tag_relations.deleteMany({
-        where: { shop_id: shop.id }
-      });
-
-      // 14. 删除商店数据
-      await tx.shop.delete({
-        where: { id: shop.id }
-      });
-    }
+  const shop = await prismaClient.shop.findUnique({
+    where: { shopify_domain: shopDomain },
+    select: { id: true }
   });
 
-  // 15. 删除 Redis 中的 session 数据
-  await redisClient.del(`session:${shopDomain}`);
+  if (!shop) {
+    console.log(`商店${shopDomain}不存在，无需清理数据`);
+    return true;
+  }
+  const shopId = shop.id;
 
-  await beginLogger({
-    level: 'info',
-    message:`商店数据清理完成`,
-    meta:{
-      taskType: 'cleanup_shop_data',
-      jobId: job.id,
-      shopDomain: shopDomain
-    }
-  })
+  try {
+    // 事务1：轻量无关联数据删除
+    await prismaClient.$transaction(async (tx) => {
+      await Promise.all([
+        // 并行删除无关联的轻量数据
+        tx.session.deleteMany({ where: { shop: shopDomain } }),
+        tx.conversation.deleteMany({ where: { shop_id: shopId } }),
+        tx.chatListItem.deleteMany({ where: { shop: shopDomain } }),
+        tx.webhookLog.deleteMany({ where: { shop: shopDomain } }),
+        // 无依赖的客户/客服轻量数据
+        tx.customerServiceStaff.deleteMany({ where: { shop_id: shopId } }),
+        tx.agentSettings.deleteMany({ where: { shop_id: shopId } }),
+        tx.staffProfile.deleteMany({ where: { shop_id: shopId } }),
+        tx.customer_tags.deleteMany({ where: { shop_id: shopId } }),
+        tx.customer_tag_relations.deleteMany({ where: { shop_id: shopId } })
+      ]);
+    });
+
+    // 订单关联数据删除
+    await prismaClient.$transaction(async (tx) => {
+      const hasOrders = await tx.order.findMany({ where: { shop_id: shopId } });
+      if (hasOrders) {
+        await Promise.all([
+          tx.orderLineItem.deleteMany({ where: { order: { shop_id: shopId } } }),
+          tx.orderTaxLine.deleteMany({ where: { order: { shop_id: shopId } } }),
+          tx.orderAdditionalFee.deleteMany({ where: { order: { shop_id: shopId } } }),
+          tx.shipment.deleteMany({ where: { order: { shop_id: shopId } } }),
+          tx.fulfillmentOrderLineItem.deleteMany({ where: { shop_id: shopId } })
+        ]);
+        // 最后删除订单主表（依赖关联表已删）
+        await tx.fulfillmentOrder.deleteMany({ where: { order: { shop_id: shopId } } });
+        await tx.order.deleteMany({ where: { shop_id: shopId } });
+      }
+    });
+
+    // 事务3：核心数据删除
+    await prismaClient.$transaction(async (tx) => {
+      await tx.customers.deleteMany({ where: { shop_id: shopId } });
+      await tx.product.deleteMany({ where: { shop_id: shopId } });
+      await tx.shop.delete({ where: { id: shopId } });
+    });
+
+    // 删除 Redis 中的 session 数据
+    await redisClient.del(`session:${shopDomain}`);
+
+    await beginLogger({
+      level: 'info',
+      message:`商店数据清理完成`,
+      meta:{
+        taskType: 'cleanup_shop_data',
+        jobId: job.id,
+        shopDomain: shopDomain
+      }
+    })
+    return true;
+
+  } catch (e) {
+    await beginLogger({ level: 'error', message: `清理商店${shopDomain}失败：${e.message}`,meta:{e} });
+  }
 };
 
 // 同步 Shopify 数据的任务处理函数

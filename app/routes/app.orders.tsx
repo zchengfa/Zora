@@ -395,20 +395,33 @@ function OrdersPage() {
   }, [selectedOrder, carrier, selectedWarehouse, notifyCustomer, shopDomain]);
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { status: string; progress: 'complete' | 'partial' | 'incomplete' }> = {
-      PAID: { status: 'Paid', progress: 'complete' },
-      PENDING: { status: 'Pending', progress: 'incomplete' },
-      PARTIALLY_PAID: { status: 'Partially Paid', progress: 'partial' },
-      VOIDED: { status: 'Voided', progress: 'incomplete' },
-      FULFILLED: { status: 'Fulfilled', progress: 'complete' },
-      UNFULFILLED: { status: 'Unfulfilled', progress: 'incomplete' },
-      PARTIALLY_FULFILLED: { status: 'Partially Fulfilled', progress: 'partial' },
-      IN_PROGRESS: { status: 'In Progress', progress: 'partial' },
-      RESTOCKED: { status: 'Restocked', progress: 'incomplete' },
+    const statusProgressMap: Record<string, 'complete' | 'partial' | 'incomplete'> = {
+      // FulfillmentStatus
+      SUCCESS: 'complete',
+      ERROR: 'incomplete',
+      FAILURE: 'incomplete',
+      CANCELLED: 'incomplete',
+      // FulfillmentOrderStatus
+      OPEN: 'incomplete',
+      CLOSED: 'complete',
+      IN_PROGRESS: 'partial',
+      INCOMPLETE: 'incomplete',
+      ON_HOLD: 'incomplete',
+      SCHEDULED: 'incomplete',
+      // Order Status
+      PAID: 'complete',
+      PENDING: 'incomplete',
+      PARTIALLY_PAID: 'partial',
+      VOIDED: 'incomplete',
+      FULFILLED: 'complete',
+      UNFULFILLED: 'incomplete',
+      PARTIALLY_FULFILLED: 'partial',
+      RESTOCKED: 'incomplete',
     };
 
-    const badgeConfig = statusMap[status] || { status: status, progress: 'incomplete' as const };
-    return <Badge progress={badgeConfig.progress}>{badgeConfig.status}</Badge>;
+    const statusText = translation.orders.order.statusMap[status] || status;
+    const progress = statusProgressMap[status] || 'incomplete';
+    return <Badge progress={progress as any}>{statusText}</Badge>;
   };
 
   const formatDate = (dateString: string) => {
@@ -432,7 +445,7 @@ function OrdersPage() {
       order.customer?.displayName || 'N/A',
       formatDate(order.processedAt),
       formatPrice(order.totalPriceSet.shopMoney.amount, selectedOrder?.totalPriceSet.shopMoney.currencyCode || 'USD'),
-      getStatusBadge(order.fulfillmentStatus),
+      getStatusBadge(order.fulfillments?.[0]?.status || 'PENDING'),
       <InlineStack gap="200">
         <Button
           variant="plain"
@@ -440,7 +453,7 @@ function OrdersPage() {
         >
           {t.order.viewDetails}
         </Button>
-        {order.fulfillmentStatus === 'UNFULFILLED' && (
+        {order.fulfillments?.[0]?.status !== 'SUCCESS' && (
           <Button
             variant="primary"
             size="slim"
@@ -750,13 +763,13 @@ function OrdersPage() {
 
             {parcelTemplatesLoading ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
-                <Text as={'span'} variant="bodyMd">加载包裹模板中...</Text>
+                <Text as={'span'} variant="bodyMd">{t.fulfillment.parcelTemplate.loading}</Text>
               </div>
             ) : parcelTemplates.length > 0 ? (
               <>
                 <Divider />
                 <ChoiceList
-                  title="选择包裹模板"
+                  title={t.fulfillment.parcelTemplate.select}
                   choices={parcelTemplates.map(template => ({
                     label: template.name,
                     value: template.token
@@ -772,20 +785,20 @@ function OrdersPage() {
                   }}
                 />
                 {selectedParcelTemplate && (
-                  <LegacyCard.Section title="包裹模板详情">
+                  <LegacyCard.Section title={t.fulfillment.parcelTemplate.details}>
                     <BlockStack gap="200">
-                      <Text variant="bodyMd" as="p"><strong>名称:</strong> {selectedParcelTemplate.name}</Text>
-                      <Text variant="bodyMd" as="p"><strong>承运商:</strong> {selectedParcelTemplate.carrier}</Text>
-                      <Text variant="bodyMd" as="p"><strong>长度:</strong> {selectedParcelTemplate.length} {selectedParcelTemplate.distanceUnit}</Text>
-                      <Text variant="bodyMd" as="p"><strong>宽度:</strong> {selectedParcelTemplate.width} {selectedParcelTemplate.distanceUnit}</Text>
-                      <Text variant="bodyMd" as="p"><strong>高度:</strong> {selectedParcelTemplate.height} {selectedParcelTemplate.distanceUnit}</Text>
-                      <Text variant="bodyMd" as="p"><strong>可变尺寸:</strong> {selectedParcelTemplate.isVariableDimensions ? '是' : '否'}</Text>
+                      <Text variant="bodyMd" as="p"><strong>{t.fulfillment.parcelTemplate.name}:</strong> {selectedParcelTemplate.name}</Text>
+                      <Text variant="bodyMd" as="p"><strong>{t.fulfillment.parcelTemplate.carrier}:</strong> {selectedParcelTemplate.carrier}</Text>
+                      <Text variant="bodyMd" as="p"><strong>{t.fulfillment.parcelTemplate.length}:</strong> {selectedParcelTemplate.length} {selectedParcelTemplate.distanceUnit}</Text>
+                      <Text variant="bodyMd" as="p"><strong>{t.fulfillment.parcelTemplate.width}:</strong> {selectedParcelTemplate.width} {selectedParcelTemplate.distanceUnit}</Text>
+                      <Text variant="bodyMd" as="p"><strong>{t.fulfillment.parcelTemplate.height}:</strong> {selectedParcelTemplate.height} {selectedParcelTemplate.distanceUnit}</Text>
+                      <Text variant="bodyMd" as="p"><strong>{t.fulfillment.parcelTemplate.variableDimensions}:</strong> {selectedParcelTemplate.isVariableDimensions ? t.fulfillment.parcelTemplate.yes : t.fulfillment.parcelTemplate.no}</Text>
                     </BlockStack>
                   </LegacyCard.Section>
                 )}
               </>
             ) : carrier && !parcelTemplatesLoading ? (
-              <Text variant="bodyMd" tone="subdued">该承运商暂无可用包裹模板</Text>
+              <Text variant="bodyMd" tone="subdued">{t.fulfillment.parcelTemplate.noTemplates}</Text>
             ) : null}
           </BlockStack>
         </Modal.Section>

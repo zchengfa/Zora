@@ -1,11 +1,14 @@
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('CREATED', 'PAYMENT_PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED');
-
--- CreateEnum
 CREATE TYPE "ReturnStatus" AS ENUM ('NO_RETURN', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURN_RECEIVED', 'REFUND_PROCESSING', 'REFUND_COMPLETED');
 
 -- CreateEnum
 CREATE TYPE "CurrencyCode" AS ENUM ('CNY', 'USD', 'EUR', 'GBP', 'JPY');
+
+-- CreateEnum
+CREATE TYPE "FulfillmentOrderStatus" AS ENUM ('CANCELLED', 'CLOSED', 'IN_PROGRESS', 'INCOMPLETE', 'ON_HOLD', 'OPEN', 'SCHEDULED');
+
+-- CreateEnum
+CREATE TYPE "FulfillmentStatus" AS ENUM ('CANCELLED', 'ERROR', 'FAILURE', 'SUCCESS');
 
 -- CreateEnum
 CREATE TYPE "ConversationStatus" AS ENUM ('ACTIVE', 'RESOLVED', 'ARCHIVED');
@@ -265,7 +268,6 @@ CREATE TABLE "orders" (
     "note" TEXT,
     "confirmationNumber" TEXT NOT NULL,
     "shop_id" TEXT NOT NULL,
-    "status" "OrderStatus" NOT NULL DEFAULT 'CREATED',
     "returnStatus" "ReturnStatus" NOT NULL DEFAULT 'NO_RETURN',
     "fullyPaid" BOOLEAN NOT NULL DEFAULT false,
     "unpaid" BOOLEAN NOT NULL DEFAULT false,
@@ -297,6 +299,7 @@ CREATE TABLE "fulfillment_orders" (
     "shopifyOrderId" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "shop_id" TEXT,
+    "status" "FulfillmentOrderStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -324,12 +327,13 @@ CREATE TABLE "shipments" (
     "orderId" TEXT NOT NULL,
     "trackingNumber" TEXT,
     "carrier" TEXT NOT NULL,
-    "status" TEXT NOT NULL,
+    "status" "FulfillmentStatus" NOT NULL,
     "labelUrl" TEXT,
     "trackingUrl" TEXT,
     "shippoShipmentId" TEXT,
     "shippoLabelId" TEXT,
     "shop_id" TEXT,
+    "test" BOOLEAN NOT NULL DEFAULT false,
     "weight" DECIMAL(10,2),
     "length" DECIMAL(10,2),
     "width" DECIMAL(10,2),
@@ -338,6 +342,8 @@ CREATE TABLE "shipments" (
     "massUnit" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "eta" TIMESTAMP(3),
+    "original_eta" TIMESTAMP(3),
 
     CONSTRAINT "shipments_pkey" PRIMARY KEY ("id")
 );
@@ -619,9 +625,6 @@ CREATE UNIQUE INDEX "orders_shopifyOrderId_key" ON "orders"("shopifyOrderId");
 
 -- CreateIndex
 CREATE INDEX "orders_customerId_idx" ON "orders"("customerId");
-
--- CreateIndex
-CREATE INDEX "orders_status_idx" ON "orders"("status");
 
 -- CreateIndex
 CREATE INDEX "orders_processedAt_idx" ON "orders"("processedAt");
