@@ -133,6 +133,8 @@ export interface TrackingInfo {
   test: boolean;
 }
 
+type ShippoTrackingNumberTest = 'SHIPPO_PRE_TRANSIT'| 'SHIPPO_TRANSIT'| 'SHIPPO_DELIVERED'| 'SHIPPO_RETURNED'| 'SHIPPO_FAILURE' | 'SHIPPO_UNKNOWN'
+
 /**
  * Shippo 类封装
  * 提供 Shippo API 的主要功能：生成运单、获取物流信息、追踪货物轨迹
@@ -480,6 +482,25 @@ export class ShippoService {
    */
   async getCarrierParcelPackages(carrier:string): Promise<any[]> {
     return await this.shippo.carrierParcelTemplates.list(undefined,carrier)
+  }
+
+  /**
+   * 创建追踪单
+   */
+  async createTracking(trackingParams:{carrier:string,metadata:string,trackingNumber:string | ShippoTrackingNumberTest},testMode:boolean):Promise<any>{
+    const paramsObj = testMode ? {
+      carrier:'shippo',
+      metadata:trackingParams.metadata,
+      trackingNumber: trackingParams.trackingNumber || 'SHIPPO_TRANSIT'
+    }
+    :trackingParams
+    const result = await this.shippo.trackingStatus.create({...paramsObj});
+
+    if (testMode){
+      result.tracking_url = `${process.env.SHIPPO_BASE_TRACKING_URL_TEST}${paramsObj.carrier}/${paramsObj.trackingNumber}`
+    }
+
+    return result
   }
 
   /**

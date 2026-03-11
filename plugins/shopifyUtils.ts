@@ -27,12 +27,14 @@ import type {
   GraphqlCustomerByIdentifierResponse,
   GraphqlLocationsResponse
 } from './shopifyQuery.ts'
-import {CUSTOMER_CREATE_MUTATION, FULFILLMENT_CREATE_MUTATION} from './shopifyMutation.ts'
+import {CUSTOMER_CREATE_MUTATION, FULFILLMENT_CREATE_MUTATION,FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION} from './shopifyMutation.ts'
 import type {
   GraphqlCustomerCreateMutationResponse,
   GraphqlMutationVariables,
   GraphqlFulfillmentCreateMutationResponse,
-  FulfillmentInput
+  FulfillmentInput,
+  FulfillmentOrderMoveInput,
+  GraphqlFulfillmentOrderMoveMutationResponse
 } from './shopifyMutation.ts'
 import type {PrismaClient} from "@prisma/client";
 import type {Redis} from "ioredis"
@@ -109,6 +111,11 @@ export interface IShopifyApiClient {
    * 创建发货记录
    */
   fulfillmentCreate(input:FulfillmentInput): Promise<GraphqlFulfillmentCreateMutationResponse>,
+
+  /**
+   * 给待履约订单设置新的发货地点
+   */
+  updateFulfillmentOrderLocation(input:FulfillmentOrderMoveInput): Promise<GraphqlFulfillmentOrderMoveMutationResponse>
 }
 export class ShopifyApiClient implements IShopifyApiClient {
   private readonly shopConfig: { apiVersion: string; shopDomain: string; accessToken: string };
@@ -207,6 +214,12 @@ export class ShopifyApiClient implements IShopifyApiClient {
 
   public shopLocations(): Promise<GraphqlLocationsResponse> {
     return this.shopifyApiGraphqlRequest(LOCATIONS_QUERY)
+  }
+
+  public updateFulfillmentOrderLocation = (input:FulfillmentOrderMoveInput):Promise<GraphqlFulfillmentOrderMoveMutationResponse> => {
+    return this.shopifyApiGraphqlRequest(FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION, {
+      input
+    })
   }
 }
 
@@ -489,13 +502,15 @@ export const shopifyHandleResponseData = async (
       status: string,
       trackingUrl: string,
       createdAt: string,
-      shop_id?:string
+      shop_id?:string,
+      test: boolean
     }> = []
     const prismaFulfillmentOrders: Array<{
       id: string,
       shopifyOrderId: string,
       orderId: string,
-      shop_id?:string
+      shop_id?:string,
+      status: string
     }> = []
     const prismaFulfillmentOrderLineItems: Array<{
       id: string,
@@ -598,7 +613,8 @@ export const shopifyHandleResponseData = async (
               status: fulfillment.status,
               trackingUrl: trackingInfo.url,
               createdAt: fulfillment.createdAt,
-              shop_id: shop_id
+              shop_id: shop_id,
+              test: trackingInfo.url.indexOf('shippo') !== -1
             })
           })
         })
@@ -612,7 +628,8 @@ export const shopifyHandleResponseData = async (
             id: fulfillmentOrderId,
             shopifyOrderId: fulfillmentOrder.id,
             orderId: executeShopifyId(item.id),
-            shop_id: shop_id
+            shop_id: shop_id,
+            status: fulfillmentOrder.status,
           });
 
           // 处理待履约订单行项目

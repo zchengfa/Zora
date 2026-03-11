@@ -300,20 +300,6 @@ model ChatListItem {
   @@map("chat_list_items")
 }
 
-// 订单状态枚举
-enum OrderStatus {
-  CREATED
-  PAYMENT_PENDING
-  PAID
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  COMPLETED
-  CANCELLED
-  REFUNDED
-  FAILED
-}
-
 // 退货状态枚举
 enum ReturnStatus {
   NO_RETURN
@@ -371,8 +357,6 @@ model Order {
 
   shop shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
 
-  // 状态信息
-  status       OrderStatus  @default(CREATED)
   returnStatus ReturnStatus @default(NO_RETURN)
   fullyPaid    Boolean      @default(false)
   unpaid       Boolean      @default(false)
@@ -416,7 +400,6 @@ model Order {
   fulfillmentOrders FulfillmentOrder[]
 
   @@index([customerId])
-  @@index([status])
   @@index([processedAt])
   @@index([createdAt])
   @@index([confirmationNumber])
@@ -425,12 +408,23 @@ model Order {
   @@map("orders")
 }
 
+enum FulfillmentOrderStatus {
+  CANCELLED
+  CLOSED
+  IN_PROGRESS
+  INCOMPLETE
+  ON_HOLD
+  OPEN
+  SCHEDULED
+}
+
 // 待履约订单模型
 model FulfillmentOrder {
-  id             String  @id @default(cuid())
-  shopifyOrderId String  @unique // Shopify FulfillmentOrder ID
+  id             String                 @id @default(cuid())
+  shopifyOrderId String                 @unique // Shopify FulfillmentOrder ID
   orderId        String // 关联的Order ID
   shop_id        String?
+  status         FulfillmentOrderStatus
 
   order     Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shop      shop?                      @relation(fields: [shop_id], references: [id], onDelete: Cascade)
@@ -471,18 +465,28 @@ model FulfillmentOrderLineItem {
   @@map("fulfillment_order_line_items")
 }
 
+enum FulfillmentStatus {
+  CANCELLED
+  ERROR
+  FAILURE
+  SUCCESS
+}
+
 // 运单信息模型
 model Shipment {
-  id               String  @id @default(cuid())
-  orderId          String  @unique
+  id               String            @id @default(cuid())
+  orderId          String            @unique
   trackingNumber   String?
   carrier          String // USPS, FedEx, UPS 等
-  status           String // CREATED, IN_TRANSIT, DELIVERED 等
+  status           FulfillmentStatus
   labelUrl         String? // 运单标签URL
   trackingUrl      String? // 追踪页面URL
   shippoShipmentId String? // Shippo运单ID
   shippoLabelId    String? // Shippo标签ID
   shop_id          String?
+  test             Boolean           @default(false) //是否为测试运单
+
+  // 运单信息
 
   // 包裹信息
   weight       Decimal? @db.Decimal(10, 2)
@@ -492,8 +496,10 @@ model Shipment {
   distanceUnit String? // in, cm
   massUnit     String? // lb, kg
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  eta          DateTime?
+  original_eta DateTime?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shop  shop? @relation(fields: [shop_id], references: [id], onDelete: Cascade)
