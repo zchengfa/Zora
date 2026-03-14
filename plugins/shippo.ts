@@ -265,8 +265,6 @@ export class ShippoService {
         metadata: metadata || '',
       });
 
-      console.log(label)
-
       beginLogger({
         level: 'info',
         message: '购买运单标签成功',

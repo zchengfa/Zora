@@ -300,6 +300,7 @@ CREATE TABLE "fulfillment_orders" (
     "orderId" TEXT NOT NULL,
     "shop_id" TEXT,
     "status" "FulfillmentOrderStatus" NOT NULL,
+    "locationId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

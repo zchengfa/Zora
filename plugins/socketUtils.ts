@@ -190,7 +190,7 @@ export class SocketUtils{
   private handleAIChatRequest = () => {
     this.ws.on('ai_chat_request', async (payload) => {
       try {
-        const { message, timestamp } = payload;
+        const { message } = payload;
 
         if (!message || typeof message !== 'string') {
           this.ws.emit('ai_chat_error', {
@@ -1184,6 +1184,7 @@ export class SocketUtils{
    * @param agentId 客服ID
    * @param chatList 聊天列表数据
    * @param activeCustomerItem 当前激活的会话ID
+   * @param shopDomain
    */
   public static async saveChatList(
     agentId: string,
@@ -1253,38 +1254,30 @@ export class SocketUtils{
           } else {
             lastTimestamp = new Date(item.lastTimestamp);
           }
-
+          const listItemData = {
+            conversationId: item.conversationId,
+            customerId: item.id,
+            customerFirstName: item.firstName,
+            customerLastName: item.lastName,
+            customerAvatar: item.avatar,
+            lastMessage: item.lastMessage,
+            lastTimestamp: lastTimestamp,
+            isOnline: item.isOnline || false,
+            hadRead: item.hadRead || false,
+            isActive: item.isActive || false,
+            unreadMessageCount: item.unreadMessageCount || 0,
+            agentId: agentId,
+            shop: shop.id,
+          }
           // 使用upsert更新或创建聊天列表项
           await tx.chatListItem.upsert({
             where: { conversationId: item.conversationId },
             update: {
-              customerFirstName: item.firstName,
-              customerLastName: item.lastName,
-              customerAvatar: item.avatar,
-              lastMessage: item.lastMessage,
-              lastTimestamp: lastTimestamp,
-              isOnline: item.isOnline || false,
-              hadRead: item.hadRead || false,
-              isActive: item.isActive || false,
-              unreadMessageCount: item.unreadMessageCount || 0,
-              agentId: agentId,
-              shop: shop.id,
+              ...listItemData,
               updatedAt: new Date()
             },
             create: {
-              conversationId: item.conversationId,
-              customerId: item.id,
-              customerFirstName: item.firstName,
-              customerLastName: item.lastName,
-              customerAvatar: item.avatar,
-              lastMessage: item.lastMessage,
-              lastTimestamp: lastTimestamp,
-              isOnline: item.isOnline || false,
-              hadRead: item.hadRead || false,
-              isActive: item.isActive || false,
-              unreadMessageCount: item.unreadMessageCount || 0,
-              agentId: agentId,
-              shop: shop.id
+              ...listItemData
             }
           });
         }

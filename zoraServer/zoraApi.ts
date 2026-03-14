@@ -10,14 +10,13 @@ import {
 import rateLimiter from 'express-rate-limit'
 import Redis from "ioredis";
 import type {PrismaClient} from "@prisma/client";
-import {Decimal} from "@prisma/client/runtime/library";
 import bcrypt from 'bcrypt';
 import {handleApiError, handlePrismaError} from "../plugins/handleZoraError.ts";
 import {v4 as uuidv4} from "uuid";
 import {createToken, verifyTokenAsync} from "../plugins/token.ts";
 import type {IShopifyApiClient, IShopifyApiClientsManager} from "../plugins/shopifyUtils.ts";
 import {executeShopifyId, shopifyHandleResponseData} from "../plugins/shopifyUtils.ts";
-import {addShopifySyncDataJob, beginLogger, addShopDataCleanupJob} from "../plugins/bullTaskQueue.ts";
+import {addShopifySyncDataJob, beginLogger, addShopDataCleanupJob, addOrderFulfillmentJob} from "../plugins/bullTaskQueue.ts";
 import type {GraphqlCustomerCreateMutationResponse, GraphqlMutationVariables} from "../plugins/shopifyMutation.ts";
 import {generateCustomerProfile} from "../plugins/customerProfile.ts";
 
@@ -26,6 +25,7 @@ interface ZoraApiType {
   redis: Redis,
   prisma: PrismaClient,
   shopifyApiClientsManager: IShopifyApiClientsManager,
+  redlock: any,
 }
 
 interface FormDataType {
@@ -1303,420 +1303,64 @@ export function zoraApi({app,redis,prisma,shopifyApiClientsManager}:ZoraApiType)
   // 订单发货
   app.post('/orders/fulfill', RATE_LIMITS.NORMAL, async (req, res) => {
     try {
-      const { orderId, carrier, warehouseAddress, notifyCustomer,parcelTemplateToken } = req.body;
-      const {shop} = req.query
+      const { orderId, carrier, warehouseAddress, notifyCustomer, parcelTemplateToken, customerStaffId } = req.body;
+      const { shop } = req.query;
 
-      if (!orderId || !parcelTemplateToken) {
+      // 1. 基础参数校验
+      if (!orderId || !parcelTemplateToken || !shop) {
         return res.status(400).json({ result: false, message: "bad request,missing params" });
       }
 
-      // 获取订单信息
+      // 2. 检查本地是否已履约（避免重复调用）
+      const existingShipment = await prisma.shipment.findFirst({
+        where: { orderId },
+        select: { id: true }
+      });
+      if (existingShipment) {
+        return res.status(400).json({
+          result: false,
+          message: "该订单已生成运单，无需重复操作"
+        });
+      }
+
+      // 3. 获取订单基础信息
       const order = await prisma.order.findUnique({
         where: { id: orderId }
       });
-
-      if (!order) {
-        return res.status(404).json({ result: false, message: "Order not found" });
+      if (!order || !order.shopifyOrderId) {
+        return res.status(404).json({ result: false, message: "Order not found or missing shopifyOrderId" });
       }
 
-      const finalCarrier = carrier;
-      let finalTrackingNumber,finalTrackingUrl,trackingResult ,label,fulfillmentOrders,selectedRate,shipment;
-      if (carrier) {
-        try {
-          const { shippoClientManager } = await import('../plugins/shippoClient.ts');
-
-          if (!shippoClientManager.isInitialized()) {
-            return res.status(500).json({ result: false, message: "Shippo service not initialized" });
-          }
-
-          const shippoService = shippoClientManager.getShippoService();
-
-          // 从数据库获取订单的收货地址
-          let orderWithAddress = await prisma.order.findUnique({
-            where: { id: orderId },
-            include: {
-              shippingAddress: true
-            }
-          });
-
-          // 如果数据库中没有收货地址，从Shopify获取并保存
-          if (!orderWithAddress || !orderWithAddress.shippingAddress) {
-            try {
-              const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop as string);
-              const orderResult = await shopifyApiClient.order(order.shopifyOrderId as string);
-
-              if (orderResult.order.shippingAddress) {
-                const addressId = `${orderId}_shipping`;
-
-                // 使用事务保存收货地址并更新订单
-                await prisma.$transaction(async (tx) => {
-                  // 创建收货地址
-                  await tx.address.create({
-                    data: {
-                      id: addressId,
-                      customerId: order.customerId || null,
-                      name: orderResult.order.shippingAddress.name || '',
-                      address1: orderResult.order.shippingAddress.address1 || '',
-                      address2: orderResult.order.shippingAddress.address2 || '',
-                      city: orderResult.order.shippingAddress.city || '',
-                      province: orderResult.order.shippingAddress.province || '',
-                      country: orderResult.order.shippingAddress.countryCodeV2 || orderResult.order.shippingAddress.country || '',
-                      zip: orderResult.order.shippingAddress.zip || '',
-                      isDefault: false
-                    }
-                  });
-
-                  // 更新订单的收货地址ID
-                  await tx.order.update({
-                    where: { id: orderId },
-                    data: { shippingAddressId: addressId }
-                  });
-                });
-
-                // 重新获取订单信息
-                orderWithAddress = await prisma.order.findUnique({
-                  where: { id: orderId },
-                  include: {
-                    shippingAddress: true
-                  }
-                });
-              }
-            } catch (error) {
-              console.error('从Shopify获取订单收货地址失败:', error);
-              return res.status(500).json({
-                result: false,
-                message: "获取订单收货地址失败",
-                error: error.message
-              });
-            }
-          }
-
-          // 如果还是没有收货地址，返回错误
-          if (!orderWithAddress || !orderWithAddress.shippingAddress) {
-            return res.status(400).json({ result: false, message: "订单收货地址不存在" });
-          }
-
-          const shippingAddress = orderWithAddress.shippingAddress;
-
-          // 使用前端传递的仓库地址
-          const addressFrom = {
-            name: warehouseAddress?.name,
-            street1: warehouseAddress?.address?.address1,
-            street2: warehouseAddress?.address?.address2,
-            city: warehouseAddress?.address?.city,
-            state: warehouseAddress?.address?.province,
-            zip: warehouseAddress?.address?.zip,
-            country: warehouseAddress?.address?.countryCode
-          };
-          const parcelTemplate = await shippoService.getCarrierParcelByToken(parcelTemplateToken)
-
-          // 从数据库获取待履约订单的重量数据
-          fulfillmentOrders = await prisma.fulfillmentOrder.findMany({
-            where: { orderId },
-            include: {
-              lineItems: true
-            }
-          });
-
-          // 计算总重量
-          let totalWeight = 0;
-          let massUnit = 'lb';
-
-          if (fulfillmentOrders && fulfillmentOrders.length > 0) {
-            // 获取第一个重量单位，用于确定最终使用的单位
-            const firstWeightUnit = fulfillmentOrders[0].lineItems[0]?.weightUnit || 'POUND';
-
-            // 将全称转换为Shippo API使用的简写
-            if (firstWeightUnit === 'KILOGRAM') {
-              massUnit = 'kg';
-            } else if (firstWeightUnit === 'GRAM') {
-              massUnit = 'g';
-            } else if (firstWeightUnit === 'OUNCE') {
-              massUnit = 'oz';
-            } else {
-              massUnit = 'lb';
-            }
-
-            fulfillmentOrders.forEach(fulfillmentOrder => {
-              fulfillmentOrder.lineItems.forEach(lineItem => {
-                // 将所有重量转换为同一单位
-                const weightValue = Number(lineItem.weightValue);
-                let itemWeight = weightValue;
-
-                if (lineItem.weightUnit !== firstWeightUnit) {
-                  // 需要转换单位
-                  if (firstWeightUnit === 'KILOGRAM') {
-                    if (lineItem.weightUnit === 'GRAM') {
-                      itemWeight = weightValue / 1000;
-                    } else if (lineItem.weightUnit === 'OUNCE') {
-                      itemWeight = weightValue * 0.0283495;
-                    } else if (lineItem.weightUnit === 'POUND') {
-                      itemWeight = weightValue * 0.453592;
-                    }
-                  } else if (firstWeightUnit === 'GRAM') {
-                    if (lineItem.weightUnit === 'KILOGRAM') {
-                      itemWeight = weightValue * 1000;
-                    } else if (lineItem.weightUnit === 'OUNCE') {
-                      itemWeight = weightValue * 28.3495;
-                    } else if (lineItem.weightUnit === 'POUND') {
-                      itemWeight = weightValue * 453.592;
-                    }
-                  } else if (firstWeightUnit === 'OUNCE') {
-                    if (lineItem.weightUnit === 'KILOGRAM') {
-                      itemWeight = weightValue * 35.274;
-                    } else if (lineItem.weightUnit === 'GRAM') {
-                      itemWeight = weightValue * 0.035274;
-                    } else if (lineItem.weightUnit === 'POUND') {
-                      itemWeight = weightValue * 16;
-                    }
-                  } else if (firstWeightUnit === 'POUND') {
-                    if (lineItem.weightUnit === 'KILOGRAM') {
-                      itemWeight = weightValue * 2.20462;
-                    } else if (lineItem.weightUnit === 'GRAM') {
-                      itemWeight = weightValue * 0.00220462;
-                    } else if (lineItem.weightUnit === 'OUNCE') {
-                      itemWeight = weightValue * 0.0625;
-                    }
-                  }
-                }
-
-                totalWeight += itemWeight;
-              });
-            });
-          }
-
-          // 如果没有重量数据，使用默认值
-          const weight = totalWeight  || '1';
-
-          // 创建运单
-          shipment = await shippoService.createShipment({
-            addressFrom,
-            addressTo: {
-              name: shippingAddress.name ,
-              street1: shippingAddress.address1,
-              street2: shippingAddress.address2 || '',
-              city: shippingAddress.city ,
-              state: shippingAddress.province ,
-              zip: shippingAddress.zip,
-              country: shippingAddress.country
-            },
-            parcels: [{
-              length: parcelTemplate?.length || '10',
-              width: parcelTemplate?.width || '10',
-              height: parcelTemplate?.height || '10',
-              distanceUnit: parcelTemplate?.distanceUnit || 'in',
-              weight: weight,
-              massUnit: massUnit
-            }]
-          });
-
-          // 获取运费列表
-          const rates = await shippoService.getRates(shipment.objectId);
-
-          // 检查运单是否有可用的运费
-          if (!rates || rates.length === 0) {
-            return res.status(200).json({
-              result: true,
-              message: "当前地区没有可用的运费服务",
-              data: {
-                rates: [],
-                availableCarriers: [],
-                noRatesAvailable: true
-              }
-            });
-          }
-
-          // 查找指定承运商的费率
-          const carrierRates = rates.filter(rate => rate.provider.toLowerCase() === carrier.toLowerCase());
-
-          // 检查指定承运商是否支持该地区
-          if (carrierRates.length === 0) {
-            const availableCarriers = [...new Set(rates.map(r => r.provider))];
-            return res.status(200).json({
-              result: true,
-              message: `承运商 ${carrier} 不支持该地区的服务，可用的承运商有: ${availableCarriers.join(', ')}`,
-              data: {
-                rates: [],
-                availableCarriers,
-                noRatesAvailable: false
-              }
-            });
-          }
-
-          // 选择第一个可用的运费
-          selectedRate = carrierRates[0];
-
-          // 购买标签
-          label = await shippoService.purchaseLabel(selectedRate.objectId, `Order-${order.id}`);
-
-          // 创建追踪单
-          trackingResult = await shippoService.createTracking({
-            carrier:label.carrier,
-            trackingNumber:label.trackingNumber,
-            metadata: label.metadata
-          },label.test)
-
-          console.log(trackingResult)
-
-          //追踪号
-          finalTrackingNumber = trackingResult.trackingNumber;
-          finalTrackingUrl = trackingResult.tracking_url
-        } catch (error) {
-          console.error('Shippo 运单生成失败:', error);
-          return res.status(500).json({
-            result: false,
-            message: 'Failed to create shipment via Shippo',
-            error: error.message
-          });
-        }
-      }
-
-      // 同步发货信息到 Shopify
-      try {
-        const shopifyApiClient = await shopifyApiClientsManager.getShopifyApiClient(shop as string);
-
-        // 判断选择的发货仓库是否与订单预设发货仓库一致
-        // 如果不一致，则需要执行修改Shopify订单发货仓库的请求
-        if (warehouseAddress && fulfillmentOrders.length > 0) {
-          // 获取订单的原始履约订单信息
-          const originalFulfillmentOrder = fulfillmentOrders[0];
-
-          // 比较仓库地址是否一致
-          const isWarehouseChanged =
-            warehouseAddress.address?.address1 !== originalFulfillmentOrder.assignedLocation?.address1 ||
-            warehouseAddress.address?.address2 !== originalFulfillmentOrder.assignedLocation?.address2 ||
-            warehouseAddress.address?.city !== originalFulfillmentOrder.assignedLocation?.city ||
-            warehouseAddress.address?.province !== originalFulfillmentOrder.assignedLocation?.province ||
-            warehouseAddress.address?.zip !== originalFulfillmentOrder.assignedLocation?.zip ||
-            warehouseAddress.address?.countryCode !== originalFulfillmentOrder.assignedLocation?.countryCode;
-
-          if (isWarehouseChanged) {
-            try {
-              // 使用Shopify API移动履约订单到新的仓库位置
-              const moveResult = await shopifyApiClient.updateFulfillmentOrderLocation({
-                id: originalFulfillmentOrder.shopifyOrderId,
-                newLocationId: warehouseAddress.locationId,
-                fulfillmentOrderLineItems: originalFulfillmentOrder.lineItems.map(item => ({
-                  id: item.shopifyLineItemId,
-                  quantity: item.totalQuantity
-                }))
-              });
-
-              // 检查移动操作是否成功
-              if (moveResult?.fulfillmentOrderMove?.userErrors?.length > 0) {
-                console.error('移动履约订单到新仓库失败:', moveResult.fulfillmentOrderMove.userErrors);
-                return res.status(400).json({
-                  result: false,
-                  message: '无法将订单移动到指定的发货仓库',
-                  errors: moveResult.fulfillmentOrderMove.userErrors
-                });
-              }
-
-              // 履约订单已通过Shopify API移动到新仓库，无需在本地数据库中更新仓库信息
-            } catch (moveError) {
-              console.error('移动履约订单到新仓库时发生错误:', moveError);
-              return res.status(500).json({
-                result: false,
-                message: '移动订单到指定仓库时发生错误',
-                error: moveError.message
-              });
-            }
-          }
-        }
-
-        // 构建lineItemsByFulfillmentOrder参数
-        const lineItemsByFulfillmentOrder = fulfillmentOrders.map(fulfillmentOrder => ({
-          fulfillmentOrderId: fulfillmentOrder.shopifyOrderId,
-          fulfillmentOrderLineItems: fulfillmentOrder.lineItems.map(lineItem => ({
-            id: lineItem.shopifyLineItemId,
-            quantity: lineItem.totalQuantity
-          }))
-        }));
-
-        // 检查lineItemsByFulfillmentOrder是否为空
-        if (!lineItemsByFulfillmentOrder || lineItemsByFulfillmentOrder.length === 0) {
-          console.error('Shopify fulfillment error: No fulfillment orders to fulfill');
-          return res.status(400).json({
-            result: false,
-            message: 'No fulfillment orders to fulfill'
-          });
-        }
-
-        const fulfillmentResult = await shopifyApiClient.fulfillmentCreate({
-          trackingInfo: {
-            company: finalCarrier,
-            numbers: [finalTrackingNumber],
-            urls: [finalTrackingUrl]
-          },
-          notifyCustomer: notifyCustomer !== false,
-          lineItemsByFulfillmentOrder,
-          originAddress: {
-            address1: warehouseAddress?.address?.address1 || '',
-            address2: warehouseAddress?.address?.address2 || '',
-            city: warehouseAddress?.address?.city || '',
-            zip: warehouseAddress?.address?.zip || '',
-            provinceCode: warehouseAddress?.address?.province || '',
-            countryCode: warehouseAddress?.address?.countryCode || 'US'
-          }
-        });
-        console.log('同步发货结果：'+fulfillmentResult.fulfillmentCreate)
-        if (fulfillmentResult?.fulfillmentCreate?.userErrors.length > 0) {
-          console.error('Shopify fulfillment errors:', fulfillmentResult.fulfillmentCreate.userErrors);
-        }
-        else{
-          // 创建运单记录
-          await prisma.shipment.create({
-            data: {
-              orderId: order.id,
-              trackingNumber: trackingResult.trackingNumber,
-              carrier: finalCarrier,
-              status: trackingResult.trackingStatus.status,
-              labelUrl: label.labelUrl,
-              trackingUrl: trackingResult.tracking_url,
-              shippoShipmentId: shipment.objectId,
-              shippoLabelId: label.objectId,
-              weight: new Decimal(selectedRate.estimatedWeight?.value || '1'),
-              length: new Decimal('10'),
-              width: new Decimal('10'),
-              height: new Decimal('10'),
-              distanceUnit: selectedRate.estimatedWeight?.unit || 'in',
-              massUnit: 'lb',
-              test:label.test,
-              eta: trackingResult.eta,
-              original_eta: trackingResult.originalEta
-            }
-          });
-          //更新订单处理时间
-          await prisma.order.update({
-            where: { id: orderId },
-            data: {
-              processedAt: new Date()
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Failed to sync fulfillment to Shopify:', error);
-      }
-
-      res.json({
-        result: true,
-        message: '订单发货成功',
-        fulfillment: {
-          id: order.id,
-          status: 'IN_TRANSIT',
-          trackingInfo: {
-            company: finalCarrier,
-            number: finalTrackingNumber || order.confirmationNumber,
-            url: order.statusPageUrl
-          }
-        }
+      // 4. 将发货任务放入异步队列
+      const jobId = await addOrderFulfillmentJob({
+        orderId,
+        carrier,
+        warehouseAddress,
+        notifyCustomer,
+        parcelTemplateToken,
+        shop: shop as string,
+        customerStaffId
       });
+
+      // 5. 立即返回成功响应
+      return res.status(200).json({
+        result: true,
+        message: '订单发货请求已提交，正在处理中',
+        jobId: jobId
+      });
+
     } catch (error) {
       handleApiError(req, error);
       handlePrismaError(error);
-      res.status(500).json({ error: '订单发货失败' });
+      console.error('订单发货流程总错误:', error);
+      return res.status(500).json({
+        result: false,
+        error: '订单发货失败',
+        message: error.message
+      });
     }
   });
+
 
   app.get('/orders/carriers', RATE_LIMITS.NORMAL, async (req, res) => {
     try {

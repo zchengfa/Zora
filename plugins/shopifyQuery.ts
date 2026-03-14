@@ -193,6 +193,11 @@ interface DisplayAddress {
     nodes:Array<{
       id:string,
       status: string,
+      assignedLocation:{
+        location:{
+          id:string
+        }
+      },
       lineItems:{
         nodes:Array<{
           id:string,
@@ -264,8 +269,12 @@ export interface GraphqlQueryVariables {
     emailAddress?: string;
     id?:string;
     phoneNumber?:string;
-  }
+  },
+  locationId?:string
+  names?:InventoryLevelNames
 }
+
+ export type InventoryLevelNames = Array<'incoming' | 'on_hand' | 'available' | 'committed' | 'reserved' | 'damaged' | 'safety_stock' | 'quality_control'>;
 
 type MoneyDetailSet = {
   amount: string;
@@ -347,6 +356,26 @@ export interface GraphqlOrderResponse {
 export interface GraphqlProductResponse {
   product: GraphqlProductsResponse['products']["nodes"][0]
 }
+// 产品库存查询响应类型
+export interface GraphqlProductInventoryLocationResponse {
+  product: {
+    id: string;
+    variants: {
+      nodes: Array<{
+        id: string;
+        inventoryItem: {
+          inventoryLevel: {
+            quantities: Array<{
+              id: string;
+              quantity: number;
+            }>
+          }
+        };
+      }>;
+    };
+  };
+}
+
 //查询指定客户信息
 export const CUSTOMER_QUERY_BY_identifier = `
 query getCustomerByEmail($identifier:CustomerIdentifierInput!){
@@ -719,6 +748,11 @@ export const ORDERS_QUERY = `
         nodes{
           id
           status
+          assignedLocation{
+            location{
+              id
+            }
+          }
           lineItems(first:10){
             nodes{
               id
@@ -1080,6 +1114,27 @@ export const ORDER_QUERY = `
         }
         createdAt
       }
+      fulfillmentOrders(first:10){
+        nodes{
+          id
+          status
+          assignedLocation{
+            location{
+              id
+            }
+          }
+          lineItems(first:10){
+            nodes{
+              id
+              weight{
+                unit
+                value
+              }
+              totalQuantity
+            }
+          }
+        }
+      }
       additionalFees{
         id
         name
@@ -1103,6 +1158,26 @@ export const ORDER_QUERY = `
         shopMoney{
           amount
           currencyCode
+        }
+      }
+    }
+  }
+`
+//查询产品在对应仓库的库存
+export const PRODUCT_INVENTORY_LOCATION_QUERY = `
+  query productInventoryWithLocation($productId:ID!,$locationId:ID!,$names:[String!]!){
+    product(id:$productId){
+      variants(first:10){
+        nodes{
+          id
+          inventoryItem{
+            inventoryLevel(locationId:$locationId){
+              quantities(names:$names){
+                id,
+                quantity
+              }
+            }
+          }
         }
       }
     }

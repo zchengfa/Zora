@@ -28,7 +28,10 @@ export interface CustomerCreateInput {
 }
 
 export interface GraphqlMutationVariables {
-  input?:CustomerCreateInput | FulfillmentInput | FulfillmentOrderMoveInput
+  input?:CustomerCreateInput | FulfillmentInput
+  id?:string,
+  newLocationId?:string,
+  fulfillmentOrderLineItems?:Array<{id:string,quantity:number}>
 }
 
 //新建客户
@@ -192,8 +195,8 @@ export interface GraphqlFulfillmentOrderMoveMutationResponse {
 }
 //修改特定待履约订单的发货地点
 export const FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION = `
-  mutation fulfillmentOrderMove($input:FulfillmentOrderLineItemInput!,$id:ID!,$newLocationId:ID!){
-    fulfillmentOrderMove(fulfillmentOrderLineItems:$input,id:$id,newLocationId:$newLocationId){
+  mutation fulfillmentOrderMove($fulfillmentOrderLineItems:[FulfillmentOrderLineItemInput!],$id:ID!,$newLocationId:ID!){
+    fulfillmentOrderMove(fulfillmentOrderLineItems:$fulfillmentOrderLineItems,id:$id,newLocationId:$newLocationId){
       movedFulfillmentOrder {
       id
       status

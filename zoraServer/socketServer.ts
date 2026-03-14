@@ -21,6 +21,32 @@ export async function startSocketServer({server,redis,prisma}:{server:Server,red
       //客服socket
       const agent = new Map()
 
+      // 订阅发货消息通道
+      const fulfillmentSubscriber = redis.duplicate();
+      fulfillmentSubscriber.subscribe('order_fulfillment', (err) => {
+        if (err) {
+          console.error(`订阅Redis频道order_fulfillment失败:`, err);
+          return;
+        }
+
+        fulfillmentSubscriber.on('message', (channel, message) => {
+          if (channel === 'order_fulfillment') {
+            try {
+              const fulfillmentMessage = JSON.parse(message);
+              // 根据消息中的 customerStaffId 推送给指定客服
+              if (fulfillmentMessage.customerStaffId) {
+                const socketId = agent.get(fulfillmentMessage.customerStaffId);
+                if (socketId) {
+                  io.to(socketId).emit('order_fulfillment', fulfillmentMessage);
+                }
+              }
+            } catch (e) {
+              console.error('解析Redis消息失败:', e);
+            }
+          }
+        });
+      });
+
       // 为每个socket订阅Redis消息通道
       io.on('connection', (ws:Socket)=>{
         const socketUtils = new SocketUtils({

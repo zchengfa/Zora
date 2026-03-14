@@ -52,7 +52,7 @@ app.use(bodyParser.urlencoded({ extended: true }))
 
 app.post('/api/agent-offline', async (req, res) => {
   try {
-    const { agent, action, chatList, activeCustomerItem } = req.body;
+    const { agent, chatList, activeCustomerItem } = req.body;
 
     // 将客服标记为离线
     SocketUtils.manualOffline(agent);
