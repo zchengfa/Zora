@@ -4,11 +4,21 @@ import {ShopifyApiClientsManager, shopifyHandleResponseData} from "./shopifyUtil
 import {prismaClient} from "./prismaClient.ts";
 import {beginLogger} from "./bullTaskQueue.ts";
 import {WorkerHealth} from "./workerHealth.ts";
+import {Decimal} from "@prisma/client/runtime/library";
+import Redlock from 'redlock';
 
 const workerHealth = new WorkerHealth({
   connection: redisClient,
   workerName: process.env.SHOPIFY_WORKER_HEALTH_KEY || 'shopify'
 })
+
+// 初始化 Redlock
+const redlock = new Redlock([redisClient], {
+  retryCount: 10,
+  retryDelay: 200,
+  retryJitter: 200
+});
+
 // 全局独立订阅客户端（只初始化一次，避免重复创建）
 const subscriber = redisClient.duplicate();
 // 存储已订阅的店铺（防止重复订阅）
@@ -193,6 +203,839 @@ const handleCleanupShopData = async (job: any) => {
   }
 };
 
+// 检查订单是否已履约
+const checkOrderAlreadyFulfilled = async (orderId: string) => {
+  const existingShipment = await prismaClient.shipment.findFirst({
+    where: { orderId },
+    select: { id: true }
+  });
+  return !!existingShipment;
+};
+
+// 获取订单信息
+const getOrderInfo = async (orderId: string) => {
+  return prismaClient.order.findUnique({
+    where: { id: orderId }
+  });
+};
+
+// 从Shopify获取并同步订单收货地址
+const syncOrderShippingAddress = async (order: any, shop: string) => {
+  let orderWithAddress = await prismaClient.order.findUnique({
+    where: { id: order.id },
+    include: { shippingAddress: true }
+  });
+
+  if (!orderWithAddress || !orderWithAddress.shippingAddress) {
+    const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
+    const orderResult = await shopifyApiClient.order(order.shopifyOrderId);
+
+    if (orderResult.order?.shippingAddress) {
+      const addressId = `${order.id}_shipping`;
+      await prismaClient.$transaction(async (tx) => {
+        await tx.address.create({
+          data: {
+            id: addressId,
+            customerId: order.customerId || null,
+            name: orderResult.order.shippingAddress.name || '',
+            address1: orderResult.order.shippingAddress.address1 || '',
+            address2: orderResult.order.shippingAddress.address2 || '',
+            city: orderResult.order.shippingAddress.city || '',
+            province: orderResult.order.shippingAddress.province || '',
+            country: orderResult.order.shippingAddress.countryCodeV2 || orderResult.order.shippingAddress.country || '',
+            zip: orderResult.order.shippingAddress.zip || '',
+            isDefault: false
+          }
+        });
+        await tx.order.update({
+          where: { id: order.id },
+          data: { shippingAddressId: addressId }
+        });
+      });
+
+      orderWithAddress = await prismaClient.order.findUnique({
+        where: { id: order.id },
+        include: { shippingAddress: true }
+      });
+    }
+  }
+
+  return orderWithAddress;
+};
+
+// 构建发货地址
+const buildAddressFrom = (warehouseAddress?: any) => {
+  return {
+    name: warehouseAddress?.name || 'Default Warehouse',
+    street1: warehouseAddress?.address?.address1 || '',
+    street2: warehouseAddress?.address?.address2 || '',
+    city: warehouseAddress?.address?.city || '',
+    state: warehouseAddress?.address?.province || '',
+    zip: warehouseAddress?.address?.zip || '',
+    country: warehouseAddress?.address?.countryCode || ''
+  };
+};
+
+// 计算订单总重量
+const calculateOrderWeight = async (orderId: string) => {
+  const fulfillmentOrders = await prismaClient.fulfillmentOrder.findMany({
+    where: { orderId },
+    include: { lineItems: true }
+  });
+
+  let totalWeight = 0;
+  let massUnit = 'lb';
+
+  if (fulfillmentOrders.length > 0) {
+    const firstWeightUnit = fulfillmentOrders[0].lineItems[0]?.weightUnit || 'POUND';
+    const unitMap = {
+      KILOGRAM: 'kg',
+      GRAM: 'g',
+      OUNCE: 'oz',
+      POUND: 'lb'
+    };
+    massUnit = unitMap[firstWeightUnit] || 'lb';
+
+    const conversion = {
+      POUND: {
+        KILOGRAM: 2.20462,
+        GRAM: 0.00220462,
+        OUNCE: 0.0625
+      },
+      KILOGRAM: {
+        POUND: 0.453592,
+        GRAM: 0.001,
+        OUNCE: 0.0283495
+      },
+      GRAM: {
+        POUND: 453.592,
+        KILOGRAM: 1000,
+        OUNCE: 28.3495
+      },
+      OUNCE: {
+        POUND: 16,
+        KILOGRAM: 35.274,
+        GRAM: 0.035274
+      }
+    };
+
+    fulfillmentOrders.forEach(fulfillmentOrder => {
+      fulfillmentOrder.lineItems.forEach(lineItem => {
+        const weightValue = Number(lineItem.weightValue) || 0;
+        let itemWeight = weightValue;
+
+        if (lineItem.weightUnit !== firstWeightUnit) {
+          itemWeight = weightValue * (conversion[firstWeightUnit][lineItem.weightUnit] || 1);
+        }
+        totalWeight += itemWeight;
+      });
+    });
+  }
+
+  return { weight: totalWeight > 0 ? totalWeight.toString() : '1', massUnit };
+};
+
+// 创建Shippo运单
+const createShippoShipment = async (params: {
+  orderId: string;
+  carrier: string;
+  warehouseAddress?: any;
+  parcelTemplateToken: string;
+  shippingAddress: any;
+  jobId: string;
+}) => {
+  const { orderId, carrier, warehouseAddress, parcelTemplateToken, shippingAddress, jobId } = params;
+
+  try {
+    const { shippoClientManager } = await import('./shippoClient.ts');
+    if (!shippoClientManager.isInitialized()) {
+      await beginLogger({
+        level: 'error',
+        message: `Shippo服务未初始化`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId,
+          orderId
+        }
+      });
+      return null;
+    }
+
+    const shippoService = shippoClientManager.getShippoService();
+    const addressFrom = buildAddressFrom(warehouseAddress);
+    const parcelTemplate = await shippoService.getCarrierParcelByToken(parcelTemplateToken);
+    const { weight, massUnit } = await calculateOrderWeight(orderId);
+
+    const shipment = await shippoService.createShipment({
+      addressFrom,
+      addressTo: {
+        name: shippingAddress.name || '',
+        street1: shippingAddress.address1 || '',
+        street2: shippingAddress.address2 || '',
+        city: shippingAddress.city || '',
+        state: shippingAddress.province || '',
+        zip: shippingAddress.zip || '',
+        country: shippingAddress.country || ''
+      },
+      parcels: [{
+        length: parcelTemplate?.length || '10',
+        width: parcelTemplate?.width || '10',
+        height: parcelTemplate?.height || '10',
+        distanceUnit: parcelTemplate?.distanceUnit || 'in',
+        weight,
+        massUnit
+      }]
+    });
+
+    return { shipment, parcelTemplate, shippoService };
+  } catch (error) {
+    await beginLogger({
+      level: 'error',
+      message: `订单${orderId}Shippo运单创建失败: ${error.message}`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId,
+        orderId,
+        error: error.message
+      }
+    });
+    return null;
+  }
+};
+
+// 获取并筛选运费
+const getAndFilterRates = async (params: {
+  shipment: any;
+  carrier: string;
+  orderId: string;
+  jobId: string;
+}) => {
+  const { shipment, carrier, orderId, jobId } = params;
+
+  const rates = await shipment.getRates(shipment.objectId);
+  if (!rates || rates.length === 0) {
+    await beginLogger({
+      level: 'warning',
+      message: `订单${orderId}当前地区没有可用的运费服务`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId,
+        orderId
+      }
+    });
+    return null;
+  }
+
+  const carrierRates = rates.filter(rate => rate.provider.toLowerCase() === carrier.toLowerCase());
+  if (carrierRates.length === 0) {
+    await beginLogger({
+      level: 'warning',
+      message: `承运商${carrier}不支持订单${orderId}的地区的服务`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId,
+        orderId,
+        carrier
+      }
+    });
+    return null;
+  }
+
+  return carrierRates[0];
+};
+
+// 购买标签并创建追踪单
+const purchaseLabelAndCreateTracking = async (params: {
+  selectedRate: any;
+  orderId: string;
+  jobId: string;
+  shippoService: any;
+}) => {
+  const { selectedRate, orderId, jobId, shippoService } = params;
+
+  try {
+    const label = await shippoService.purchaseLabel(selectedRate.objectId, `Order-${orderId}`);
+    const trackingResult = await shippoService.createTracking({
+      carrier: label.carrier,
+      trackingNumber: label.trackingNumber,
+      metadata: label.metadata
+    }, label.test);
+
+    return {
+      label,
+      trackingNumber: trackingResult.trackingNumber,
+      trackingUrl: trackingResult.tracking_url || `${process.env.SHIPPO_BASE_TRACKING_URL_TEST}${label.carrier}/${label.trackingNumber}`
+    };
+  } catch (error) {
+    await beginLogger({
+      level: 'error',
+      message: `订单${orderId}购买标签或创建追踪单失败: ${error.message}`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId,
+        orderId,
+        error: error.message
+      }
+    });
+    return null;
+  }
+};
+
+// 获取Shopify履约订单
+const getShopifyFulfillmentOrders = async (shop: string, shopifyOrderId: string) => {
+  const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
+  const shopifyOrder = await shopifyApiClient.order(shopifyOrderId);
+  return shopifyOrder.order?.fulfillmentOrders?.nodes || [];
+};
+
+// 筛选可履约的订单
+const filterAvailableFulfillmentOrders = (fulfillmentOrders: any[]) => {
+  return fulfillmentOrders.filter(
+    fo => ['OPEN', 'PARTIALLY_FULFILLED'].includes(fo.status)
+  );
+};
+
+// 移动履约订单到指定仓库
+/**
+ * 检查仓库库存是否足够
+ */
+const checkWarehouseInventory = async (params: {
+  availableFulfillmentOrders: any[];
+  warehouseAddress?: any;
+  shopifyApiClient: any;
+  orderId: string;
+  jobId: string;
+}) => {
+  const { availableFulfillmentOrders, warehouseAddress, shopifyApiClient, orderId, jobId } = params;
+
+  if (!warehouseAddress?.id) return true;
+
+  const targetLocationId = warehouseAddress.id.toString();
+
+  for (const fo of availableFulfillmentOrders) {
+    for (const item of fo.lineItems.nodes) {
+      const productId = item.variant.product.id;
+      const variantId = item.variant.id;
+      const requiredQuantity = item.totalQuantity;
+
+      // 查询产品在指定仓库的库存
+      const inventoryResult = await shopifyApiClient.productInventoryLocation(
+        productId,
+        targetLocationId,
+        ['available']
+      );
+
+      if (!inventoryResult?.product?.variants?.nodes) {
+        await beginLogger({
+          level: 'error',
+          message: `订单${orderId}无法查询产品${productId}的库存`,
+          meta: {
+            taskType: 'fulfill_order',
+            jobId,
+            orderId,
+            productId
+          }
+        });
+        return false;
+      }
+
+      // 查找对应变体的库存
+      const variant = inventoryResult.product.variants.nodes.find(
+        (v: any) => v.id === variantId
+      );
+
+      if (!variant) {
+        await beginLogger({
+          level: 'error',
+          message: `订单${orderId}无法找到产品变体${variantId}`,
+          meta: {
+            taskType: 'fulfill_order',
+            jobId,
+            orderId,
+            variantId
+          }
+        });
+        return false;
+      }
+
+      // 检查库存是否足够
+      const availableQuantity = variant.inventoryItem?.inventoryLevel?.quantities?.find(
+        (q: any) => q.name === 'available'
+      )?.quantity || 0;
+
+      if (availableQuantity < requiredQuantity) {
+        await beginLogger({
+          level: 'warning',
+          message: `订单${orderId}产品${productId}变体${variantId}库存不足，需要${requiredQuantity}，可用${availableQuantity}`,
+          meta: {
+            taskType: 'fulfill_order',
+            jobId,
+            orderId,
+            productId,
+            variantId,
+            requiredQuantity,
+            availableQuantity
+          }
+        });
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+const moveFulfillmentOrders = async (params: {
+  availableFulfillmentOrders: any[];
+  warehouseAddress?: any;
+  shop: string;
+  orderId: string;
+  jobId: string;
+}) => {
+  const { availableFulfillmentOrders, warehouseAddress, shop, orderId, jobId } = params;
+
+  if (!warehouseAddress?.id) return true;
+
+  const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
+  const targetLocationId = warehouseAddress.id.toString();
+
+  for (const fo of availableFulfillmentOrders) {
+    const currentLocationId = fo.assignedLocation.location.id?.toString() || '';
+    if (currentLocationId !== targetLocationId) {
+      const updateFulfillmentOrderInput = {
+        id: fo.id,
+        fulfillmentOrderLineItems: fo.lineItems.nodes.map(item => ({
+          id: item.id,
+          quantity: item.totalQuantity
+        })),
+        newLocationId: targetLocationId
+      };
+
+      const moveResult = await shopifyApiClient.updateFulfillmentOrderLocation(updateFulfillmentOrderInput);
+      if (moveResult?.fulfillmentOrderMove?.userErrors?.length > 0 || !moveResult) {
+        await beginLogger({
+          level: 'error',
+          message: `订单${orderId}无法移动到指定的发货仓库`,
+          meta: {
+            taskType: 'fulfill_order',
+            jobId,
+            orderId,
+            errors: moveResult.fulfillmentOrderMove.userErrors
+          }
+        });
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+// 创建Shopify履约
+const createShopifyFulfillment = async (params: {
+  shop: string;
+  carrier: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  availableFulfillmentOrders: any[];
+  warehouseAddress?: any;
+  notifyCustomer?: boolean;
+  orderId: string;
+  jobId: string;
+}) => {
+  const { shop, carrier, trackingNumber, trackingUrl, availableFulfillmentOrders, warehouseAddress, notifyCustomer, orderId, jobId } = params;
+
+  const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
+  const lineItemsByFulfillmentOrder = availableFulfillmentOrders.map(fo => ({
+    fulfillmentOrderId: fo.id,
+    fulfillmentOrderLineItems: fo.lineItems.nodes.map(item => ({
+      id: item.id,
+      quantity: item.totalQuantity
+    }))
+  }));
+
+  const fulfillmentResult = await shopifyApiClient.fulfillmentCreate({
+    trackingInfo: {
+      company: carrier,
+      numbers: [trackingNumber],
+      urls: [trackingUrl]
+    },
+    notifyCustomer: notifyCustomer !== false,
+    lineItemsByFulfillmentOrder: lineItemsByFulfillmentOrder,
+    originAddress: {
+      address1: warehouseAddress?.address?.address1 || '',
+      address2: warehouseAddress?.address?.address2 || '',
+      city: warehouseAddress?.address?.city || '',
+      zip: warehouseAddress?.address?.zip || '',
+      provinceCode: warehouseAddress?.address?.province || '',
+      countryCode: warehouseAddress?.address?.countryCode || 'US'
+    }
+  });
+
+  if (fulfillmentResult?.fulfillmentCreate?.userErrors?.length > 0) {
+    await beginLogger({
+      level: 'error',
+      message: `订单${orderId}Shopify履约失败`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId,
+        orderId,
+        errors: fulfillmentResult.fulfillmentCreate.userErrors
+      }
+    });
+    return null;
+  }
+
+  return fulfillmentResult;
+};
+
+// 保存运单记录到本地
+const saveShipmentRecord = async (params: {
+  order: any;
+  trackingNumber: string;
+  carrier: string;
+  trackingUrl: string;
+  label?: any;
+  shipment?: any;
+  parcelTemplate?: any;
+  selectedRate?: any;
+  trackingResult?: any;
+  massUnit: string;
+  fulfillmentStatus: string;
+}) => {
+  const { order, trackingNumber, carrier, trackingUrl, label, shipment, parcelTemplate, selectedRate, trackingResult, massUnit, fulfillmentStatus } = params;
+
+  await prismaClient.shipment.create({
+    data: {
+      orderId: order.id,
+      trackingNumber,
+      carrier,
+      status: fulfillmentStatus,
+      labelUrl: label?.labelUrl || '',
+      trackingUrl,
+      shippoShipmentId: shipment?.objectId || '',
+      shippoLabelId: label?.objectId || '',
+      weight: new Decimal(selectedRate?.estimatedWeight?.value || '1'),
+      length: new Decimal(parcelTemplate?.length || '10'),
+      width: new Decimal(parcelTemplate?.width || '10'),
+      height: new Decimal(parcelTemplate?.height || '10'),
+      distanceUnit: selectedRate?.estimatedWeight?.unit || 'in',
+      massUnit,
+      test: label?.test || true,
+      eta: trackingResult?.eta || null,
+      original_eta: trackingResult?.originalEta || null
+    }
+  });
+};
+
+// 更新订单处理时间
+const updateOrderProcessedTime = async (orderId: string) => {
+  await prismaClient.order.update({
+    where: { id: orderId },
+    data: { processedAt: new Date() }
+  });
+};
+
+// 处理订单发货的任务函数
+const handleFulfillOrder = async (job: any) => {
+  const {orderId, carrier, warehouseAddress, notifyCustomer, parcelTemplateToken, shop, customerStaffId} = job.data;
+
+  await beginLogger({
+    level: 'info',
+    message: `开始处理订单发货任务`,
+    meta: {
+      taskType: 'fulfill_order',
+      jobId: job.id,
+      orderId,
+      shop
+    }
+  });
+
+  // 使用 Redlock 分布式锁防止重复处理
+  const lockKey = `order_fulfillment_lock:${orderId}`;
+  const lockTTL = 300000; // 锁定5分钟（毫秒）
+  let lock;
+
+  try {
+    // 尝试获取锁
+    lock = await redlock.acquire([lockKey], lockTTL);
+  } catch (error) {
+    // 获取锁失败，说明订单正在被处理
+    await beginLogger({
+      level: 'warning',
+      message: `订单${orderId}正在被其他进程处理，跳过本次处理`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId: job.id,
+        orderId
+      }
+    });
+    return true;
+  }
+
+  try {
+    // 1. 检查本地是否已履约（避免重复调用）
+    const isAlreadyFulfilled = await checkOrderAlreadyFulfilled(orderId);
+    if (isAlreadyFulfilled) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}已生成运单，无需重复操作`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+      return true;
+    }
+
+    // 2. 获取订单基础信息
+    const order = await getOrderInfo(orderId);
+    if (!order || !order.shopifyOrderId) {
+      await beginLogger({
+        level: 'error',
+        message: `订单${orderId}不存在或缺少shopifyOrderId`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+      return false;
+    }
+
+    // 3. Shippo 创建运单逻辑
+    let finalTrackingNumber, finalTrackingUrl, label, shipment, parcelTemplate, selectedRate, massUnit;
+
+    if (carrier) {
+      // 3.1 获取/同步订单收货地址
+      const orderWithAddress = await syncOrderShippingAddress(order, shop);
+      if (!orderWithAddress || !orderWithAddress.shippingAddress) {
+        await beginLogger({
+          level: 'error',
+          message: `订单${orderId}收货地址不存在`,
+          meta: {
+            taskType: 'fulfill_order',
+            jobId: job.id,
+            orderId
+          }
+        });
+        return false;
+      }
+      const shippingAddress = orderWithAddress.shippingAddress;
+
+      // 3.2 创建 Shippo 运单
+      const shippoResult = await createShippoShipment({
+        orderId,
+        carrier,
+        warehouseAddress,
+        parcelTemplateToken,
+        shippingAddress,
+        jobId: job.id
+      });
+      if (!shippoResult) {
+        return false;
+      }
+      shipment = shippoResult.shipment;
+      parcelTemplate = shippoResult.parcelTemplate;
+      const shippoService = shippoResult.shippoService;
+
+      // 3.3 获取并筛选运费
+      selectedRate = await getAndFilterRates({
+        shipment,
+        carrier,
+        orderId,
+        jobId: job.id
+      });
+      if (!selectedRate) {
+        return false;
+      }
+
+      // 3.4 购买标签 + 创建追踪单
+      const trackingResult = await purchaseLabelAndCreateTracking({
+        selectedRate,
+        orderId,
+        jobId: job.id,
+        shippoService
+      });
+      if (!trackingResult) {
+        return false;
+      }
+      finalTrackingNumber = trackingResult.trackingNumber;
+      finalTrackingUrl = trackingResult.trackingUrl;
+      label = trackingResult.label;
+
+      // 获取重量单位
+      const weightResult = await calculateOrderWeight(orderId);
+      massUnit = weightResult.massUnit;
+    }
+
+    // 4. 同步 Shopify 履约逻辑
+    // 4.1 从 Shopify 实时获取履约订单
+    const shopifyFulfillmentOrders = await getShopifyFulfillmentOrders(shop, order.shopifyOrderId);
+    if (!shopifyFulfillmentOrders.length) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}无履约订单`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+      return false;
+    }
+
+    // 4.2 筛选可履约的订单
+    const availableFulfillmentOrders = filterAvailableFulfillmentOrders(shopifyFulfillmentOrders);
+    if (!availableFulfillmentOrders.length) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}所有履约订单已完成/取消`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+      return false;
+    }
+
+    // 4.3 检查仓库库存
+    const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
+    const inventoryCheckSuccess = await checkWarehouseInventory({
+      availableFulfillmentOrders,
+      warehouseAddress,
+      shopifyApiClient,
+      orderId,
+      jobId: job.id
+    });
+    if (!inventoryCheckSuccess) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}仓库库存不足`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+
+      // 发布库存不足消息到Redis
+      await subscriber.publish('order_fulfillment', JSON.stringify({
+        type: 'insufficient_inventory',
+        orderId,
+        shop,
+        customerStaffId,
+        timestamp: new Date().toISOString()
+      }));
+
+      return false;
+    }
+
+    // 4.4 移动履约订单到指定仓库
+    const moveSuccess = await moveFulfillmentOrders({
+      availableFulfillmentOrders,
+      warehouseAddress,
+      shop,
+      orderId,
+      jobId: job.id
+    });
+    if (!moveSuccess) {
+      return false;
+    }
+
+    // 4.4 创建 Shopify 履约
+    const fulfillmentResult = await createShopifyFulfillment({
+      shop,
+      carrier,
+      trackingNumber: finalTrackingNumber,
+      trackingUrl: finalTrackingUrl,
+      availableFulfillmentOrders,
+      warehouseAddress,
+      notifyCustomer,
+      orderId,
+      jobId: job.id
+    });
+    if (!fulfillmentResult) {
+      return false;
+    }
+
+    // 4.5 保存运单记录到本地
+    await saveShipmentRecord({
+      order,
+      trackingNumber: finalTrackingNumber,
+      carrier,
+      trackingUrl: finalTrackingUrl,
+      label,
+      shipment,
+      parcelTemplate,
+      selectedRate,
+      trackingResult: { eta: null, originalEta: null },
+      massUnit,
+      fulfillmentStatus: fulfillmentResult.fulfillmentCreate.fulfillment.status
+    });
+
+    // 4.6 更新订单处理时间
+    await updateOrderProcessedTime(orderId);
+
+    // 4.7 发布发货成功消息到Redis
+    await subscriber.publish('order_fulfillment', JSON.stringify({
+      type: 'fulfillment_success',
+      orderId,
+      shop,
+      trackingNumber: finalTrackingNumber,
+      trackingUrl: finalTrackingUrl,
+      carrier,
+      customerStaffId,
+      timestamp: new Date().toISOString()
+    }));
+
+    await beginLogger({
+      level: 'info',
+      message: `订单${orderId}发货成功`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId: job.id,
+        orderId,
+        trackingNumber: finalTrackingNumber
+      }
+    });
+
+    return true;
+  } catch (error) {
+    await beginLogger({
+      level: 'error',
+      message: `订单${orderId}发货流程总错误: ${error.message}`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId: job.id,
+        orderId,
+        error: error.message
+      }
+    });
+
+    // 发布发货失败消息到Redis
+    await subscriber.publish('order_fulfillment', JSON.stringify({
+      type: 'fulfillment_failure',
+      orderId,
+      shop,
+      customerStaffId,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }));
+
+    return false;
+  } finally {
+    // 释放分布式锁
+    if (lock) {
+      await lock.release().catch(err => {
+        console.error(`释放订单${orderId}的分布式锁失败:`, err);
+      });
+    }
+  }
+};
+
 // 同步 Shopify 数据的任务处理函数
 const handleSyncShopifyData = async (job: any) => {
   const {jobType, shop} = job.data;
@@ -248,8 +1091,13 @@ const worker = new Worker('shopifySyncDataQueue', async (job) => {
   shopifyApiClientManager.clearClientCache(shop);
   //订阅消息
   await subscriberRedis(shop)
+  // 处理订单发货任务
+  if(job.name === 'fulfillOrder'){
+    await handleFulfillOrder(job);
+    return;
+  }
   // 处理数据清理任务
-  if(job.name === 'cleanupShopData'){
+  else if(job.name === 'cleanupShopData'){
     await handleCleanupShopData(job);
     return;
   }

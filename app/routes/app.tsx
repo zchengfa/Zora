@@ -69,7 +69,7 @@ function AppContent({ notification }: { notification: any }) {
 
 function App() {
   const { apiKey, customerStaff, products } = useLoaderData<typeof loader>();
-  const {message,socket,messageAck,offlineMessages,notification} = useSocketService();
+  const {message,socket,messageAck,offlineMessages,notification,orderFulfillment} = useSocketService();
 
   const appBridge = useAppBridge()
   const {translation} = useAppTranslation();
@@ -191,6 +191,40 @@ function App() {
       })
     }
   }, [message]);
+
+  // 处理发货消息
+  useEffect(() => {
+    if(orderFulfillment){
+      const {showSuccess,showError,showWarning} = useZoraNotification();
+      const {translation} = useAppTranslation();
+      const t = translation.notification.fulfillment;
+      
+      switch(orderFulfillment.type){
+        case 'fulfillment_success':
+          showSuccess(
+            t.success.message
+              .replace('{orderId}', orderFulfillment.orderId)
+              .replace('{trackingNumber}', orderFulfillment.trackingNumber || ''),
+            t.success.title
+          );
+          break;
+        case 'fulfillment_failure':
+          showError(
+            t.failure.message
+              .replace('{orderId}', orderFulfillment.orderId)
+              .replace('{error}', orderFulfillment.error || ''),
+            t.failure.title
+          );
+          break;
+        case 'insufficient_inventory':
+          showWarning(
+            t.insufficientInventory.message.replace('{orderId}', orderFulfillment.orderId),
+            t.insufficientInventory.title
+          );
+          break;
+      }
+    }
+  }, [orderFulfillment]);
 
   // 处理离线消息
   useEffect(() => {

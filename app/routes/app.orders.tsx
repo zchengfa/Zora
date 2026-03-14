@@ -8,6 +8,7 @@ import { Post } from "@/network/network.ts";
 import {getOrders, getTrackingInfo, getCarriers, getParcelTemplates} from "@/network/request.ts";
 import {SHOP_INFO_QUERY_GQL} from "@Utils/graphql.ts";
 import { useZoraUniversalModal } from "@/contexts/ZoraModalProvider.tsx";
+import { useMessageStore } from "@/zustand/zustand.ts";
 
 interface Order {
   id: string;
@@ -76,6 +77,7 @@ function OrdersPage() {
   const { orders, shopDomain } = useLoaderData<typeof loader>();
   const { translation } = useAppTranslation();
   const t = translation.orders;
+  const { customerStaff } = useMessageStore();
   const { showModal } = useZoraUniversalModal();
   const [searchValue, setSearchValue] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -201,6 +203,7 @@ function OrdersPage() {
           carrier,
           trackingNumber,
           notifyCustomer,
+          customerStaffId: customerStaff?.id || null,
         },
       });
       setShowFulfillModal(false);
@@ -211,7 +214,7 @@ function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedOrder, carrier, trackingNumber, notifyCustomer, selectedParcelTemplate, selectedWarehouse]);
+  }, [selectedOrder, carrier, trackingNumber, notifyCustomer, selectedParcelTemplate, selectedWarehouse, customerStaff]);
 
   const handleTrackPackage = useCallback(async (trackingNumber: string, carrier: string) => {
     setTrackingLoading(true);
@@ -569,7 +572,7 @@ function OrdersPage() {
                     <strong>{t.order.id}:</strong> {selectedOrder.orderNumber}
                   </Text>
                   <Text variant="bodyMd" as={'strong'}>
-                    <strong>{t.order.customer}:</strong> {selectedOrder.customer?.displayName.split('').reverse().join('')}
+                    <strong>{t.order.customer}:</strong> {selectedOrder.customer?.displayName}
                   </Text>
                   <Text variant="bodyMd" as={'strong'}>
                     <strong>{t.order.date}:</strong> {formatDate(selectedOrder.processedAt)}

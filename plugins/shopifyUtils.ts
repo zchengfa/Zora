@@ -11,7 +11,8 @@ import {
   PRODUCT_QUERY,
   CUSTOMER_QUERY_BY_identifier,
   ORDERS_IDS_QUERY,
-  LOCATIONS_QUERY
+  LOCATIONS_QUERY,
+  PRODUCT_INVENTORY_LOCATION_QUERY
 } from "./shopifyQuery.ts";
 import type {
   GraphqlShopResponse,
@@ -25,7 +26,9 @@ import type {
   GraphqlOrderResponse,
   GraphqlProductResponse,
   GraphqlCustomerByIdentifierResponse,
-  GraphqlLocationsResponse
+  GraphqlLocationsResponse,
+  GraphqlProductInventoryLocationResponse,
+  InventoryLevelNames
 } from './shopifyQuery.ts'
 import {CUSTOMER_CREATE_MUTATION, FULFILLMENT_CREATE_MUTATION,FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION} from './shopifyMutation.ts'
 import type {
@@ -98,6 +101,11 @@ export interface IShopifyApiClient {
   product(productId:string): Promise<GraphqlProductResponse>,
 
   /**
+   * 查询产品在指定仓库的库存
+   */
+  productInventoryLocation(productId:string, locationId:string,names:InventoryLevelNames): Promise<GraphqlProductInventoryLocationResponse>
+
+  /**
    * 通过标识查询指定客户数据
    */
   customerByIdentifier(identifier:GraphqlQueryVariables['identifier']):Promise<GraphqlCustomerByIdentifierResponse>
@@ -129,6 +137,7 @@ export class ShopifyApiClient implements IShopifyApiClient {
     }
   }
   private shopifyApiGraphqlRequest = (query:string,variables?:GraphqlQueryVariables | GraphqlMutationVariables)=>{
+    console.log(variables)
     return this.shopifyApi.graphql({
       ...this.shopConfig,
       query,
@@ -194,6 +203,14 @@ export class ShopifyApiClient implements IShopifyApiClient {
     })
   }
 
+  public productInventoryLocation = (productId:string, locationId:string,names:InventoryLevelNames):Promise<GraphqlProductInventoryLocationResponse>=>{
+    return this.shopifyApiGraphqlRequest(PRODUCT_INVENTORY_LOCATION_QUERY,{
+      productId,
+      locationId,
+      names
+    })
+  }
+
   public customerByIdentifier = (identifier:GraphqlQueryVariables['identifier']):Promise<GraphqlCustomerByIdentifierResponse>=>{
     return this.shopifyApiGraphqlRequest(CUSTOMER_QUERY_BY_identifier,{
       identifier
@@ -217,9 +234,7 @@ export class ShopifyApiClient implements IShopifyApiClient {
   }
 
   public updateFulfillmentOrderLocation = (input:FulfillmentOrderMoveInput):Promise<GraphqlFulfillmentOrderMoveMutationResponse> => {
-    return this.shopifyApiGraphqlRequest(FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION, {
-      input
-    })
+    return this.shopifyApiGraphqlRequest(FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION, input)
   }
 }
 
@@ -510,7 +525,8 @@ export const shopifyHandleResponseData = async (
       shopifyOrderId: string,
       orderId: string,
       shop_id?:string,
-      status: string
+      status: string,
+      locationId: string,
     }> = []
     const prismaFulfillmentOrderLineItems: Array<{
       id: string,
@@ -629,6 +645,7 @@ export const shopifyHandleResponseData = async (
             shopifyOrderId: fulfillmentOrder.id,
             orderId: executeShopifyId(item.id),
             shop_id: shop_id,
+            locationId: fulfillmentOrder.assignedLocation.location.id,
             status: fulfillmentOrder.status,
           });
 

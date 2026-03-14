@@ -7,6 +7,41 @@ import {logger} from "./logger.ts";
  */
 export const shopifySyncDataQueue = new Queue('shopifySyncDataQueue',{connection: redisClient});
 
+/**
+ * 添加订单发货任务
+ * @param data 发货数据
+ * @returns 任务ID
+ */
+export const addOrderFulfillmentJob = async (data: {
+  orderId: string;
+  carrier?: string;
+  warehouseAddress?: any;
+  notifyCustomer?: boolean;
+  parcelTemplateToken: string;
+  shop: string;
+  customerStaffId?: string | null;
+}) => {
+  const job = await shopifySyncDataQueue.add('fulfillOrder', {
+    ...data,
+    timestamp: new Date().toISOString(),
+  }, {
+    attempts: 3,
+    backoff: {type: 'exponential', delay: 2000},
+    removeOnComplete: 10,
+    removeOnFail: 100,
+  });
+
+  logger.info(`已创建订单发货任务，任务：${job.id}，订单ID：${data.orderId}`, {
+    meta: {
+      taskType: 'create_order_fulfillment_job',
+      orderId: data.orderId,
+      shop: data.shop,
+    }
+  });
+
+  return job.id;
+}
+
 export const addShopifySyncDataJob = async (jobType:string,shop:string)=>{
   const job = await shopifySyncDataQueue.add('syncShopifyData',{jobType,shop},{
     attempts: 3,
