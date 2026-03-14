@@ -145,7 +145,21 @@ export default {
         }
       },
       "notification":{
-        "ariaLabel":"Close Notification"
+        "ariaLabel":"Close Notification",
+        "fulfillment": {
+          "success": {
+            "title": "Fulfillment Successful",
+            "message": "Order {orderId} has been fulfilled successfully. Tracking number: {trackingNumber}"
+          },
+          "failure": {
+            "title": "Fulfillment Failed",
+            "message": "Order {orderId} fulfillment failed: {error}"
+          },
+          "insufficientInventory": {
+            "title": "Insufficient Inventory",
+            "message": "Order {orderId} cannot be fulfilled due to insufficient inventory"
+          }
+        }
       },
       "modal":{
         "default":{
@@ -537,7 +551,21 @@ export default {
         }
       },
       "notification":{
-        "ariaLabel":"关闭通知"
+        "ariaLabel":"关闭通知",
+        "fulfillment": {
+          "success": {
+            "title": "发货成功",
+            "message": "订单 {orderId} 发货成功，物流单号：{trackingNumber}"
+          },
+          "failure": {
+            "title": "发货失败",
+            "message": "订单 {orderId} 发货失败：{error}"
+          },
+          "insufficientInventory": {
+            "title": "库存不足",
+            "message": "订单 {orderId} 库存不足，无法发货"
+          }
+        }
       },
       "modal":{
         "default":{
