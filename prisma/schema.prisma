@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  retryStrategy = "exponential"
 }
 
 datasource db {
@@ -331,6 +332,7 @@ model address {
   province   String
   country    String
   zip        String
+  phone      String
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
   shop_id    String?
