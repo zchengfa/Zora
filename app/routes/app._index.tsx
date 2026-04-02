@@ -7,6 +7,7 @@ import ZoraCustomerProfile from "@components/ZoraCustomerProfile.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
 import {useEffect, useState} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
+import {useAgentOnline} from "@/hooks/useAgentOnline.ts";
 import {getChatList,searchCustomers,addCustomerToChatList} from "@/network/request.ts";
 import {MessageDataType} from "@Utils/socket.ts";
 import {MessageServiceSendMessage} from "@Utils/MessageService.ts";
@@ -29,24 +30,8 @@ function Index(){
   const messageStore = useMessageStore();
   const {customerStaff} = messageStore;
 
-  // 监听socket连接事件
-  useEffect(() => {
-    const handleConnect = () => {
-      console.log('✅ 已成功连接到服务器！');
-      if (customerStaff?.id) {
-        socket.emit('agent',{
-          id:customerStaff.id,
-          name:customerStaff.name,
-        })
-      }
-    };
-
-    socket.on('connect', handleConnect);
-
-    return () => {
-      socket.off('connect', handleConnect);
-    };
-  }, [customerStaff]);
+  // 客服上线/下线管理
+  useAgentOnline();
 
   useEffect(() => {
     // 获取并同步聊天列表
