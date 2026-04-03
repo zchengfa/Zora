@@ -2,34 +2,124 @@
   "schema": {
     "zora": {
       "settings": {
-        "zora_bg_color":{
-          "label":"zora背景色",
-          "info": "设置zora的背景色"
+        "header_primary_colors": {
+          "content": "主色调"
         },
-        "zora_success_color":{
-          "label":"zora弹框成功色",
-          "info": "设置zora弹框成功色"
+        "zora_primary": {
+          "label": "主色调",
+          "info": "界面的主要品牌色"
         },
-        "zora_info_color":{
-          "label":"zora弹框信息色",
-          "info": "设置zora弹框信息色"
+        "zora_primary_hover": {
+          "label": "主色调悬停色",
+          "info": "鼠标悬停时显示的颜色"
         },
-        "zora_warning_color":{
-          "label":"zora弹框警告色",
-          "info": "设置zora弹框警告色"
+        "zora_primary_light": {
+          "label": "主色调浅色",
+          "info": "用于背景的浅色版本"
         },
-        "zora_error_color":{
-          "label":"zora弹框错误色",
-          "info": "设置zora弹框错误色"
+        "zora_primary_border": {
+          "label": "主色调边框色",
+          "info": "使用主色调的边框颜色"
+        },
+        "header_status_colors": {
+          "content": "状态色"
+        },
+        "zora_error_color": {
+          "label": "错误色",
+          "info": "用于错误状态和消息的颜色"
+        },
+        "zora_success_color": {
+          "label": "成功色",
+          "info": "用于成功状态和消息的颜色"
+        },
+        "zora_info_color": {
+          "label": "信息色",
+          "info": "用于信息提示的颜色"
+        },
+        "zora_warning_color": {
+          "label": "警告色",
+          "info": "用于警告状态和消息的颜色"
+        },
+        "header_neutral_colors": {
+          "content": "中性色"
+        },
+        "zora_text_primary": {
+          "label": "主要文字色",
+          "info": "标题和重要内容的主要文字颜色"
+        },
+        "zora_text_secondary": {
+          "label": "次要文字色",
+          "info": "次要文字内容的颜色"
+        },
+        "zora_background": {
+          "label": "背景色",
+          "info": "界面的主要背景颜色"
+        },
+        "zora_surface": {
+          "label": "表面色",
+          "info": "卡片和凸起表面的颜色"
+        },
+        "zora_border": {
+          "label": "边框色",
+          "info": "边框和分隔线的颜色"
+        },
+        "header_chat_colors": {
+          "content": "聊天界面色"
+        },
+        "zora_chat_bubble_customer": {
+          "label": "客户消息气泡",
+          "info": "客户消息的背景颜色"
+        },
+        "zora_chat_bubble_agent": {
+          "label": "客服消息气泡",
+          "info": "客服消息的背景颜色"
+        },
+        "zora_chat_bubble_text_customer": {
+          "label": "客户消息文字",
+          "info": "客户消息的文字颜色"
+        },
+        "zora_chat_bubble_text_agent": {
+          "label": "客服消息文字",
+          "info": "客服消息的文字颜色"
+        },
+        "header_site_colors": {
+          "content": "网站元素色"
+        },
+        "zora_header_bg": {
+          "label": "顶部导航背景",
+          "info": "顶部导航栏的背景颜色"
+        },
+        "zora_search_border": {
+          "label": "搜索框边框",
+          "info": "搜索输入框的边框颜色"
+        },
+        "zora_button_bg": {
+          "label": "按钮背景",
+          "info": "按钮的背景颜色"
+        },
+        "zora_button_text": {
+          "label": "按钮文字",
+          "info": "按钮的文字颜色"
+        },
+        "zora_badge_hot": {
+          "label": "热门标签",
+          "info": "热门标签的背景颜色"
+        },
+        "zora_badge_new": {
+          "label": "新标签",
+          "info": "新标签的背景颜色"
+        },
+        "header_position": {
+          "content": "位置设置"
         },
         "zora_size_position_x": {
-          "label": "Zora左定位",
-          "info": "设置zora距离页面左侧定位"
+          "label": "左侧位置",
+          "info": "距离页面左侧的距离"
         },
         "zora_size_position_y": {
-          "label": "Zora下方定位",
-          "info": "设置zora距离页面底部定位"
-        } 
+          "label": "底部位置",
+          "info": "距离页面底部的距离"
+        }
       }
     }
   }

@@ -130,32 +130,31 @@ syncRedis({prisma,redis}).then(async (res)=>{
 const workerHealthChecks: Map<string, WorkerHealth> = new Map();
 
 const checkWorkerHealth = async ()=>{
-  // 检查logger worker
-  const loggerWorkerHealth = new WorkerHealth({
+  const workerHealthConfig = {
     connection: redis,
-    workerName: process.env.LOGGER_WORKER_HEALTH_KEY || 'logger',
     maxCheckAttempts: 5,
     workerHealthCheckDelay: 5000
+  }
+  // 检查logger worker
+  const loggerWorkerHealth = new WorkerHealth({
+    workerName: process.env.LOGGER_WORKER_HEALTH_KEY || 'logger',
+    ...workerHealthConfig
   })
   workerHealthChecks.set('logger', loggerWorkerHealth);
   loggerWorkerHealth.checkWorkerHealthStatus();
 
   // 检查shopify worker
   const shopifyWorkerHealth = new WorkerHealth({
-    connection: redis,
     workerName: process.env.SHOPIFY_WORKER_HEALTH_KEY || 'shopify',
-    maxCheckAttempts: 5,
-    workerHealthCheckDelay: 5000
+    ...workerHealthConfig
   })
   workerHealthChecks.set('shopify', shopifyWorkerHealth);
   shopifyWorkerHealth.checkWorkerHealthStatus();
 
   // 检查offlineMessage worker
   const offlineMessageWorkerHealth = new WorkerHealth({
-    connection: redis,
     workerName: process.env.OFFLINE_MESSAGE_WORKER_HEALTH_KEY || 'offlineMessage',
-    maxCheckAttempts: 5,
-    workerHealthCheckDelay: 5000
+    ...workerHealthConfig
   })
   workerHealthChecks.set('offlineMessage', offlineMessageWorkerHealth);
   offlineMessageWorkerHealth.checkWorkerHealthStatus();

@@ -5,6 +5,7 @@ import { usePersistStorage } from '@hooks/usePersistStorage';
 import { useAppTranslation } from '@hooks/useAppTranslation';
 import { getAgentSettings, updateAgentSettings } from '@/network/request.ts';
 import { useMessageStore } from '@/zustand/zustand';
+import { useAgentOnline } from '@/hooks/useAgentOnline.ts';
 import { timeFormatting } from '@/Utils/Utils.ts';
 
 function AppSettings() {
@@ -13,7 +14,8 @@ function AppSettings() {
   const [theme, setPersistTheme] = usePersistStorage(LOCALSTORAGE_KEY, 'light');
   const settingTranslation = translation.setting;
   const messageStore = useMessageStore();
-  const [isLoading, setIsLoading] = useState(false);
+  // 客服上线/下线管理
+  useAgentOnline();
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');

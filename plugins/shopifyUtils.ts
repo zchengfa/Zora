@@ -12,7 +12,8 @@ import {
   CUSTOMER_QUERY_BY_identifier,
   ORDERS_IDS_QUERY,
   LOCATIONS_QUERY,
-  PRODUCT_INVENTORY_LOCATION_QUERY
+  PRODUCT_INVENTORY_LOCATION_QUERY,
+  ORDER_INVENTORY_QUERY
 } from "./shopifyQuery.ts";
 import type {
   GraphqlShopResponse,
@@ -28,7 +29,8 @@ import type {
   GraphqlCustomerByIdentifierResponse,
   GraphqlLocationsResponse,
   GraphqlProductInventoryLocationResponse,
-  InventoryLevelNames
+  InventoryLevelNames,
+  GraphqlOrderInventoryResponse
 } from './shopifyQuery.ts'
 import {CUSTOMER_CREATE_MUTATION, FULFILLMENT_CREATE_MUTATION,FULFILLMENT_ORDER_UPDATE_LOCATION_MUTATION} from './shopifyMutation.ts'
 import type {
@@ -106,6 +108,11 @@ export interface IShopifyApiClient {
   productInventoryLocation(productId:string, locationId:string,names:InventoryLevelNames): Promise<GraphqlProductInventoryLocationResponse>
 
   /**
+   * 查询订单的库存信息
+   */
+  orderInventory(orderId:string, names:InventoryLevelNames): Promise<GraphqlOrderInventoryResponse>
+
+  /**
    * 通过标识查询指定客户数据
    */
   customerByIdentifier(identifier:GraphqlQueryVariables['identifier']):Promise<GraphqlCustomerByIdentifierResponse>
@@ -137,7 +144,6 @@ export class ShopifyApiClient implements IShopifyApiClient {
     }
   }
   private shopifyApiGraphqlRequest = (query:string,variables?:GraphqlQueryVariables | GraphqlMutationVariables)=>{
-    console.log(variables)
     return this.shopifyApi.graphql({
       ...this.shopConfig,
       query,
@@ -207,6 +213,13 @@ export class ShopifyApiClient implements IShopifyApiClient {
     return this.shopifyApiGraphqlRequest(PRODUCT_INVENTORY_LOCATION_QUERY,{
       productId,
       locationId,
+      names
+    })
+  }
+
+  public orderInventory = (orderId:string, names:InventoryLevelNames):Promise<GraphqlOrderInventoryResponse>=>{
+    return this.shopifyApiGraphqlRequest(ORDER_INVENTORY_QUERY,{
+      orderId,
       names
     })
   }
@@ -359,12 +372,14 @@ export const executeShopifyId = (id:string)=>{
   return id.substring(id.lastIndexOf('/')+1,id.length)
 }
 
-export const getWebhookParams = (req: express.Request):{id:string,shop:string}=>{
+export const getWebhookParams = (req: express.Request):{id:string,shop:string,webhookId:string}=>{
   const {admin_graphql_api_id} = JSON.parse(req.body.toString('utf8'))
   const request_shop = req?.headers['x-shopify-shop-domain']
+  const webhookId = req?.headers['x-shopify-webhook-id'] as string
 
   return {
     id: admin_graphql_api_id,
+    webhookId,
     shop: request_shop as string,
   }
 }
@@ -506,6 +521,7 @@ export const shopifyHandleResponseData = async (
       province: string,
       country: string,
       zip: string,
+      phone: string,
       isDefault: boolean,
       shop_id?:string
     }> = []
@@ -575,6 +591,7 @@ export const shopifyHandleResponseData = async (
           province: item.shippingAddress.province || '',
           country: item.shippingAddress.country || '',
           zip: item.shippingAddress.zip || '',
+          phone: item.shippingAddress.phone || '',
           isDefault: false,
           shop_id: shop_id
         })

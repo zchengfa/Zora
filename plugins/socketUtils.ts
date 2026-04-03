@@ -1179,6 +1179,10 @@ export class SocketUtils{
     SocketUtils.agentMapInstance!.delete(id)
   }
 
+  public static getAgent = ()=>{
+    return this.agentMapInstance
+  }
+
   /**
    * 保存客服的聊天列表到数据库
    * @param agentId 客服ID
@@ -1331,4 +1335,5 @@ export class SocketUtils{
   public static getAgentMapInstance(): Map<string,string> | null {
     return SocketUtils.agentMapInstance;
   }
+
 }

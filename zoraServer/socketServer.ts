@@ -3,6 +3,7 @@ import type {Redis} from 'ioredis'
 import {PrismaClient} from "@prisma/client";
 import * as process from "node:process";
 import {SocketUtils} from '../plugins/socketUtils.ts'
+import {beginLogger} from '../plugins/bullTaskQueue.ts'
 
 export async function startSocketServer({server,redis,prisma}:{server:Server,redis:Redis,prisma:PrismaClient}) {
    const redisExpired = 3600 * 24 * 7
@@ -23,25 +24,94 @@ export async function startSocketServer({server,redis,prisma}:{server:Server,red
 
       // 订阅发货消息通道
       const fulfillmentSubscriber = redis.duplicate();
-      fulfillmentSubscriber.subscribe('order_fulfillment', (err) => {
+      fulfillmentSubscriber.subscribe('order_fulfillment', async (err) => {
         if (err) {
           console.error(`订阅Redis频道order_fulfillment失败:`, err);
           return;
         }
 
+        await beginLogger({
+          level: 'info',
+          message: `成功订阅Redis频道order_fulfillment`,
+          meta: {
+            taskType: 'socket_server',
+            channel: 'order_fulfillment'
+          }
+        });
+
         fulfillmentSubscriber.on('message', (channel, message) => {
           if (channel === 'order_fulfillment') {
             try {
               const fulfillmentMessage = JSON.parse(message);
+              beginLogger({
+                level: 'info',
+                message: `收到Redis频道order_fulfillment消息`,
+                meta: {
+                  taskType: 'socket_server',
+                  channel: 'order_fulfillment',
+                  messageType: fulfillmentMessage.type,
+                  orderId: fulfillmentMessage.orderId,
+                  shop: fulfillmentMessage.shop,
+                  customerStaffId: fulfillmentMessage.customerStaffId,
+                  timestamp: fulfillmentMessage.timestamp
+                }
+              });
+
               // 根据消息中的 customerStaffId 推送给指定客服
               if (fulfillmentMessage.customerStaffId) {
-                const socketId = agent.get(fulfillmentMessage.customerStaffId);
+                const socketId = SocketUtils.getAgent()?.get(fulfillmentMessage.customerStaffId);
+                console.log(socketId,agent,fulfillmentMessage.customerStaffId,'客服频道')
                 if (socketId) {
                   io.to(socketId).emit('order_fulfillment', fulfillmentMessage);
+                  beginLogger({
+                    level: 'info',
+                    message: `成功推送发货消息到客服${fulfillmentMessage.customerStaffId}`,
+                    meta: {
+                      taskType: 'socket_server',
+                      channel: 'order_fulfillment',
+                      customerStaffId: fulfillmentMessage.customerStaffId,
+                      socketId,
+                      messageType: fulfillmentMessage.type,
+                      orderId: fulfillmentMessage.orderId
+                    }
+                  });
+                } else {
+                  beginLogger({
+                    level: 'warning',
+                    message: `客服${fulfillmentMessage.customerStaffId}未在线，无法推送发货消息`,
+                    meta: {
+                      taskType: 'socket_server',
+                      channel: 'order_fulfillment',
+                      customerStaffId: fulfillmentMessage.customerStaffId,
+                      messageType: fulfillmentMessage.type,
+                      orderId: fulfillmentMessage.orderId
+                    }
+                  });
                 }
+              } else {
+                beginLogger({
+                  level: 'warning',
+                  message: `发货消息缺少customerStaffId，无法推送`,
+                  meta: {
+                    taskType: 'socket_server',
+                    channel: 'order_fulfillment',
+                    messageType: fulfillmentMessage.type,
+                    orderId: fulfillmentMessage.orderId,
+                    fulfillmentMessage
+                  }
+                });
               }
             } catch (e) {
-              console.error('解析Redis消息失败:', e);
+              beginLogger({
+                level: 'error',
+                message: `解析Redis消息失败`,
+                meta: {
+                  taskType: 'socket_server',
+                  channel: 'order_fulfillment',
+                  error: e.message,
+                  rawMessage: message
+                }
+              });
             }
           }
         });

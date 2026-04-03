@@ -15,6 +15,7 @@ export const shopifySyncDataQueue = new Queue('shopifySyncDataQueue',{connection
 export const addOrderFulfillmentJob = async (data: {
   orderId: string;
   carrier?: string;
+  objectId:string,
   warehouseAddress?: any;
   notifyCustomer?: boolean;
   parcelTemplateToken: string;
