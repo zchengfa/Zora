@@ -2,33 +2,123 @@
   "schema": {
     "zora": {
       "settings": {
-        "zora_bg_color":{
-          "label":"zora bg color",
-          "info": "change Zora bg color"
+        "header_primary_colors": {
+          "content": "Primary Colors"
         },
-        "zora_success_color":{
-          "label":"zora toast success color",
-          "info": "change Zora toast success color"
+        "zora_primary": {
+          "label": "Primary color",
+          "info": "Main brand color used throughout the interface"
         },
-        "zora_info_color":{
-          "label":"zora toast info color",
-          "info": "change Zora toast info color"
+        "zora_primary_hover": {
+          "label": "Primary hover color",
+          "info": "Color displayed when hovering over primary elements"
         },
-        "zora_warning_color":{
-          "label":"zora toast warning color",
-          "info": "change Zora toast warning color"
+        "zora_primary_light": {
+          "label": "Primary light color",
+          "info": "Light version of primary color for backgrounds"
         },
-        "zora_error_color":{
-          "label":"zora toast error color",
-          "info": "change Zora toast error  color"
+        "zora_primary_border": {
+          "label": "Primary border color",
+          "info": "Border color using primary tone"
+        },
+        "header_status_colors": {
+          "content": "Status Colors"
+        },
+        "zora_error_color": {
+          "label": "Error color",
+          "info": "Color for error states and messages"
+        },
+        "zora_success_color": {
+          "label": "Success color",
+          "info": "Color for success states and messages"
+        },
+        "zora_info_color": {
+          "label": "Info color",
+          "info": "Color for informational messages"
+        },
+        "zora_warning_color": {
+          "label": "Warning color",
+          "info": "Color for warning states and messages"
+        },
+        "header_neutral_colors": {
+          "content": "Neutral Colors"
+        },
+        "zora_text_primary": {
+          "label": "Primary text color",
+          "info": "Main text color for headings and important content"
+        },
+        "zora_text_secondary": {
+          "label": "Secondary text color",
+          "info": "Color for less important text content"
+        },
+        "zora_background": {
+          "label": "Background color",
+          "info": "Main background color of the interface"
+        },
+        "zora_surface": {
+          "label": "Surface color",
+          "info": "Color for cards and elevated surfaces"
+        },
+        "zora_border": {
+          "label": "Border color",
+          "info": "Color for borders and dividers"
+        },
+        "header_chat_colors": {
+          "content": "Chat Colors"
+        },
+        "zora_chat_bubble_customer": {
+          "label": "Customer message bubble",
+          "info": "Background color for customer messages"
+        },
+        "zora_chat_bubble_agent": {
+          "label": "Agent message bubble",
+          "info": "Background color for agent messages"
+        },
+        "zora_chat_bubble_text_customer": {
+          "label": "Customer message text",
+          "info": "Text color for customer messages"
+        },
+        "zora_chat_bubble_text_agent": {
+          "label": "Agent message text",
+          "info": "Text color for agent messages"
+        },
+        "header_site_colors": {
+          "content": "Site Element Colors"
+        },
+        "zora_header_bg": {
+          "label": "Header background",
+          "info": "Background color for the header navigation"
+        },
+        "zora_search_border": {
+          "label": "Search border",
+          "info": "Border color for search input"
+        },
+        "zora_button_bg": {
+          "label": "Button background",
+          "info": "Background color for buttons"
+        },
+        "zora_button_text": {
+          "label": "Button text",
+          "info": "Text color for buttons"
+        },
+        "zora_badge_hot": {
+          "label": "Hot badge",
+          "info": "Background color for Hot tags"
+        },
+        "zora_badge_new": {
+          "label": "New badge",
+          "info": "Background color for New tags"
+        },
+        "header_position": {
+          "content": "Position Settings"
         },
         "zora_size_position_x": {
-          "label": "Zora left position",
-          "info": "change zora left position"
+          "label": "Left position",
+          "info": "Distance from the left edge of the page"
         },
         "zora_size_position_y": {
-          "label": "Zora bottom position",
-          "info": "change zora bottom position"
+          "label": "Bottom position",
+          "info": "Distance from the bottom edge of the page"
         }
       }
     }

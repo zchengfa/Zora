@@ -9,6 +9,7 @@ import {getOrders, getTrackingInfo, getCarriers, getParcelTemplates} from "@/net
 import {SHOP_INFO_QUERY_GQL} from "@Utils/graphql.ts";
 import { useZoraUniversalModal } from "@/contexts/ZoraModalProvider.tsx";
 import { useMessageStore } from "@/zustand/zustand.ts";
+import { useAgentOnline } from "@/hooks/useAgentOnline.ts";
 
 interface Order {
   id: string;
@@ -79,6 +80,8 @@ function OrdersPage() {
   const t = translation.orders;
   const { customerStaff } = useMessageStore();
   const { showModal } = useZoraUniversalModal();
+  // 客服上线/下线管理
+  useAgentOnline();
   const [searchValue, setSearchValue] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -88,10 +91,11 @@ function OrdersPage() {
   const [trackingInfo, setTrackingInfo] = useState<any>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [carrier, setCarrier] = useState('');
+  const [carrierObjectId, setCarrierObjectId] = useState('');
   const [notifyCustomer, setNotifyCustomer] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showCarrierModal, setShowCarrierModal] = useState(false);
-  const [carriers, setCarriers] = useState<Array<{label: string, value: string, enabled: boolean}>>([]);
+  const [carriers, setCarriers] = useState<Array<{label: string, value: string, enabled: boolean,objectId:string}>>([]);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [ordersData, setOrdersData] = useState<Order[]>([]);
@@ -122,9 +126,9 @@ function OrdersPage() {
     setCurrentPage(1);
   }, [searchValue, filterStatus]);
 
-  // 计算总页数
-  const totalPages = useMemo(() => {
-    let filtered = ordersData;
+  // 订单筛选函数
+  const filterOrders = useCallback((orders: Order[]) => {
+    let filtered = orders;
     if (filterStatus !== 'all') {
       filtered = filtered.filter((order: Order) => {
         if (filterStatus === 'fulfilled') return order.fulfillmentStatus === 'FULFILLED';
@@ -143,8 +147,14 @@ function OrdersPage() {
       );
     }
 
+    return filtered;
+  }, [searchValue, filterStatus]);
+
+  // 计算总页数
+  const totalPages = useMemo(() => {
+    const filtered = filterOrders(ordersData);
     return Math.ceil(filtered.length / itemsPerPage);
-  }, [ordersData, searchValue, filterStatus, itemsPerPage]);
+  }, [ordersData, itemsPerPage, filterOrders]);
 
   // 刷新订单的函数
   const handleRefreshOrders = useCallback(async () => {
@@ -160,36 +170,19 @@ function OrdersPage() {
       // 更新订单数据
       setOrdersData(newOrders);
     } catch (error) {
+      setRefreshing(false);
     } finally {
       setRefreshing(false);
     }
   }, [shopDomain]);
 
   const filteredOrders = useMemo(() => {
-    let filtered = ordersData;
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter((order: Order) => {
-        if (filterStatus === 'fulfilled') return order.fulfillmentStatus === 'FULFILLED';
-        if (filterStatus === 'unfulfilled') return order.fulfillmentStatus === 'UNFULFILLED';
-        if (filterStatus === 'processing') return order.fulfillmentStatus === 'IN_PROGRESS';
-        return true;
-      });
-    }
-
-    if (searchValue) {
-      const searchLower = searchValue.toLowerCase();
-      filtered = filtered.filter((order: Order) =>
-        order.orderNumber.toString().includes(searchLower) ||
-        order.customer?.displayName?.toLowerCase().includes(searchLower) ||
-        order.customer?.email?.toLowerCase().includes(searchLower)
-      );
-    }
-
+    const filtered = filterOrders(ordersData);
     // 分页逻辑
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filtered.slice(startIndex, endIndex);
-  }, [ordersData, searchValue, filterStatus, currentPage, itemsPerPage]);
+  }, [ordersData, currentPage, itemsPerPage, filterOrders]);
 
   const handleFulfillOrder = useCallback(async () => {
     if (!selectedOrder) return;
@@ -211,6 +204,7 @@ function OrdersPage() {
       setTrackingNumber('');
       window.location.reload();
     } catch (error) {
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -223,6 +217,7 @@ function OrdersPage() {
       setTrackingInfo(response?.data?.data || null);
       setShowTrackingModal(true);
     } catch (error) {
+      setTrackingLoading(false);
     } finally {
       setTrackingLoading(false);
     }
@@ -307,6 +302,8 @@ function OrdersPage() {
 
     // 只更新选中的承运商，不关闭弹窗
     setCarrier(selectedValue);
+    // 保存承运商的objectId
+    setCarrierObjectId(selectedCarrierData.objectId);
 
     // 检查缓存中是否已有该承运商的包裹模板数据
     const cachedTemplates = parcelTemplatesCache[selectedValue];
@@ -350,8 +347,10 @@ function OrdersPage() {
     const fulfillData = {
       orderId: selectedOrder.id,
       carrier,
+      objectId:carrierObjectId,
       warehouseAddress: selectedWarehouse,
       notifyCustomer,
+      customerStaffId: customerStaff.id,
       parcelTemplateToken: selectedParcelTemplateRef.current?.token || null,
     };
 
@@ -388,30 +387,27 @@ function OrdersPage() {
       // 发货成功
       setShowCarrierModal(false);
       setCarrier('');
+      setCarrierObjectId('');
       setSelectedWarehouse(null);
-      window.location.reload();
     } catch (error) {
-
+      setLoading(false);
     } finally {
       setLoading(false);
     }
-  }, [selectedOrder, carrier, selectedWarehouse, notifyCustomer, shopDomain]);
+  }, [selectedOrder, carrier, carrierObjectId, selectedWarehouse, notifyCustomer, shopDomain]);
 
   const getStatusBadge = (status: string) => {
     const statusProgressMap: Record<string, 'complete' | 'partial' | 'incomplete'> = {
-      // FulfillmentStatus
       SUCCESS: 'complete',
       ERROR: 'incomplete',
       FAILURE: 'incomplete',
       CANCELLED: 'incomplete',
-      // FulfillmentOrderStatus
       OPEN: 'incomplete',
       CLOSED: 'complete',
       IN_PROGRESS: 'partial',
       INCOMPLETE: 'incomplete',
       ON_HOLD: 'incomplete',
       SCHEDULED: 'incomplete',
-      // Order Status
       PAID: 'complete',
       PENDING: 'incomplete',
       PARTIALLY_PAID: 'partial',
@@ -449,7 +445,7 @@ function OrdersPage() {
       formatDate(order.processedAt),
       formatPrice(order.totalPriceSet.shopMoney.amount, selectedOrder?.totalPriceSet.shopMoney.currencyCode || 'USD'),
       getStatusBadge(order.fulfillments?.[0]?.status || 'PENDING'),
-      <InlineStack gap="200">
+      <InlineStack gap="200" key={order.id}>
         <Button
           variant="plain"
           onClick={() => setSelectedOrder(order)}
@@ -687,7 +683,7 @@ function OrdersPage() {
               value={trackingNumber}
               onChange={setTrackingNumber}
               placeholder={t.fulfillment.trackingPlaceholder}
-            />
+             autoComplete={'off'}/>
             <Button
               onClick={() => setNotifyCustomer(!notifyCustomer)}
               variant="plain"
@@ -801,7 +797,7 @@ function OrdersPage() {
                 )}
               </>
             ) : carrier && !parcelTemplatesLoading ? (
-              <Text variant="bodyMd" tone="subdued">{t.fulfillment.parcelTemplate.noTemplates}</Text>
+              <Text variant="bodyMd" tone="subdued" as={'p'}>{t.fulfillment.parcelTemplate.noTemplates}</Text>
             ) : null}
           </BlockStack>
         </Modal.Section>

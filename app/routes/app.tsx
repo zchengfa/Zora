@@ -50,8 +50,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 // 内部组件，用于在ZoraNotificationProvider内部使用useSocketNotification
-function AppContent({ notification }: { notification: any }) {
-  const { showNotification } = useZoraNotification();
+function AppContent({ notification, orderFulfillment }: { notification: any; orderFulfillment: any }) {
+  const { showNotification, showSuccess, showError, showWarning } = useZoraNotification();
+  const {translation} = useAppTranslation();
+  const t = translation.components.notification.fulfillment;
 
   useEffect(() => {
     if (notification) {
@@ -63,6 +65,35 @@ function AppContent({ notification }: { notification: any }) {
       });
     }
   }, [notification, showNotification]);
+
+  useEffect(() => {
+    if(orderFulfillment){
+      switch(orderFulfillment.type){
+        case 'fulfillment_success':
+          showSuccess(
+            t.success.message
+              .replace('{orderId}', orderFulfillment.orderId)
+              .replace('{trackingNumber}', orderFulfillment.trackingNumber || ''),
+            t.success.title
+          );
+          break;
+        case 'fulfillment_failure':
+          showError(
+            t.failure.message
+              .replace('{orderId}', orderFulfillment.orderId)
+              .replace('{error}', orderFulfillment.error || ''),
+            t.failure.title
+          );
+          break;
+        case 'insufficient_inventory':
+          showWarning(
+            t.insufficientInventory.message.replace('{orderId}', orderFulfillment.orderId),
+            t.insufficientInventory.title
+          );
+          break;
+      }
+    }
+  }, [orderFulfillment, showSuccess, showError, showWarning, t]);
 
   return <Outlet/>;
 }
@@ -192,39 +223,6 @@ function App() {
     }
   }, [message]);
 
-  // 处理发货消息
-  useEffect(() => {
-    if(orderFulfillment){
-      const {showSuccess,showError,showWarning} = useZoraNotification();
-      const {translation} = useAppTranslation();
-      const t = translation.notification.fulfillment;
-      
-      switch(orderFulfillment.type){
-        case 'fulfillment_success':
-          showSuccess(
-            t.success.message
-              .replace('{orderId}', orderFulfillment.orderId)
-              .replace('{trackingNumber}', orderFulfillment.trackingNumber || ''),
-            t.success.title
-          );
-          break;
-        case 'fulfillment_failure':
-          showError(
-            t.failure.message
-              .replace('{orderId}', orderFulfillment.orderId)
-              .replace('{error}', orderFulfillment.error || ''),
-            t.failure.title
-          );
-          break;
-        case 'insufficient_inventory':
-          showWarning(
-            t.insufficientInventory.message.replace('{orderId}', orderFulfillment.orderId),
-            t.insufficientInventory.title
-          );
-          break;
-      }
-    }
-  }, [orderFulfillment]);
 
   // 处理离线消息
   useEffect(() => {
@@ -259,7 +257,7 @@ function App() {
         </s-app-nav>
         <ZoraModalProvider>
           <ZoraNotificationProvider>
-            <AppContent notification={notification}/>
+            <AppContent notification={notification} orderFulfillment={orderFulfillment}/>
           </ZoraNotificationProvider>
         </ZoraModalProvider>
       </PolarisAppProvider>

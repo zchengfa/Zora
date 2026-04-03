@@ -171,13 +171,16 @@ export class ShippoService {
           weight: string;
           massUnit: string;
           height: string
-      }[]
+      }[];
+      async?: boolean,
+      carrierAccounts:string[];
   }): Promise<ShipmentResponse> {
     try {
       beginLogger({
         level: 'info',
         message: '开始创建运单',
         meta: {
+          type:'shippo_create_begin',
           addressTo: params.addressTo,
           parcelsCount: params.parcels.length,
         }
@@ -188,12 +191,14 @@ export class ShippoService {
         addressTo: params.addressTo,
         parcels: params.parcels,
         async: params.async || false,
+        carrierAccounts: params.carrierAccounts,
       });
 
       beginLogger({
         level: 'info',
         message: '运单创建成功',
         meta: {
+          type:`shippo_shipment_crate`,
           shipmentId: shipment.objectId,
         }
       }).then();
@@ -219,7 +224,10 @@ export class ShippoService {
       beginLogger({
         level: 'info',
         message: '获取运费列表',
-        meta: { shipmentId }
+        meta: {
+          type:'shippo_getRates',
+          shipmentId
+        }
       }).then();
 
       // 获取运单详情，其中包含运费列表
@@ -229,6 +237,7 @@ export class ShippoService {
         level: 'info',
         message: '获取运费列表成功',
         meta: {
+          type:`shippo_getRates`,
           shipmentId,
           ratesCount: shipment.rates?.length || 0,
         }
@@ -369,7 +378,7 @@ export class ShippoService {
     try {
       //获取承运商列表
       const carriers = await this.shippo.carrierAccounts.list({});
-
+      console.log(carriers)
       beginLogger({
         level: 'info',
         message: '获取承运商列表成功',
@@ -382,6 +391,7 @@ export class ShippoService {
       return (carriers.results || []).map((carrier: any) => ({
         label: carrier.display_name || carrier.carrier || carrier.account_id,
         value: carrier.carrier || carrier.account_id,
+        objectId: carrier.objectId,
         enabled: true // 获取的承运商都可用
       }));
     } catch (error) {
@@ -424,7 +434,10 @@ export class ShippoService {
       beginLogger({
         level: 'error',
         message: '创建地址失败',
-        meta: { error }
+        meta: {
+          type:'shippo_address_create',
+          error
+        }
       }).then();
       throw error;
     }

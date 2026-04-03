@@ -201,6 +201,9 @@ interface DisplayAddress {
       lineItems:{
         nodes:Array<{
           id:string,
+          variant?:{
+            id:string
+          };
           weight:{
             unit:string,
             value:number
@@ -356,6 +359,35 @@ export interface GraphqlOrderResponse {
 export interface GraphqlProductResponse {
   product: GraphqlProductsResponse['products']["nodes"][0]
 }
+// 订单库存查询响应类型
+export interface GraphqlOrderInventoryResponse {
+  order: {
+    fulfillmentOrders: {
+      nodes: Array<{
+        lineItems: {
+          nodes: Array<{
+            variant: {
+              id:string;
+              inventoryItem: {
+                inventoryLevels: {
+                  nodes: Array<{
+                    location: {
+                      id: string;
+                    };
+                    quantities: Array<{
+                      quantity: number;
+                    }>;
+                  }>;
+                };
+              };
+            };
+          }>;
+        };
+      }>;
+    };
+  };
+}
+
 // 产品库存查询响应类型
 export interface GraphqlProductInventoryLocationResponse {
   product: {
@@ -525,6 +557,7 @@ export type GraphqlLocationsResponse = {
         city: string;
         countryCode: string;
         province: string;
+        phone: string;
       };
       isFulfillmentService: boolean;
     }>;
@@ -546,6 +579,7 @@ query GetShopLocations {
         city
         countryCode
         province
+        phone
       }
       isFulfillmentService
     }
@@ -1126,6 +1160,9 @@ export const ORDER_QUERY = `
           lineItems(first:10){
             nodes{
               id
+              variant{
+                id
+              }
               weight{
                 unit
                 value
@@ -1161,6 +1198,37 @@ export const ORDER_QUERY = `
         }
       }
     }
+  }
+`
+//查询订单中的lineItems在每个仓库的库存
+export const ORDER_INVENTORY_QUERY = `
+  query orderInventory($orderId:ID!,$names:[String!]!){
+    order(id:$orderId){
+      fulfillmentOrders(first:10){
+        nodes{
+          lineItems(first:10){
+            nodes{
+              variant{
+                id
+                inventoryItem{
+                  inventoryLevels(first:10){
+                    nodes{
+                      location{
+                        id
+                      }
+                      quantities(names:$names){
+                        quantity
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
   }
 `
 //查询产品在对应仓库的库存

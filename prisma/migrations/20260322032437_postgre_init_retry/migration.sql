@@ -254,6 +254,7 @@ CREATE TABLE "addresses" (
     "province" TEXT NOT NULL,
     "country" TEXT NOT NULL,
     "zip" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "shop_id" TEXT,

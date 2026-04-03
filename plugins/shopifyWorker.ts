@@ -6,6 +6,7 @@ import {beginLogger} from "./bullTaskQueue.ts";
 import {WorkerHealth} from "./workerHealth.ts";
 import {Decimal} from "@prisma/client/runtime/library";
 import Redlock from 'redlock';
+import {shippoClientManager} from "./shippoClient.ts";
 
 const workerHealth = new WorkerHealth({
   connection: redisClient,
@@ -71,6 +72,14 @@ const subscriberRedis = async (shop:string)=>{
 }
 
 await workerHealth.registerWorker()
+
+// 初始化 Shippo 客户端
+const shippoApiKey = process.env.SHIPPO_API_KEY;
+if (shippoApiKey) {
+  shippoClientManager.initialize(shippoApiKey);
+} else {
+  console.warn('SHIPPO_API_KEY not found in environment variables. Shippo functionality will be disabled.');
+}
 
 const shopifyApiClientManager = new ShopifyApiClientsManager({redis:redisClient,prisma:prismaClient});
 
@@ -244,6 +253,7 @@ const syncOrderShippingAddress = async (order: any, shop: string) => {
             province: orderResult.order.shippingAddress.province || '',
             country: orderResult.order.shippingAddress.countryCodeV2 || orderResult.order.shippingAddress.country || '',
             zip: orderResult.order.shippingAddress.zip || '',
+            phone: orderResult.order.shippingAddress.phone || '',
             isDefault: false
           }
         });
@@ -272,7 +282,9 @@ const buildAddressFrom = (warehouseAddress?: any) => {
     city: warehouseAddress?.address?.city || '',
     state: warehouseAddress?.address?.province || '',
     zip: warehouseAddress?.address?.zip || '',
-    country: warehouseAddress?.address?.countryCode || ''
+    country: warehouseAddress?.address?.countryCode || '',
+    phone: warehouseAddress?.address?.phone || warehouseAddress?.phone || '+1 555 555 5555',
+    email: warehouseAddress?.address?.email || warehouseAddress?.email || 'warehouse@example.com'
   };
 };
 
@@ -343,8 +355,9 @@ const createShippoShipment = async (params: {
   parcelTemplateToken: string;
   shippingAddress: any;
   jobId: string;
+  objectId:string;
 }) => {
-  const { orderId, carrier, warehouseAddress, parcelTemplateToken, shippingAddress, jobId } = params;
+  const { orderId, carrier,objectId, warehouseAddress, parcelTemplateToken, shippingAddress, jobId } = params;
 
   try {
     const { shippoClientManager } = await import('./shippoClient.ts');
@@ -375,7 +388,8 @@ const createShippoShipment = async (params: {
         city: shippingAddress.city || '',
         state: shippingAddress.province || '',
         zip: shippingAddress.zip || '',
-        country: shippingAddress.country || ''
+        country: shippingAddress.country || '',
+        phone: shippingAddress.phone || '+1 555 555 5555'
       },
       parcels: [{
         length: parcelTemplate?.length || '10',
@@ -384,7 +398,8 @@ const createShippoShipment = async (params: {
         distanceUnit: parcelTemplate?.distanceUnit || 'in',
         weight,
         massUnit
-      }]
+      }],
+      carrierAccounts:[objectId]
     });
 
     return { shipment, parcelTemplate, shippoService };
@@ -409,10 +424,12 @@ const getAndFilterRates = async (params: {
   carrier: string;
   orderId: string;
   jobId: string;
+  shippoService: any;
 }) => {
-  const { shipment, carrier, orderId, jobId } = params;
+  const { shipment, carrier, orderId, jobId, shippoService } = params;
 
-  const rates = await shipment.getRates(shipment.objectId);
+  const rates = await shippoService.getRates(shipment.objectId);
+
   if (!rates || rates.length === 0) {
     await beginLogger({
       level: 'warning',
@@ -427,6 +444,7 @@ const getAndFilterRates = async (params: {
   }
 
   const carrierRates = rates.filter(rate => rate.provider.toLowerCase() === carrier.toLowerCase());
+
   if (carrierRates.length === 0) {
     await beginLogger({
       level: 'warning',
@@ -504,83 +522,169 @@ const checkWarehouseInventory = async (params: {
   warehouseAddress?: any;
   shopifyApiClient: any;
   orderId: string;
+  shopifyOrderId: string;
   jobId: string;
 }) => {
-  const { availableFulfillmentOrders, warehouseAddress, shopifyApiClient, orderId, jobId } = params;
+  const { availableFulfillmentOrders, warehouseAddress, shopifyApiClient, orderId, shopifyOrderId, jobId } = params;
 
   if (!warehouseAddress?.id) return true;
 
   const targetLocationId = warehouseAddress.id.toString();
 
+  // 一次性查询订单中所有商品的库存信息
+  const inventoryResult = await shopifyApiClient.orderInventory(
+    shopifyOrderId,
+    ['available']
+  );
+
+  if (!inventoryResult?.order?.fulfillmentOrders?.nodes) {
+    await beginLogger({
+      level: 'error',
+      message: `订单${orderId}无法查询库存信息`,
+      meta: {
+        taskType: 'fulfill_order',
+        jobId,
+        orderId
+      }
+    });
+    return false;
+  }
+
+  console.log('targetLocationId:', targetLocationId);
+
+  await beginLogger({
+    level: 'info',
+    message: `订单${orderId}开始检查仓库库存，目标仓库:${targetLocationId}`,
+    meta: {
+      taskType: 'fulfill_order',
+      jobId,
+      orderId,
+      targetLocationId,
+      fulfillmentOrderCount: availableFulfillmentOrders.length,
+      fulfillmentOrderIds: availableFulfillmentOrders.map(fo => fo.id)
+    }
+  });
+
+
+
+  // 构建库存映射，方便后续查询
+  const inventoryMap = new Map<string, number>();
+  // 记录哪些商品在指定仓库有库存数据
+  const hasWarehouseInventory = new Set<string>();
+
+  for (const fo of inventoryResult.order.fulfillmentOrders.nodes) {
+    for (const item of fo.lineItems.nodes) {
+      if (!item.variant?.inventoryItem?.inventoryLevels?.nodes) continue;
+
+      const variantId = item.variant.id;
+      console.log('variantId:', variantId);
+      console.log('inventoryLevels:', item.variant.inventoryItem.inventoryLevels.nodes);
+
+      // 查找指定仓库的库存
+      const inventoryLevel = item.variant.inventoryItem.inventoryLevels.nodes.find(
+        (level: any) => {
+          console.log('comparing:', level.location.id, targetLocationId);
+          return level.location.id === targetLocationId;
+        }
+      );
+
+      console.log('found inventoryLevel:', inventoryLevel);
+      if (inventoryLevel?.quantities) {
+        hasWarehouseInventory.add(variantId);
+        const quantityInfo = inventoryLevel.quantities[0];
+        const availableQuantity = quantityInfo?.quantity || 0;
+        console.log('availableQuantity:', availableQuantity);
+        inventoryMap.set(variantId, availableQuantity);
+      }
+    }
+  }
+  console.log('inventoryMap:', inventoryMap);
+  console.log('availableFulfillmentOrders:', JSON.stringify(availableFulfillmentOrders, null, 2));
+  // 检查每个商品的库存是否足够
   for (const fo of availableFulfillmentOrders) {
     for (const item of fo.lineItems.nodes) {
-      const productId = item.variant.product.id;
+      if (!item.variant) {
+        await beginLogger({
+          level: 'error',
+          message: `订单${orderId}商品变体信息缺失`,
+          meta: {
+            taskType: 'fulfill_order',
+            jobId,
+            orderId,
+            itemId: item.id
+          }
+        });
+        return false;
+      }
       const variantId = item.variant.id;
       const requiredQuantity = item.totalQuantity;
 
-      // 查询产品在指定仓库的库存
-      const inventoryResult = await shopifyApiClient.productInventoryLocation(
-        productId,
-        targetLocationId,
-        ['available']
-      );
-
-      if (!inventoryResult?.product?.variants?.nodes) {
+      // 检查该商品是否在指定仓库有库存数据
+      if (!hasWarehouseInventory.has(variantId)) {
         await beginLogger({
-          level: 'error',
-          message: `订单${orderId}无法查询产品${productId}的库存`,
+          level: 'warning',
+          message: `订单${orderId}产品${variantId}不在指定仓库(${targetLocationId})销售，无法发货`,
           meta: {
             taskType: 'fulfill_order',
             jobId,
             orderId,
-            productId
+            variantId,
+            targetLocationId,
+            productName: item.variant?.title || '',
+            sku: item.variant?.sku || '',
+            requiredQuantity,
+            availableWarehouses: item.variant?.inventoryItem?.inventoryLevels?.nodes?.map((level: any) => ({
+              locationId: level.location.id,
+              available: level.quantities?.[0]?.quantity || 0
+            })) || []
           }
         });
         return false;
       }
 
-      // 查找对应变体的库存
-      const variant = inventoryResult.product.variants.nodes.find(
-        (v: any) => v.id === variantId
-      );
-
-      if (!variant) {
-        await beginLogger({
-          level: 'error',
-          message: `订单${orderId}无法找到产品变体${variantId}`,
-          meta: {
-            taskType: 'fulfill_order',
-            jobId,
-            orderId,
-            variantId
-          }
-        });
-        return false;
-      }
-
-      // 检查库存是否足够
-      const availableQuantity = variant.inventoryItem?.inventoryLevel?.quantities?.find(
-        (q: any) => q.name === 'available'
-      )?.quantity || 0;
+      const availableQuantity = inventoryMap.get(variantId) || 0;
 
       if (availableQuantity < requiredQuantity) {
         await beginLogger({
           level: 'warning',
-          message: `订单${orderId}产品${productId}变体${variantId}库存不足，需要${requiredQuantity}，可用${availableQuantity}`,
+          message: `订单${orderId}产品${variantId}库存不足，需要${requiredQuantity}，可用${availableQuantity}，无法发货`,
           meta: {
             taskType: 'fulfill_order',
             jobId,
             orderId,
-            productId,
             variantId,
+            productName: item.variant?.title || '',
+            sku: item.variant?.sku || '',
             requiredQuantity,
-            availableQuantity
+            availableQuantity,
+            targetLocationId,
+            fulfillmentOrderId: fo.id,
+            allWarehousesInventory: item.variant?.inventoryItem?.inventoryLevels?.nodes?.map((level: any) => ({
+              locationId: level.location.id,
+              available: level.quantities?.[0]?.quantity || 0
+            })) || []
           }
         });
         return false;
       }
     }
   }
+
+  await beginLogger({
+    level: 'info',
+    message: `订单${orderId}仓库库存检查通过，所有商品库存充足`,
+    meta: {
+      taskType: 'fulfill_order',
+      jobId,
+      orderId,
+      targetLocationId,
+      checkedItemsCount: inventoryMap.size,
+      inventoryDetails: Array.from(inventoryMap.entries()).map(([variantId, quantity]) => ({
+        variantId,
+        availableQuantity: quantity
+      }))
+    }
+  });
 
   return true;
 };
@@ -602,6 +706,25 @@ const moveFulfillmentOrders = async (params: {
   for (const fo of availableFulfillmentOrders) {
     const currentLocationId = fo.assignedLocation.location.id?.toString() || '';
     if (currentLocationId !== targetLocationId) {
+      await beginLogger({
+        level: 'info',
+        message: `订单${orderId}开始移动履约订单${fo.id}从仓库${currentLocationId}到目标仓库${targetLocationId}`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId,
+          orderId,
+          fulfillmentOrderId: fo.id,
+          currentLocationId,
+          targetLocationId,
+          lineItems: fo.lineItems.nodes.map(item => ({
+            id: item.id,
+            title: item.variant?.title || '',
+            sku: item.variant?.sku || '',
+            quantity: item.totalQuantity
+          }))
+        }
+      });
+
       const updateFulfillmentOrderInput = {
         id: fo.id,
         fulfillmentOrderLineItems: fo.lineItems.nodes.map(item => ({
@@ -615,16 +738,32 @@ const moveFulfillmentOrders = async (params: {
       if (moveResult?.fulfillmentOrderMove?.userErrors?.length > 0 || !moveResult) {
         await beginLogger({
           level: 'error',
-          message: `订单${orderId}无法移动到指定的发货仓库`,
+          message: `订单${orderId}移动履约订单${fo.id}到仓库${targetLocationId}失败`,
           meta: {
             taskType: 'fulfill_order',
             jobId,
             orderId,
-            errors: moveResult.fulfillmentOrderMove.userErrors
+            fulfillmentOrderId: fo.id,
+            currentLocationId,
+            targetLocationId,
+            errors: moveResult?.fulfillmentOrderMove?.userErrors || [],
+            input: updateFulfillmentOrderInput
           }
         });
         return false;
       }
+
+      await beginLogger({
+        level: 'info',
+        message: `订单${orderId}成功移动履约订单${fo.id}到目标仓库${targetLocationId}`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId,
+          orderId,
+          fulfillmentOrderId: fo.id,
+          targetLocationId
+        }
+      });
     }
   }
 
@@ -654,6 +793,29 @@ const createShopifyFulfillment = async (params: {
     }))
   }));
 
+  await beginLogger({
+    level: 'info',
+    message: `订单${orderId}开始创建Shopify履约，承运商:${carrier}，追踪号:${trackingNumber}`,
+    meta: {
+      taskType: 'fulfill_order',
+      jobId,
+      orderId,
+      carrier,
+      trackingNumber,
+      trackingUrl,
+      notifyCustomer,
+      fulfillmentOrderCount: availableFulfillmentOrders.length,
+      fulfillmentOrderIds: availableFulfillmentOrders.map(fo => fo.id),
+      lineItems: availableFulfillmentOrders.flatMap(fo => fo.lineItems.nodes.map(item => ({
+        fulfillmentOrderId: fo.id,
+        itemId: item.id,
+        title: item.variant?.title || '',
+        sku: item.variant?.sku || '',
+        quantity: item.totalQuantity
+      })))
+    }
+  });
+
   const fulfillmentResult = await shopifyApiClient.fulfillmentCreate({
     trackingInfo: {
       company: carrier,
@@ -675,16 +837,35 @@ const createShopifyFulfillment = async (params: {
   if (fulfillmentResult?.fulfillmentCreate?.userErrors?.length > 0) {
     await beginLogger({
       level: 'error',
-      message: `订单${orderId}Shopify履约失败`,
+      message: `订单${orderId}Shopify履约失败，承运商:${carrier}，追踪号:${trackingNumber}`,
       meta: {
         taskType: 'fulfill_order',
         jobId,
         orderId,
-        errors: fulfillmentResult.fulfillmentCreate.userErrors
+        carrier,
+        trackingNumber,
+        trackingUrl,
+        errors: fulfillmentResult.fulfillmentCreate.userErrors,
+        fulfillmentOrderIds: availableFulfillmentOrders.map(fo => fo.id),
+        originAddress: warehouseAddress?.address
       }
     });
     return null;
   }
+
+  await beginLogger({
+    level: 'info',
+    message: `订单${orderId}Shopify履约成功，履约ID:${fulfillmentResult?.fulfillmentCreate?.fulfillment?.id}，状态:${fulfillmentResult?.fulfillmentCreate?.fulfillment?.status}`,
+    meta: {
+      taskType: 'fulfill_order',
+      jobId,
+      orderId,
+      fulfillmentId: fulfillmentResult?.fulfillmentCreate?.fulfillment?.id,
+      fulfillmentStatus: fulfillmentResult?.fulfillmentCreate?.fulfillment?.status,
+      trackingNumber,
+      trackingUrl
+    }
+  });
 
   return fulfillmentResult;
 };
@@ -738,7 +919,7 @@ const updateOrderProcessedTime = async (orderId: string) => {
 
 // 处理订单发货的任务函数
 const handleFulfillOrder = async (job: any) => {
-  const {orderId, carrier, warehouseAddress, notifyCustomer, parcelTemplateToken, shop, customerStaffId} = job.data;
+  const {orderId, carrier, objectId, warehouseAddress, notifyCustomer, parcelTemplateToken, shop, customerStaffId} = job.data;
 
   await beginLogger({
     level: 'info',
@@ -804,11 +985,75 @@ const handleFulfillOrder = async (job: any) => {
       return false;
     }
 
-    // 3. Shippo 创建运单逻辑
+    // 3. 同步 Shopify 履约逻辑
+    // 3.1 从 Shopify 实时获取履约订单
+    const shopifyFulfillmentOrders = await getShopifyFulfillmentOrders(shop, order.shopifyOrderId);
+    if (!shopifyFulfillmentOrders.length) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}无履约订单`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+      return false;
+    }
+
+    // 3.2 筛选可履约的订单
+    const availableFulfillmentOrders = filterAvailableFulfillmentOrders(shopifyFulfillmentOrders);
+    if (!availableFulfillmentOrders.length) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}所有履约订单已完成/取消`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+      return false;
+    }
+
+    // 3.3 检查仓库库存
+    const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
+    const inventoryCheckSuccess = await checkWarehouseInventory({
+      availableFulfillmentOrders,
+      warehouseAddress,
+      shopifyApiClient,
+      orderId,
+      shopifyOrderId: order.shopifyOrderId,
+      jobId: job.id
+    });
+    if (!inventoryCheckSuccess) {
+      await beginLogger({
+        level: 'warning',
+        message: `订单${orderId}仓库库存不足`,
+        meta: {
+          taskType: 'fulfill_order',
+          jobId: job.id,
+          orderId
+        }
+      });
+
+      // 发布库存不足消息到Redis
+      await redisClient.publish('order_fulfillment', JSON.stringify({
+        type: 'insufficient_inventory',
+        orderId,
+        shop,
+        customerStaffId,
+        timestamp: new Date().toISOString()
+      }));
+
+      return false;
+    }
+
+    // 4. Shippo 创建运单逻辑
     let finalTrackingNumber, finalTrackingUrl, label, shipment, parcelTemplate, selectedRate, massUnit;
 
     if (carrier) {
-      // 3.1 获取/同步订单收货地址
+      // 4.1 获取/同步订单收货地址
       const orderWithAddress = await syncOrderShippingAddress(order, shop);
       if (!orderWithAddress || !orderWithAddress.shippingAddress) {
         await beginLogger({
@@ -824,10 +1069,11 @@ const handleFulfillOrder = async (job: any) => {
       }
       const shippingAddress = orderWithAddress.shippingAddress;
 
-      // 3.2 创建 Shippo 运单
+      // 4.2 创建 Shippo 运单
       const shippoResult = await createShippoShipment({
         orderId,
         carrier,
+        objectId,
         warehouseAddress,
         parcelTemplateToken,
         shippingAddress,
@@ -840,18 +1086,19 @@ const handleFulfillOrder = async (job: any) => {
       parcelTemplate = shippoResult.parcelTemplate;
       const shippoService = shippoResult.shippoService;
 
-      // 3.3 获取并筛选运费
+      // 4.3 获取并筛选运费
       selectedRate = await getAndFilterRates({
         shipment,
         carrier,
         orderId,
-        jobId: job.id
+        jobId: job.id,
+        shippoService
       });
       if (!selectedRate) {
         return false;
       }
 
-      // 3.4 购买标签 + 创建追踪单
+      // 4.4 购买标签 + 创建追踪单
       const trackingResult = await purchaseLabelAndCreateTracking({
         selectedRate,
         orderId,
@@ -870,70 +1117,7 @@ const handleFulfillOrder = async (job: any) => {
       massUnit = weightResult.massUnit;
     }
 
-    // 4. 同步 Shopify 履约逻辑
-    // 4.1 从 Shopify 实时获取履约订单
-    const shopifyFulfillmentOrders = await getShopifyFulfillmentOrders(shop, order.shopifyOrderId);
-    if (!shopifyFulfillmentOrders.length) {
-      await beginLogger({
-        level: 'warning',
-        message: `订单${orderId}无履约订单`,
-        meta: {
-          taskType: 'fulfill_order',
-          jobId: job.id,
-          orderId
-        }
-      });
-      return false;
-    }
-
-    // 4.2 筛选可履约的订单
-    const availableFulfillmentOrders = filterAvailableFulfillmentOrders(shopifyFulfillmentOrders);
-    if (!availableFulfillmentOrders.length) {
-      await beginLogger({
-        level: 'warning',
-        message: `订单${orderId}所有履约订单已完成/取消`,
-        meta: {
-          taskType: 'fulfill_order',
-          jobId: job.id,
-          orderId
-        }
-      });
-      return false;
-    }
-
-    // 4.3 检查仓库库存
-    const shopifyApiClient = await shopifyApiClientManager.getShopifyApiClient(shop);
-    const inventoryCheckSuccess = await checkWarehouseInventory({
-      availableFulfillmentOrders,
-      warehouseAddress,
-      shopifyApiClient,
-      orderId,
-      jobId: job.id
-    });
-    if (!inventoryCheckSuccess) {
-      await beginLogger({
-        level: 'warning',
-        message: `订单${orderId}仓库库存不足`,
-        meta: {
-          taskType: 'fulfill_order',
-          jobId: job.id,
-          orderId
-        }
-      });
-
-      // 发布库存不足消息到Redis
-      await subscriber.publish('order_fulfillment', JSON.stringify({
-        type: 'insufficient_inventory',
-        orderId,
-        shop,
-        customerStaffId,
-        timestamp: new Date().toISOString()
-      }));
-
-      return false;
-    }
-
-    // 4.4 移动履约订单到指定仓库
+    // 5. 移动履约订单到指定仓库
     const moveSuccess = await moveFulfillmentOrders({
       availableFulfillmentOrders,
       warehouseAddress,
@@ -945,7 +1129,7 @@ const handleFulfillOrder = async (job: any) => {
       return false;
     }
 
-    // 4.4 创建 Shopify 履约
+    // 5.1 创建 Shopify 履约
     const fulfillmentResult = await createShopifyFulfillment({
       shop,
       carrier,
@@ -961,7 +1145,7 @@ const handleFulfillOrder = async (job: any) => {
       return false;
     }
 
-    // 4.5 保存运单记录到本地
+    // 5.2 保存运单记录到本地
     await saveShipmentRecord({
       order,
       trackingNumber: finalTrackingNumber,
@@ -976,11 +1160,11 @@ const handleFulfillOrder = async (job: any) => {
       fulfillmentStatus: fulfillmentResult.fulfillmentCreate.fulfillment.status
     });
 
-    // 4.6 更新订单处理时间
+    // 5.3 更新订单处理时间
     await updateOrderProcessedTime(orderId);
 
-    // 4.7 发布发货成功消息到Redis
-    await subscriber.publish('order_fulfillment', JSON.stringify({
+    // 5.4 发布发货成功消息到Redis
+    await redisClient.publish('order_fulfillment', JSON.stringify({
       type: 'fulfillment_success',
       orderId,
       shop,
@@ -1016,7 +1200,7 @@ const handleFulfillOrder = async (job: any) => {
     });
 
     // 发布发货失败消息到Redis
-    await subscriber.publish('order_fulfillment', JSON.stringify({
+    await redisClient.publish('order_fulfillment', JSON.stringify({
       type: 'fulfillment_failure',
       orderId,
       shop,
