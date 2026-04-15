@@ -68,7 +68,7 @@ export async function generateCustomerProfile(
   try {
     // 获取客户信息
     const customer = await prisma.customers.findUnique({
-      where: { id: BigInt(customerId) },
+      where: { id: customerId },
       select: {
         id: true,
         email: true,
@@ -84,7 +84,6 @@ export async function generateCustomerProfile(
           select: {
             id: true,
             name: true,
-            status: true,
             totalPrice: true,
             currencyCode: true,
             createdAt: true,
