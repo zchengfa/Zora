@@ -1,11 +1,19 @@
+@import "../mixins";
 .productContainer{
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   row-gap: 1rem;
-  width: 50dvw;
+  column-gap: .5rem;
+  width: 40dvw;
   height: 50dvh;
   overflow-y: scroll;
   border-radius: calc(var(--z-primary_border_radius)/2);
+}
+
+@include responsive(md){
+  .productContainer{
+    width: 86dvw;
+  }
 }

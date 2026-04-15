@@ -54,10 +54,8 @@ class RenderMessage {
                <p class="zora-message-product-desc">${product?.description}</p>
                <div class="zora-message-product-tag-box">
                   ${product?.tags.map(tag=>{
-          return `
-                      <span class="zora-message-product-tag">${tag}</span>
-                    `
-        })}
+                    return `<span class="zora-message-product-tag">${tag}</span>`
+                  }).join('')}
                </div>
                <span class="zora-message-product-vendor">${product.vendor}</span>
               ${

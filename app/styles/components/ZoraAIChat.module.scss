@@ -1,6 +1,6 @@
 .chatWindow {
   position: fixed;
-  bottom: 80px;
+  bottom: 20dvh;
   right: 24px;
   width: 380px;
   max-width: calc(100vw - 48px);
@@ -276,7 +276,7 @@
 
 .floatingButton {
   position: fixed;
-  bottom: 24px;
+  bottom: 10dvh;
   right: 24px;
   width: 56px;
   height: 56px;
@@ -335,7 +335,6 @@
   .chatWindow {
     width: calc(100vw - 32px);
     right: 16px;
-    bottom: 80px;
     max-height: calc(100vh - 120px);
     height: 500px;
   }
@@ -419,7 +418,6 @@
   .chatWindow {
     width: calc(100vw - 24px);
     right: 12px;
-    bottom: 72px;
     max-height: calc(100vh - 100px);
     height: 450px;
   }
@@ -486,7 +484,6 @@
   .floatingButton {
     width: 44px;
     height: 44px;
-    bottom: 12px;
     right: 12px;
 
     .chatIcon {
