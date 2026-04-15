@@ -16,7 +16,6 @@ export const useAgentOnline = () => {
 
     // 发送客服上线消息的函数
     const sendAgentOnline = () => {
-      console.log(customerStaff.id, '客服上线');
       socket.emit('agent', {
         id: customerStaff.id,
         name: customerStaff.name || customerStaff.email || 'Unknown'

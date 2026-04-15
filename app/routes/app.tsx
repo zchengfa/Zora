@@ -99,7 +99,7 @@ function AppContent({ notification, orderFulfillment }: { notification: any; ord
 }
 
 function App() {
-  const { apiKey, customerStaff, products } = useLoaderData<typeof loader>();
+  const { apiKey, customerStaff, products,params } = useLoaderData<typeof loader>();
   const {message,socket,messageAck,offlineMessages,notification,orderFulfillment} = useSocketService();
 
   const appBridge = useAppBridge()
@@ -191,7 +191,6 @@ function App() {
 
       //列表不存在该客户信息，需要新增客户聊天列表项
       if(!isExistUser){
-        const params = new URLSearchParams(window.location.search);
         shopifyRequestUserInfo(params.toString() ? params.toString()+'&id='+message.senderId : `?id=${message.senderId}`).then(res=>{
           const {userInfo} = res.data
           pushChatList({
@@ -222,7 +221,6 @@ function App() {
       })
     }
   }, [message]);
-
 
   // 处理离线消息
   useEffect(() => {
