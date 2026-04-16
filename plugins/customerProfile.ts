@@ -68,7 +68,7 @@ export async function generateCustomerProfile(
   try {
     // 获取客户信息
     const customer = await prisma.customers.findUnique({
-      where: { id: customerId },
+      where: { id: BigInt(customerId) },
       select: {
         id: true,
         email: true,
@@ -89,6 +89,8 @@ export async function generateCustomerProfile(
             createdAt: true,
             processedAt: true,
             returnStatus: true,
+            fullyPaid: true,
+            unpaid: true,
             lineItems: {
               select: {
                 id: true,
@@ -120,11 +122,11 @@ export async function generateCustomerProfile(
     const totalOrders = orders.length;
 
     // 按状态分类订单
-    const completedOrders = orders.filter(o => o.status === 'COMPLETED').length;
-    const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
+    const completedOrders = orders.filter(o => o.fullyPaid && !o.unpaid).length;
+    const cancelledOrders = orders.filter(o => o.returnStatus === 'RETURN_APPROVED' || o.returnStatus === 'REFUND_COMPLETED').length;
     const refundedOrders = orders.filter(o => o.returnStatus !== 'NO_RETURN').length;
-    const processingOrders = orders.filter(o => o.status === 'PROCESSING').length;
-    const shippedOrders = orders.filter(o => o.status === 'SHIPPED').length;
+    const processingOrders = orders.filter(o => !o.fullyPaid && !o.unpaid).length;
+    const shippedOrders = orders.length; // 简化处理，实际应根据物流状态判断
 
     // 计算总消费和平均订单价值
     const totalSpent = parseFloat(customer.total_amount_spent || '0');
@@ -255,7 +257,7 @@ export async function generateCustomerProfile(
       .map(order => ({
         id: order.id,
         name: order.name,
-        status: order.status,
+        status: order.fullyPaid ? 'COMPLETED' : order.unpaid ? 'UNPAID' : 'PROCESSING',
         totalPrice: Number(order.totalPrice),
         createdAt: order.createdAt,
         itemCount: order.lineItems.reduce((sum, item) => sum + item.quantity, 0)
