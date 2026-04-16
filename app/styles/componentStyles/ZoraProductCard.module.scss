@@ -1,12 +1,15 @@
 .productCard {
-  width: var(--product-card-width);
+  width: var(--product-card-width, 100%);
   background-color: var(--z-color-surface);
   border: 1px solid var(--z-color-border);
   border-radius: calc(var(--z-primary_border_radius)/2);
   overflow: hidden;
   display: flex;
-  flex-direction: var(--product-card-display);
+  flex-direction: var(--product-card-display, column);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+  box-sizing: border-box;
+  height: 100%;
+  flex: 0 0 auto;
 }
 .productCardVendor {
   margin-bottom: .5rem;
@@ -52,6 +55,8 @@
   padding: 0.25rem 0.5rem;
   border-radius: 0.5rem;
   line-height: 1;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .productCardInfo {
   padding: var(--z-primary_padding);
@@ -68,16 +73,22 @@
   justify-content: flex-start;
   align-items: center;
   column-gap: .5rem;
+  row-gap: .5rem;
   margin-bottom: .5rem;
+  max-height: 3.6rem;
+  overflow-y: scroll;
 }
 .productCardTag {
-  background-color: var(--z-color-success); /* 使用绿色突出标签 */
+  background-color: var(--z-color-success);
   color: #fff;
   font-size: .7rem;
   font-weight: 500;
   padding: 0.15rem 0.5rem;
   border-radius: 0.5rem;
   white-space: nowrap;
+  max-width: 8rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .productCardTitle {
   font-size: 1rem;
@@ -125,12 +136,12 @@
 .shimmerVendor {
   /* 1. 定义流动的渐变背景 */
   background-image: linear-gradient(
-      110deg,
-      var(--z-color-shimmer-start) 0%,
-      var(--z-color-shimmer-mid) 25%,
-      var(--z-color-shimmer-end) 50%,
-      var(--z-color-shimmer-mid) 75%,
-      var(--z-color-shimmer-start) 100%
+    110deg,
+    var(--z-color-shimmer-start) 0%,
+    var(--z-color-shimmer-mid) 25%,
+    var(--z-color-shimmer-end) 50%,
+    var(--z-color-shimmer-mid) 75%,
+    var(--z-color-shimmer-start) 100%
   );
   /* 2. 将背景裁剪到文字形状 */
   -webkit-background-clip: text;
@@ -149,5 +160,93 @@
   }
   100% {
     background-position: -300%; /* 移动到左侧 */
+  }
+}
+
+/* 响应式布局 */
+@media (max-width: 1200px) {
+  .productCard {
+    --z-primary_padding: 0.75rem;
+  }
+
+  .productCardTitle {
+    font-size: 0.9rem;
+  }
+
+  .productCardDesc {
+    font-size: 0.8rem;
+  }
+
+  .productCardPriceCurrent {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .productCard {
+    --z-primary_padding: 0.5rem;
+  }
+
+  .productCardVendor {
+    font-size: 0.65rem;
+  }
+
+  .productCardTitle {
+    font-size: 0.85rem;
+  }
+
+  .productCardDesc {
+    font-size: 0.75rem;
+    -webkit-line-clamp: 1;
+  }
+
+  .productCardPriceCurrent {
+    font-size: 0.85rem;
+  }
+
+  .productCardTag {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+  }
+
+  .productCardBadge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+    top: 0.5rem;
+    left: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .productCard {
+    --z-primary_padding: 0.4rem;
+    --product-card-width: 45% !important;
+  }
+
+  .productCardTagBox {
+    max-height: 2.8rem;
+  }
+
+  .productCardTitle {
+    margin: 0 0 0.3rem 0;
+  }
+
+  .productCardDesc {
+    margin: 0 0 0.5rem 0;
+  }
+
+  .productCardPrice {
+    gap: 0.3rem;
+  }
+}
+
+/* 行模式响应式调整 */
+@media (max-width: 768px) {
+  .productCardImageWrapperRow {
+    flex: 0 0 120px;
+  }
+
+  .productCardInfoRow {
+    padding-left: var(--z-primary_padding);
   }
 }

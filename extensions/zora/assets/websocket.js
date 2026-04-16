@@ -43,7 +43,6 @@ socket.on('conversation_success',(conversation_id)=>{
 
 //接收后端回执
 socket.on('message_ack',(ack)=>{
-  console.log('消息回执',ack)
   renderMessage.setMessageStatus(ack.msgId,ack.msgStatus)
   renderMessage.updateMessageStatus(ack.msgId,ack.msgStatus)
 })
@@ -54,7 +53,6 @@ socket.on('message', (data) => {
   const msgBoxEl = document.querySelector('.zora-message-box-active')
   const zoraBtnEl = document.querySelector('.zora-default-btn-box.btn-box-hidden')
   const msgStatus = msgBoxEl && zoraBtnEl ? 'READ' : 'DELIVERED'
-  console.log(`收到服务器消息:发送回执告诉客服我已接收（未读）或已读，可发送消息状态：${msgStatus}`);
   socket.emit('message_delivered',{
     type: 'ACK',
     senderType: 'CUSTOMER',
@@ -73,7 +71,6 @@ socket.on('message', (data) => {
 
 // 监听消息已读回执
 socket.on('message_delivered', (ack) => {
-  console.log('收到消息已读回执:', ack);
   if (ack.msgStatus === 'READ') {
     // 更新本地消息状态
     renderMessage.updateMessageStatus(ack.msgId, ack.msgStatus);
@@ -81,7 +78,6 @@ socket.on('message_delivered', (ack) => {
 });
 //离线消息接收
 socket.on('offline_messages',(data)=>{
-  console.log('收到离线消息',data);
   const { messages, totalCount } = data;
 
   if(messages && messages.length > 0){

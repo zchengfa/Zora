@@ -54,10 +54,8 @@ class RenderMessage {
                <p class="zora-message-product-desc">${product?.description}</p>
                <div class="zora-message-product-tag-box">
                   ${product?.tags.map(tag=>{
-          return `
-                      <span class="zora-message-product-tag">${tag}</span>
-                    `
-        })}
+                    return `<span class="zora-message-product-tag">${tag}</span>`
+                  }).join('')}
                </div>
                <span class="zora-message-product-vendor">${product.vendor}</span>
               ${
@@ -139,6 +137,11 @@ class RenderMessage {
       return;
     }
 
+    // 检查消息是否已经存在，如果存在则不添加
+    if (this.isMessageExists(payload.msgId)) {
+      return;
+    }
+
     // 生成并插入单条消息
     const messageHtml = this.generateMessageHtml(payload);
     this.zoraMessageContainer.insertAdjacentHTML('beforeend', messageHtml);
@@ -150,15 +153,25 @@ class RenderMessage {
     this.setupCustomerMessageTimers(payload);
   }
 
+  // 检查消息是否已经存在
+  isMessageExists = (msgId) => {
+    return document.querySelector(`[data-msg-unique="${msgId}"]`) !== null;
+  }
+
   // 批量添加消息
   addBatchMessages = (messages) => {
     if (!messages || messages.length === 0) return;
 
+    // 去重处理：根据msgId去重
+    const uniqueMessages = this.removeDuplicateMessages(messages);
+
+    if (uniqueMessages.length === 0) return;
+
     // 检查是否是离线消息
-    const isOfflineMessages = messages.some(msg => msg.isOffline);
+    const isOfflineMessages = uniqueMessages.some(msg => msg.isOffline);
 
     // 批量生成所有消息的HTML
-    const messagesHtml = messages.map(payload => this.generateMessageHtml(payload)).join('');
+    const messagesHtml = uniqueMessages.map(payload => this.generateMessageHtml(payload)).join('');
 
     if (isOfflineMessages) {
       // 离线消息插入到列表前面（历史消息位置）
@@ -169,6 +182,18 @@ class RenderMessage {
       // 滚动到底部
       this.scrollToBottom();
     }
+  }
+
+  // 去重消息数组，根据msgId
+  removeDuplicateMessages = (messages) => {
+    const seenMsgIds = new Set();
+    return messages.filter(msg => {
+      if (seenMsgIds.has(msg.msgId)) {
+        return false;
+      }
+      seenMsgIds.add(msg.msgId);
+      return true;
+    });
   }
   getMessageStatus(msgId) {
     return this.msgStatusMap.get(msgId) || 'SENDING';
@@ -258,4 +283,3 @@ class RenderMessage {
     }
   }
 }
-

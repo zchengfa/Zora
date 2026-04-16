@@ -12,6 +12,25 @@ const SESSION_STORAGE_CHAT_LIST_KEY = "zora_chat_list";
 const SESSION_STORAGE_ACTIVE_ITEM_KEY = "zora_active_item";
 const SESSION_STORAGE_ACTIVE_CUSTOMER_INFO_KEY = "zora_active_customer_info";
 
+export interface AgentSettingsType {
+  theme: string;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  soundEnabled: boolean;
+  notificationSound: string;
+  autoReplyEnabled: boolean;
+  autoReplyMessage: string;
+  autoReplyDelay: number;
+  workHoursEnabled: boolean;
+  workStartHour: string;
+  workEndHour: string;
+  workDays: string[];
+  typingIndicator: boolean;
+  readReceipts: boolean;
+  maxChatHistory: number;
+  updatedAt?: string;
+}
+
 export interface UseMessageStoreType {
   messages: MessageDataType[];
   messageTimers: Map<string, Map<string, ReturnType<typeof setTimeout>>>;
@@ -26,9 +45,12 @@ export interface UseMessageStoreType {
   activeCustomerItem: string;
   shopify_Shop_products: GraphqlProductInfoType;
   countedMsgIds: Set<string>;
+  settings: AgentSettingsType;
   initMessages: (target: string) => Promise<void>;
   initGlobalState: (customerStaff: any, products: GraphqlProductInfoType) => void;
   initChatState: () => void;
+  initSettings: (settings: AgentSettingsType) => void;
+  updateSettings: (settings: Partial<AgentSettingsType>) => void;
   addMessage: (message: MessageDataType | MessageDataType[]) => Promise<void>;
   changeMessages: (params: { conversationId: string; page: number; pageSize: number }) => Promise<void>;
   updateMessageStatus: (ack: MessageAckType) => void;
@@ -56,6 +78,23 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
       activeCustomerInfo:null,
       activeCustomerItem: undefined,
       shopify_Shop_products:{},
+      settings: {
+        theme: 'light',
+        emailNotifications: true,
+        pushNotifications: true,
+        soundEnabled: true,
+        notificationSound: 'default',
+        autoReplyEnabled: true,
+        autoReplyMessage: '',
+        autoReplyDelay: 30,
+        workHoursEnabled: true,
+        workStartHour: '09:00',
+        workEndHour: '18:00',
+        workDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        typingIndicator: true,
+        readReceipts: true,
+        maxChatHistory: 30
+      },
       initMessages:async (target:string)=>{
         let messages = []
         if (target){
@@ -89,6 +128,38 @@ export const useMessageStore = create<UseMessageStoreType>((set)=>{
             chatList,
             activeCustomerItem,
             activeCustomerInfo
+          }
+        })
+      },
+      initSettings:(settings: AgentSettingsType)=>{
+        set(()=>{
+          // 设置主题
+          if (settings.theme) {
+            const htmlEl = document.getElementsByTagName('html')[0];
+            htmlEl.setAttribute('data-theme', settings.theme);
+          }
+          // 存储到本地存储
+          localStorage.setItem('zora_application_theme', settings.theme);
+          return {
+            settings
+          }
+        })
+      },
+      updateSettings:(settings: Partial<AgentSettingsType>)=>{
+        set((state)=>{
+          const newSettings = {
+            ...state.settings,
+            ...settings
+          };
+          // 如果更新了主题，立即应用
+          if (settings.theme) {
+            const htmlEl = document.getElementsByTagName('html')[0];
+            htmlEl.setAttribute('data-theme', settings.theme);
+            // 存储到本地存储
+            localStorage.setItem('zora_application_theme', settings.theme);
+          }
+          return {
+            settings: newSettings
           }
         })
       },
