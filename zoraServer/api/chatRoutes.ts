@@ -210,10 +210,18 @@ export function registerChatRoutes({app, prisma}: ZoraApiType) {
           },
         });
 
-        const updatedChatList = await prisma.chatListItem.findMany({
-          where: {agentId: agentId},
-          orderBy: {lastTimestamp: "desc"},
-        });
+        const updatedChatList = await Promise.all(
+          (await prisma.chatListItem.findMany({
+            where: {agentId: agentId},
+            orderBy: {lastTimestamp: "desc"},
+          })).map(async (item) => {
+            const customerProfile = item.customerId ? await generateCustomerProfile(prisma, item.customerId) : null;
+            return {
+              ...item,
+              customerProfile,
+            };
+          })
+        );
 
         return res.json({
           success: true,
@@ -253,10 +261,18 @@ export function registerChatRoutes({app, prisma}: ZoraApiType) {
         data: {isActive: false},
       });
 
-      const updatedChatList = await prisma.chatListItem.findMany({
-        where: {agentId: agentId},
-        orderBy: {lastTimestamp: "desc"},
-      });
+      const updatedChatList = await Promise.all(
+        (await prisma.chatListItem.findMany({
+          where: {agentId: agentId},
+          orderBy: {lastTimestamp: "desc"},
+        })).map(async (item) => {
+          const customerProfile = item.customerId ? await generateCustomerProfile(prisma, item.customerId) : null;
+          return {
+            ...item,
+            customerProfile,
+          };
+        })
+      );
 
       res.json({
         success: true,
