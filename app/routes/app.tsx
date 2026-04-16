@@ -119,15 +119,15 @@ function App() {
   }, [customerStaff, products]);
 
   useEffect(() => {
-    const locale = appBridge.config.locale
-    //设置主题
     const setTheme = ()=>{
-      const theme = localStorage.getItem('zora_application_theme') || 'light'
-      document.getElementsByTagName('html')[0].setAttribute('data-theme',theme)
+      const localStorageTheme = localStorage.getItem('zora_application_theme');
+      const zustandTheme = messageStore.settings.theme;
+      const currentTheme = localStorageTheme || zustandTheme || 'light';
+      document.getElementsByTagName('html')[0].setAttribute('data-theme', currentTheme);
     }
     setTheme()
 
-  },[])
+  },[messageStore.settings.theme, messageStore.customerStaff])
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -200,7 +200,8 @@ function App() {
             avatar: userInfo.image_url,
             lastMessage: message.contentBody,
             conversationId: message.conversationId,
-            lastTimestamp: message.timestamp
+            lastTimestamp: message.timestamp,
+            customerProfile: userInfo.customerProfile
           })
           addMessage(message).then()
         }).catch(err=>{

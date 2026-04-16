@@ -1,5 +1,5 @@
 import ZoraSearchStyle from '@styles/componentStyles/ZoraSearch.module.scss'
-import {useState, useEffect} from "react";
+import {useState, useEffect, forwardRef, useImperativeHandle, useRef} from "react";
 import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 
 interface ZoraSearchProps {
@@ -9,12 +9,24 @@ interface ZoraSearchProps {
   onSearchResultClick?: (customer: any) => void;
 }
 
-export default function ZoraSearch(props: ZoraSearchProps) {
+interface ZoraSearchRef {
+  focus: () => void;
+}
+
+const ZoraSearch = forwardRef<ZoraSearchRef, ZoraSearchProps>((props, ref) => {
   const {translation} = useAppTranslation();
   const ct = translation.components.chat;
   const [mouseEntered, setInputStatus] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 暴露focus方法给父组件
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef?.current?.focus();
+    }
+  }));
 
   const mouseEvent = () => {
     setInputStatus(!mouseEntered)
@@ -49,7 +61,7 @@ export default function ZoraSearch(props: ZoraSearchProps) {
 
   const {placeholder, searchResult} = props
   return <div className={ZoraSearchStyle.container}>
-    <input name={'searchInput'} value={inputValue} onChange={inputChange} onMouseEnter={mouseEvent} onMouseLeave={mouseEvent} className={mouseEntered ? ZoraSearchStyle.inputActive : ZoraSearchStyle.input} placeholder={placeholder} />
+    <input ref={inputRef} name={'searchInput'} value={inputValue} onChange={inputChange} onMouseEnter={mouseEvent} onMouseLeave={mouseEvent} className={mouseEntered ? ZoraSearchStyle.inputActive : ZoraSearchStyle.input} placeholder={placeholder} />
     <div className={mouseEntered ? ZoraSearchStyle.searchIconActive : ZoraSearchStyle.searchIcon}>
       <s-icon type={'search'}></s-icon>
     </div>
@@ -59,19 +71,19 @@ export default function ZoraSearch(props: ZoraSearchProps) {
           searchResult?.length ? (
             <div className={ZoraSearchStyle.resultList}>
               {searchResult.map((customer: any) => (
-                <div 
+                <div
                   key={customer.id}
                   className={ZoraSearchStyle.resultItem}
                   onClick={() => props.onSearchResultClick?.(customer)}
                 >
-                  <img 
-                    src={customer.avatar || '/assets/default_avatar.jpg'} 
+                  <img
+                    src={customer.avatar || '/assets/default_avatar.jpg'}
                     alt={customer.firstName}
                     className={ZoraSearchStyle.resultAvatar}
                   />
                   <div className={ZoraSearchStyle.resultInfo}>
                     <span className={ZoraSearchStyle.resultName}>
-                      {customer.firstName} {customer.lastName}
+                      {customer.last_name + ' ' + customer.first_name}
                     </span>
                     <span className={ZoraSearchStyle.resultEmail}>
                       {customer.email}
@@ -87,4 +99,6 @@ export default function ZoraSearch(props: ZoraSearchProps) {
       </div> : null
     }
   </div>
-}
+});
+
+export default ZoraSearch;

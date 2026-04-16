@@ -9,12 +9,13 @@ interface ZoraCustomerListProps {
   customerData: CustomerDataType[],
   ItemClick:(conversationId:string)=> void,
   activeView?: 'list' | 'chat' | 'profile',
-  setActiveView?: (view: 'list' | 'chat' | 'profile') => void
+  setActiveView?: (view: 'list' | 'chat' | 'profile') => void,
+  onEmptyButtonClick?: () => void
 }
 
 
 const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
-  {customerData,ItemClick,activeView,setActiveView}
+  {customerData,ItemClick,activeView,setActiveView,onEmptyButtonClick}
 ) => {
 
   const handlerClick = (conversationId:string)=>{
@@ -31,7 +32,7 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
         <div className={ZoraCustomerListStyle.customerList}>
           {
             customerData?.map((item: CustomerDataType) => {
-              return <div 
+              return <div
                 onTouchEnd={(e) => {
                   e.preventDefault()
                   handlerClick(item.conversationId)
@@ -61,7 +62,7 @@ const ZoraCustomerList:React.FC<ZoraCustomerListProps> = (
             })
           }
         </div>
-        : <ZoraEmpty isEmptyMessage={false}></ZoraEmpty>
+        : <ZoraEmpty isEmptyMessage={false} onButtonClick={onEmptyButtonClick}></ZoraEmpty>
     }
   </div>
 }

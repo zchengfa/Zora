@@ -9,149 +9,18 @@ import { useAgentOnline } from '@/hooks/useAgentOnline.ts';
 import { timeFormatting } from '@/Utils/Utils.ts';
 
 function AppSettings() {
-  const LOCALSTORAGE_KEY = 'zora_application_theme';
   const {translation} = useAppTranslation()
-  const [theme, setPersistTheme] = usePersistStorage(LOCALSTORAGE_KEY, 'light');
   const settingTranslation = translation.setting;
   const messageStore = useMessageStore();
+  const { settings, initSettings, updateSettings } = messageStore;
   // 客服上线/下线管理
   useAgentOnline();
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [notificationSound, setNotificationSound] = useState('default');
-
-  const [autoReplyEnabled, setAutoReplyEnabled] = useState(true);
-  const [autoReplyMessage, setAutoReplyMessage] = useState('');
-  const [autoReplyDelay, setAutoReplyDelay] = useState('30');
-
-  const [workHoursEnabled, setWorkHoursEnabled] = useState(true);
-  const [workStartHour, setWorkStartHour] = useState('09:00');
-  const [workEndHour, setWorkEndHour] = useState('18:00');
-  const [workDays, setWorkDays] = useState(()=> ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].toString());
-
-  const [typingIndicator, setTypingIndicator] = useState(true);
-  const [readReceipts, setReadReceipts] = useState(true);
-  const [maxChatHistory, setMaxChatHistory] = useState('30');
-
-  const changeTheme = useCallback(() => {
-    const newState = theme === 'dark' ? 'light' : 'dark';
-    setPersistTheme(newState);
-    const htmlEl = document.getElementsByTagName('html')[0];
-    htmlEl.setAttribute('data-theme', newState);
-  }, [theme, setPersistTheme]);
-
-  const handleEmailNotificationsChange = useCallback((event: any) => {
-    setEmailNotifications(event.target.checked);
-  }, []);
-
-  const handlePushNotificationsChange = useCallback((event: any) => {
-    setPushNotifications(event.target.checked);
-  }, []);
-
-  const handleSoundEnabledChange = useCallback((event: any) => {
-    setSoundEnabled(event.target.checked);
-  }, []);
-
-  const handleAutoReplyEnabledChange = useCallback((event: any) => {
-    setAutoReplyEnabled(event.target.checked);
-  }, []);
-
-  const handleWorkHoursEnabledChange = useCallback((event: any) => {
-    setWorkHoursEnabled(event.target.checked);
-  }, []);
-
-  const handleTypingIndicatorChange = useCallback((event: any) => {
-    setTypingIndicator(event.target.checked);
-  }, []);
-
-  const handleReadReceiptsChange = useCallback((event: any) => {
-    setReadReceipts(event.target.checked);
-  }, []);
-
-  // 加载设置数据
-  useEffect(() => {
-    const loadSettings = async () => {
-      if (messageStore.customerStaff?.id) {
-        try {
-          const response = await getAgentSettings(messageStore.customerStaff.id);
-          if (response?.data?.settings) {
-            const settings = response.data.settings;
-            // 更新所有设置状态
-            setEmailNotifications(settings.emailNotifications ?? true);
-            setPushNotifications(settings.pushNotifications ?? true);
-            setSoundEnabled(settings.soundEnabled ?? true);
-            setNotificationSound(settings.notificationSound ?? 'default');
-            setAutoReplyEnabled(settings.autoReplyEnabled ?? true);
-            setAutoReplyMessage(settings.autoReplyMessage ?? '');
-            setAutoReplyDelay(settings.autoReplyDelay?.toString() ?? '30');
-            setWorkHoursEnabled(settings.workHoursEnabled ?? true);
-            setWorkStartHour(settings.workStartHour ?? '09:00');
-            setWorkEndHour(settings.workEndHour ?? '18:00');
-            setWorkDays(settings.workDays?.toString() ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].toString());
-            setTypingIndicator(settings.typingIndicator ?? true);
-            setReadReceipts(settings.readReceipts ?? true);
-            setMaxChatHistory(settings.maxChatHistory?.toString() ?? '30');
-            // 设置更新时间
-            if (settings.updatedAt) {
-              setLastUpdated(settings.updatedAt);
-            }
-          }
-        } catch (error) {
-          console.error('加载设置失败:', error);
-        }
-      }
-    };
-
-    loadSettings().then();
-  }, [messageStore.customerStaff?.id]);
-
-  // 保存设置数据
-  const handleSaveSettings = useCallback(async () => {
-    if (!messageStore.customerStaff?.id) {
-      console.error('未找到客服信息');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const settingsData = {
-        staffProfileId: messageStore.customerStaff.id,
-        theme,
-        emailNotifications,
-        pushNotifications,
-        soundEnabled,
-        notificationSound,
-        autoReplyEnabled,
-        autoReplyMessage,
-        autoReplyDelay: parseInt(autoReplyDelay, 10),
-        workHoursEnabled,
-        workStartHour,
-        workEndHour,
-        workDays: workDays.split(',').map((day: string) => day.trim()),
-        typingIndicator,
-        readReceipts,
-        maxChatHistory: parseInt(maxChatHistory, 10),
-      };
-
-      const response = await updateAgentSettings(settingsData);
-      setShowSaveSuccess(true);
-      // 更新最后更新时间
-      if (response?.data?.updatedAt) {
-        setLastUpdated(response.data.updatedAt);
-      }
-      setTimeout(() => setShowSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error('保存设置失败:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [
-    messageStore.customerStaff?.id,
+  // 从settings中获取状态
+  const {
     theme,
     emailNotifications,
     pushNotifications,
@@ -166,8 +35,112 @@ function AppSettings() {
     workDays,
     typingIndicator,
     readReceipts,
-    maxChatHistory,
-  ]);
+    maxChatHistory
+  } = settings;
+
+  const changeTheme = useCallback(() => {
+    const newState = theme === 'dark' ? 'light' : 'dark';
+    updateSettings({ theme: newState });
+  }, [theme, updateSettings]);
+
+  const handleEmailNotificationsChange = useCallback((event: any) => {
+    updateSettings({ emailNotifications: event.target.checked });
+  }, [updateSettings]);
+
+  const handlePushNotificationsChange = useCallback((event: any) => {
+    updateSettings({ pushNotifications: event.target.checked });
+  }, [updateSettings]);
+
+  const handleSoundEnabledChange = useCallback((event: any) => {
+    updateSettings({ soundEnabled: event.target.checked });
+  }, [updateSettings]);
+
+  const handleAutoReplyEnabledChange = useCallback((event: any) => {
+    updateSettings({ autoReplyEnabled: event.target.checked });
+  }, [updateSettings]);
+
+  const handleWorkHoursEnabledChange = useCallback((event: any) => {
+    updateSettings({ workHoursEnabled: event.target.checked });
+  }, [updateSettings]);
+
+  const handleTypingIndicatorChange = useCallback((event: any) => {
+    updateSettings({ typingIndicator: event.target.checked });
+  }, [updateSettings]);
+
+  const handleReadReceiptsChange = useCallback((event: any) => {
+    updateSettings({ readReceipts: event.target.checked });
+  }, [updateSettings]);
+
+  // 加载设置数据
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (messageStore.customerStaff?.id) {
+        try {
+          const response = await getAgentSettings(messageStore.customerStaff.id);
+          if (response?.data?.settings) {
+            const settings = response.data.settings;
+            // 初始化设置状态
+            initSettings({
+              theme: settings.theme ?? 'light',
+              emailNotifications: settings.emailNotifications ?? true,
+              pushNotifications: settings.pushNotifications ?? true,
+              soundEnabled: settings.soundEnabled ?? true,
+              notificationSound: settings.notificationSound ?? 'default',
+              autoReplyEnabled: settings.autoReplyEnabled ?? true,
+              autoReplyMessage: settings.autoReplyMessage ?? '',
+              autoReplyDelay: settings.autoReplyDelay ?? 30,
+              workHoursEnabled: settings.workHoursEnabled ?? true,
+              workStartHour: settings.workStartHour ?? '09:00',
+              workEndHour: settings.workEndHour ?? '18:00',
+              workDays: settings.workDays ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+              typingIndicator: settings.typingIndicator ?? true,
+              readReceipts: settings.readReceipts ?? true,
+              maxChatHistory: settings.maxChatHistory ?? 30,
+              updatedAt: settings.updatedAt
+            });
+            // 设置更新时间
+            if (settings.updatedAt) {
+              setLastUpdated(settings.updatedAt);
+            }
+          }
+        } catch (error) {
+          console.error('加载设置失败:', error);
+        }
+      }
+    };
+
+    loadSettings().then();
+  }, [messageStore.customerStaff?.id, initSettings]);
+
+  // 保存设置数据
+  const handleSaveSettings = useCallback(async () => {
+    if (!messageStore.customerStaff?.id) {
+      console.error('未找到客服信息');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const settingsData = {
+        staffProfileId: messageStore.customerStaff.id,
+        ...settings
+      };
+
+      const response = await updateAgentSettings(settingsData);
+      setShowSaveSuccess(true);
+      // 更新最后更新时间
+      if (response?.data?.updatedAt) {
+        setLastUpdated(response.data.updatedAt);
+        // 更新settings中的updatedAt
+        updateSettings({ updatedAt: response.data.updatedAt });
+      }
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('保存设置失败:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [messageStore.customerStaff?.id, settings, updateSettings]);
 
   const soundOptions = [
     { label: 'Default sound', value: 'default' },
@@ -269,7 +242,7 @@ function AppSettings() {
                       label={settingTranslation.sound.label.notificationSound}
                       options={soundOptions}
                       value={notificationSound}
-                      onChange={setNotificationSound}
+                      onChange={(value) => updateSettings({ notificationSound: value })}
                     />
                   </>
                 )}
@@ -297,7 +270,7 @@ function AppSettings() {
                     <TextField
                       label={settingTranslation.reply.label.replyMessage}
                       value={autoReplyMessage}
-                      onChange={setAutoReplyMessage}
+                      onChange={(value) => updateSettings({ autoReplyMessage: value })}
                       multiline={3}
                       placeholder={settingTranslation.reply.placeholder}
                       autoComplete={'off'}/>
@@ -306,7 +279,7 @@ function AppSettings() {
                       label={settingTranslation.reply.label.replyDelay}
                       type="number"
                       value={autoReplyDelay}
-                      onChange={setAutoReplyDelay}
+                      onChange={(value) => updateSettings({ autoReplyDelay: parseInt(value, 10) })}
                       helpText={settingTranslation.reply.label.helpText}
                       autoComplete={'on'}/>
                   </>
@@ -338,7 +311,7 @@ function AppSettings() {
                           label={settingTranslation.working.label.start}
                           type="time"
                           value={workStartHour}
-                          onChange={setWorkStartHour}
+                          onChange={(value) => updateSettings({ workStartHour: value })}
                           autoComplete={'off'}/>
                       </div>
                       <div style={{ flex: 1 }}>
@@ -346,7 +319,7 @@ function AppSettings() {
                           label={settingTranslation.working.label.end}
                           type="time"
                           value={workEndHour}
-                          onChange={setWorkEndHour}
+                          onChange={(value) => updateSettings({ workEndHour: value })}
                           autoComplete={'off'}/>
                       </div>
                     </InlineStack>
@@ -355,7 +328,7 @@ function AppSettings() {
                       label="Working Days"
                       options={dayOptions}
                       value={workDays.toString()}
-                      onChange={setWorkDays}
+                      onChange={(value) => updateSettings({ workDays: value.split(',').map((day: string) => day.trim()) })}
                     />
                   </>
                 )}
@@ -394,7 +367,7 @@ function AppSettings() {
                   label={settingTranslation.chat.label.maxChatHistory}
                   type="number"
                   value={maxChatHistory}
-                  onChange={setMaxChatHistory}
+                  onChange={(value) => updateSettings({ maxChatHistory: parseInt(value, 10) })}
                   helpText={settingTranslation.chat.label.helpText}
                   autoComplete={'off'}
                 />

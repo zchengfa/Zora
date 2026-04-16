@@ -5,7 +5,7 @@ import ZoraMessageItems from "@components/ZoraMessageItems";
 import ZoraChat from "@components/ZoraChat.tsx";
 import ZoraCustomerProfile from "@components/ZoraCustomerProfile.tsx";
 import {useSocketService} from "@hooks/useSocketService.ts";
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {useMessageStore} from "@/zustand/zustand.ts";
 import {useAgentOnline} from "@/hooks/useAgentOnline.ts";
 import {getChatList,searchCustomers,addCustomerToChatList} from "@/network/request.ts";
@@ -40,12 +40,13 @@ function Index(){
         .then(async res => {
           if (res?.data?.chatList) {
             // 转换字段名，统一为前端使用的字段名
-            const transformedChatList = res.data.chatList.map((item: any) => ({
-              ...item,
-              firstName: item.customerFirstName || item.firstName || '',
-              lastName: item.customerLastName || item.lastName || '',
-              avatar: item.customerAvatar || item.avatar || null
-            }));
+          const transformedChatList = res.data.chatList.map((item: any) => ({
+            ...item,
+            firstName: item.customerFirstName || item.firstName || '',
+            lastName: item.customerLastName || item.lastName || '',
+            avatar: item.customerAvatar || item.avatar || null,
+            customerProfile: item.customerProfile
+          }));
             // 1. 设置聊天列表
             messageStore.setChatList(transformedChatList)
 
@@ -70,7 +71,6 @@ function Index(){
               // 4. 初始化消息（在设置activeCustomerInfo之后）
               messageStore.initMessages(activeItem.conversationId).then()
             }
-
             // 5. 同步消息到IndexedDB
             for (const chatItem of res.data.chatList) {
               if (chatItem.messages && chatItem.messages.length > 0) {
@@ -150,6 +150,7 @@ function Index(){
   // 搜索相关状态
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const searchInputRef = React.useRef<{ focus: () => void }>(null);
 
   // 搜索客户处理函数
   const handleSearch = async (keyword: string) => {
@@ -174,6 +175,11 @@ function Index(){
     }
   };
 
+  // 处理空状态按钮点击，聚焦搜索框
+  const handleEmptyButtonClick = () => {
+    searchInputRef.current?.focus();
+  };
+
   // 添加客户到聊天列表
   const handleAddToChatList = async (customer: any) => {
     try {
@@ -190,7 +196,8 @@ function Index(){
             ...item,
             firstName: item.customerFirstName || item.firstName || '',
             lastName: item.customerLastName || item.lastName || '',
-            avatar: item.customerAvatar || item.avatar || null
+            avatar: item.customerAvatar || item.avatar || null,
+            customerProfile: item.customerProfile
           }));
           messageStore.setChatList(transformedChatList);
 
@@ -269,6 +276,7 @@ function Index(){
         <div className={indexStyle.chatBox}>
           <div className={`${indexStyle.chatLeft} ${activeView !== 'list' ? indexStyle.hidden : ''}`}>
             <ZoraSearch
+              ref={searchInputRef}
               placeholder={ct.searchPlaceholder}
               onSearch={handleSearch}
               searchResult={searchResults}
@@ -279,6 +287,7 @@ function Index(){
               ItemClick={customerItemClick}
               activeView={activeView}
               setActiveView={setActiveView}
+              onEmptyButtonClick={handleEmptyButtonClick}
             ></ZoraCustomerList>
           </div>
           <div className={indexStyle.chatMiddle}>

@@ -5,9 +5,10 @@ import {useAppTranslation} from "@hooks/useAppTranslation.ts";
 interface ZoraEmptyProps {
   isEmptyMessage?: boolean
   isEmptyProfile?: boolean
+  onButtonClick?: () => void
 }
 
-const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile})=> {
+const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile, onButtonClick})=> {
   const {translation} = useAppTranslation()
   const et = translation.components.empty
   if(isEmptyProfile) {
@@ -25,7 +26,7 @@ const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile})=> 
         <div className={ZoraEmptyStyle.emptyStateIcon}>👥</div>
         <div className={ZoraEmptyStyle.emptyStateTitle}>{et.customer.title}</div>
         <div className={ZoraEmptyStyle.emptyStateDesc}>{et.customer.subtitle}</div>
-        <button className={ZoraEmptyStyle.btnPrimary}>{et.customer.primaryAction.content}</button>
+        <button className={ZoraEmptyStyle.btnPrimary} onClick={onButtonClick}>{et.customer.primaryAction.content}</button>
       </div>
     </div>
   }
@@ -34,7 +35,7 @@ const ZoraEmpty:React.FC<ZoraEmptyProps> = ({isEmptyMessage, isEmptyProfile})=> 
       <div className={ZoraEmptyStyle.emptyStateIcon}>💬</div>
       <div className={ZoraEmptyStyle.emptyStateTitle}>{et.message.title}</div>
       <div className={ZoraEmptyStyle.emptyStateDesc}>{et.message.subtitle}</div>
-      <button className={ZoraEmptyStyle.btnPrimary}>{et.message.primaryAction.content}</button>
+      <button className={ZoraEmptyStyle.btnPrimary} onClick={onButtonClick}>{et.message.primaryAction.content}</button>
       </div>
     </div>
 }
