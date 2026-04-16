@@ -1005,38 +1005,156 @@ export class SocketUtils{
           recipient = this.agent.get(payload.recipientId)
           sender = this.users.get(payload.senderId)
 
+          // 先将客户消息转发给客服
+          if (recipient) {
+            this.config.io.to(recipient).emit('message', payload);
+          }
+
+          // 接收者不在线
+          if(!recipient){
+            // 保存离线消息到数据库
+            await this.config.prisma.offlineMessage.create({
+              data: {
+                conversationId: payload.conversationId,
+                senderId: payload.senderId,
+                senderType: payload.senderType,
+                recipientId: payload.recipientId,
+                recipientType: payload.recipientType,
+                contentType: payload.contentType,
+                contentBody: payload.contentBody,
+                metadata: payload.metadata || {},
+                msgId: payload.msgId,
+                isDelivered: false,
+                shop_id: conversation.shop_id
+              }
+            })
+
+            const redis_key = payload.recipientId
+            await this.config.redis.lpush(`offline_messages:${redis_key}`,JSON.stringify(saveMessagePrisma))
+            await this.config.redis.expire(`offline_messages:${redis_key}`,this.config.redisExpired)
+            //告诉发送者，服务器接收到消息，消息已发送，但用户不在线
+            this.sendMessageAck(sender as string,payload.msgId,'SENT',10001,payload.conversationId)
+          }
+          else{
+            // 告诉发送者，消息已送达
+            this.sendMessageAck(sender as string,payload.msgId,'DELIVERED',10004,payload.conversationId)
+          }
+
+          // 检查是否需要AI自动回复
+          if (payload.senderType === 'CUSTOMER' && recipient) {
+            // 获取客服的设置
+            const agentSettings = await this.config.prisma.agentSettings.findUnique({
+              where: {
+                staffProfileId: payload.recipientId
+              }
+            });
+
+            // 如果启用了AI自动回复
+            if (agentSettings?.autoReplyEnabled) {
+              try {
+                // 构建AI提示词
+                const prompt = `客户发送了以下消息，请作为客服助手进行回复：\n\n${payload.contentBody}`;
+
+                // 调用AI生成回复
+                const aiResponse = await chatWithAI(prompt, {
+                  enableTools: true,
+                  toolCallContext: {
+                    prisma: this.config.prisma
+                  }
+                });
+
+                // 生成AI回复消息
+                const aiMessage = {
+                  senderId: payload.recipientId,
+                  senderType: 'AGENT',
+                  contentType: 'TEXT',
+                  msgStatus: 'SENT',
+                  recipientType: 'CUSTOMER',
+                  recipientId: payload.senderId,
+                  contentBody: aiResponse,
+                  msgId: 'msg_' + new Date().getTime(),
+                  conversationId: payload.conversationId,
+                  timestamp: new Date().toISOString()
+                };
+
+                // 保存AI回复到数据库
+                await this.config.prisma.message.create({
+                  data: {
+                    ...aiMessage,
+                    shop_id: conversation.shop_id
+                  }
+                });
+
+                // 发送AI回复给客户
+                if (sender) {
+                  this.config.io.to(sender).emit('message', aiMessage);
+                }
+
+                // 同时将AI回复转发给客服，让客服知道AI回复了什么
+                this.config.io.to(recipient).emit('message', aiMessage);
+
+                await beginLogger({
+                  level: 'info',
+                  message: `AI自动回复已发送`,
+                  meta: {
+                    taskType: 'ai_auto_reply',
+                    conversationId: payload.conversationId,
+                    customerId: payload.senderId,
+                    agentId: payload.recipientId
+                  }
+                });
+              } catch (aiError) {
+                await beginLogger({
+                  level: 'error',
+                  message: `AI自动回复失败`,
+                  meta: {
+                    taskType: 'ai_auto_reply_error',
+                    error: {
+                      name: aiError?.name,
+                      message: aiError?.message,
+                      stack: aiError?.stack
+                    }
+                  }
+                });
+              }
+            }
+          }
+
         }
         else{
           recipient = this.users.get(payload.recipientId)
           sender = this.agent.get(payload.senderId)
-        }
-        //接收者不在线
-        if(!recipient){
-          // 保存离线消息到数据库
-          await this.config.prisma.offlineMessage.create({
-            data: {
-              conversationId: payload.conversationId,
-              senderId: payload.senderId,
-              senderType: payload.senderType,
-              recipientId: payload.recipientId,
-              recipientType: payload.recipientType,
-              contentType: payload.contentType,
-              contentBody: payload.contentBody,
-              metadata: payload.metadata || {},
-              msgId: payload.msgId,
-              isDelivered: false,
-              shop_id: conversation.shop_id
-            }
-          })
 
-          const redis_key = payload.recipientId
-          await this.config.redis.lpush(`offline_messages:${redis_key}`,JSON.stringify(saveMessagePrisma))
-          await this.config.redis.expire(`offline_messages:${redis_key}`,this.config.redisExpired)
-          //告诉发送者，服务器接收到消息，消息已发送，但用户不在线
-          this.sendMessageAck(sender as string,payload.msgId,'SENT',10001,payload.conversationId)
-        }
-        else{
-          this.config.io.to(recipient).emit('message',payload)
+          // 接收者不在线
+          if(!recipient){
+            // 保存离线消息到数据库
+            await this.config.prisma.offlineMessage.create({
+              data: {
+                conversationId: payload.conversationId,
+                senderId: payload.senderId,
+                senderType: payload.senderType,
+                recipientId: payload.recipientId,
+                recipientType: payload.recipientType,
+                contentType: payload.contentType,
+                contentBody: payload.contentBody,
+                metadata: payload.metadata || {},
+                msgId: payload.msgId,
+                isDelivered: false,
+                shop_id: conversation.shop_id
+              }
+            })
+
+            const redis_key = payload.recipientId
+            await this.config.redis.lpush(`offline_messages:${redis_key}`,JSON.stringify(saveMessagePrisma))
+            await this.config.redis.expire(`offline_messages:${redis_key}`,this.config.redisExpired)
+            //告诉发送者，服务器接收到消息，消息已发送，但用户不在线
+            this.sendMessageAck(sender as string,payload.msgId,'SENT',10001,payload.conversationId)
+          }
+          else{
+            this.config.io.to(recipient).emit('message',payload)
+            // 告诉发送者，消息已送达
+            this.sendMessageAck(sender as string,payload.msgId,'DELIVERED',10004,payload.conversationId)
+          }
         }
 
       }
