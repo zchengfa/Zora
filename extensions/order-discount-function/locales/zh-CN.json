@@ -1,0 +1,8 @@
+{
+  "name": "order-discount-function",
+  "description": "order-discount-function",
+  "discounts": {
+    "one": "满100元享9折优惠",
+    "two": "满200元享8折优惠"
+  }
+}
