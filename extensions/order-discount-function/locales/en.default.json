@@ -1,0 +1,8 @@
+{
+  "name": "order-discount-function",
+  "description": "order-discount-function",
+  "discounts": {
+    "one": "10% Off Orders Over 100",
+    "two": "20% Off Orders Over 200"
+  }
+}

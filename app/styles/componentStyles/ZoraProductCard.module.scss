@@ -2,46 +2,55 @@
   width: var(--product-card-width, 100%);
   background-color: var(--z-color-surface);
   border: 1px solid var(--z-color-border);
-  border-radius: calc(var(--z-primary_border_radius)/2);
-  overflow: hidden;
+  border-radius: calc(var(--z-primary_border_radius) * 0.6);
   display: flex;
   flex-direction: var(--product-card-display, column);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: all 0.28s cubic-bezier(0.22, 0.6, 0.22, 1);
   box-sizing: border-box;
   height: 100%;
-  flex: 0 0 auto;
+  gap: 0.5rem;
+  isolation: isolate;
 }
+
 .productCardVendor {
-  margin-bottom: .5rem;
+  margin-bottom: 0.5rem;
   font-weight: 600;
   color: var(--z-color-text-secondary);
-  letter-spacing: 0.5px;
-  font-size: .7rem;
+  letter-spacing: 0.4px;
+  font-size: 0.7rem;
   text-align: left;
+  text-transform: uppercase;
 }
+
 .productCard:hover {
-  box-shadow: 0 6px 16px rgba(92, 106, 196, 0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(92, 106, 196, 0.12);
+  transform: translateY(-3px);
+  border-color: var(--z-color-primary-light, var(--z-color-primary));
 }
+
 .productCardImageWrapper {
   position: relative;
   background-color: var(--z-color-surface);
   flex: 1;
+  border-radius: .3rem;
   overflow: hidden;
-  &.productCardImageWrapperRow{
-    padding: var(--z-primary_padding);
-  }
 }
+
+.productCardImageWrapperRow {
+  padding: var(--z-primary_padding);
+}
+
 .productCardImage {
   width: 100%;
+  height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: calc(var(--z-primary_border_radius)/2);
-  transition: transform 0.3s ease;
+  border-radius: calc(var(--z-primary_border_radius) * 0.5);
+  transition: transform 0.32s cubic-bezier(0.22, 0.6, 0.22, 1);
 }
 
 .productCard:hover .productCardImage {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .productCardBadge {
@@ -50,57 +59,63 @@
   left: 0.75rem;
   background-color: var(--z-color-primary);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   padding: 0.25rem 0.5rem;
-  border-radius: 0.5rem;
+  border-radius: 0.4rem;
   line-height: 1;
   z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.3px;
 }
+
 .productCardInfo {
   padding: var(--z-primary_padding);
   display: flex;
   flex-direction: column;
   flex: 1;
-  &.productCardInfoRow{
-    padding-left: 0;
-  }
 }
-.productCardTagBox{
+
+.productCardInfoRow {
+  padding-left: 0;
+}
+
+.productCardTagBox {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-  column-gap: .5rem;
-  row-gap: .5rem;
-  margin-bottom: .5rem;
-  max-height: 3.6rem;
-  overflow-y: scroll;
+  column-gap: 0.4rem;
+  row-gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  max-height: 3.4rem;
+  overflow-y: auto;
 }
+
 .productCardTag {
   background-color: var(--z-color-success);
   color: #fff;
-  font-size: .7rem;
+  font-size: 0.65rem;
   font-weight: 500;
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.5rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
   white-space: nowrap;
   max-width: 8rem;
   text-overflow: ellipsis;
   overflow: hidden;
+  letter-spacing: 0.2px;
 }
+
 .productCardTitle {
   font-size: 1rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
-  line-height: 1.3;
-  /* 超出一行显示省略号 */
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  mix-blend-mode: difference;
+  color: var(--z-color-text);
 }
 
 .productCardDesc {
@@ -108,145 +123,86 @@
   color: var(--z-color-text-secondary);
   margin: 0 0 0.75rem 0;
   flex: 1;
-  line-height: 1.3;
-  letter-spacing: 1px;
-  /* 超出两行显示省略号 */
+  line-height: 1.4;
+  letter-spacing: 0.3px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 .productCardPrice {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
+  margin-top: auto;
 }
 
 .productCardPriceCompare {
-  font-size: .7rem;
+  font-size: 0.75rem;
   color: var(--z-color-text-light);
   text-decoration: line-through;
 }
+
 .productCardPriceCurrent {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--z-color-primary);
 }
+
 .shimmerVendor {
-  /* 1. 定义流动的渐变背景 */
   background-image: linear-gradient(
     110deg,
     var(--z-color-shimmer-start) 0%,
-    var(--z-color-shimmer-mid) 25%,
+    var(--z-color-shimmer-mid) 30%,
     var(--z-color-shimmer-end) 50%,
-    var(--z-color-shimmer-mid) 75%,
+    var(--z-color-shimmer-mid) 70%,
     var(--z-color-shimmer-start) 100%
   );
-  /* 2. 将背景裁剪到文字形状 */
+  background-size: 300% 100%;
   -webkit-background-clip: text;
   background-clip: text;
-  /* 3. 让文字本身透明，从而显示背景 */
   color: transparent;
-  /* 4. 应用动画，让背景动起来 */
-  animation: shimmer-flow 1s ease-out infinite;
-  /* 5. 增强文字发光效果 */
-  filter: drop-shadow(0 0 4px rgba(138, 148, 255, 0.4));
+  animation: shimmer-flow 1.6s linear infinite;
+  filter: drop-shadow(0 0 3px rgba(138, 148, 255, 0.3));
 }
-/* 定义流光动画 */
+
 @keyframes shimmer-flow {
-  0% {
-    background-position: 300%; /* 从右侧开始 */
-  }
-  100% {
-    background-position: -300%; /* 移动到左侧 */
-  }
+  0% { background-position: 300% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
-/* 响应式布局 */
 @media (max-width: 1200px) {
-  .productCard {
-    --z-primary_padding: 0.75rem;
-  }
-
-  .productCardTitle {
-    font-size: 0.9rem;
-  }
-
-  .productCardDesc {
-    font-size: 0.8rem;
-  }
-
-  .productCardPriceCurrent {
-    font-size: 0.9rem;
-  }
+  .productCard { --z-primary_padding: 0.75rem; }
+  .productCardTitle { font-size: 0.95rem; }
+  .productCardDesc { font-size: 0.8rem; }
+  .productCardPriceCurrent { font-size: 0.95rem; }
 }
 
 @media (max-width: 768px) {
-  .productCard {
-    --z-primary_padding: 0.5rem;
-  }
+  .productCard { --z-primary_padding: 0.5rem; }
+  .productCardVendor { font-size: 0.65rem; }
+  .productCardTitle { font-size: 0.9rem; }
+  .productCardDesc { font-size: 0.75rem; -webkit-line-clamp: 1; }
+  .productCardPriceCurrent { font-size: 0.9rem; }
+  .productCardTag { font-size: 0.65rem; padding: 0.1rem 0.4rem; }
+  .productCardBadge { font-size: 0.65rem; padding: 0.2rem 0.4rem; top: 0.5rem; left: 0.5rem; }
 
-  .productCardVendor {
-    font-size: 0.65rem;
+  .productCardImageWrapperRow {
+    flex: 0 0 110px;
   }
-
-  .productCardTitle {
-    font-size: 0.85rem;
-  }
-
-  .productCardDesc {
-    font-size: 0.75rem;
-    -webkit-line-clamp: 1;
-  }
-
-  .productCardPriceCurrent {
-    font-size: 0.85rem;
-  }
-
-  .productCardTag {
-    font-size: 0.65rem;
-    padding: 0.1rem 0.4rem;
-  }
-
-  .productCardBadge {
-    font-size: 0.7rem;
-    padding: 0.2rem 0.4rem;
-    top: 0.5rem;
-    left: 0.5rem;
+  .productCardInfoRow {
+    padding-left: var(--z-primary_padding);
   }
 }
 
 @media (max-width: 480px) {
   .productCard {
     --z-primary_padding: 0.4rem;
-    --product-card-width: 45% !important;
   }
-
-  .productCardTagBox {
-    max-height: 2.8rem;
-  }
-
-  .productCardTitle {
-    margin: 0 0 0.3rem 0;
-  }
-
-  .productCardDesc {
-    margin: 0 0 0.5rem 0;
-  }
-
-  .productCardPrice {
-    gap: 0.3rem;
-  }
-}
-
-/* 行模式响应式调整 */
-@media (max-width: 768px) {
-  .productCardImageWrapperRow {
-    flex: 0 0 120px;
-  }
-
-  .productCardInfoRow {
-    padding-left: var(--z-primary_padding);
-  }
+  .productCardTagBox { max-height: 2.6rem; }
+  .productCardTitle { margin: 0 0 0.3rem 0; }
+  .productCardDesc { margin: 0 0 0.4rem 0; }
+  .productCardPrice { gap: 0.3rem; }
 }
