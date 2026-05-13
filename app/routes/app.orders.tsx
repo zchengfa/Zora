@@ -1,7 +1,6 @@
 import { LoaderFunctionArgs, useLoaderData } from "react-router";
 import { authenticate } from "@/shopify.server";
 import { Page, Layout, Card, Text, BlockStack, InlineStack, Button, TextField, Select, Badge, DataTable, LegacyCard, EmptyState, Divider, Modal, ChoiceList, Pagination } from "@shopify/polaris";
-import '@shopify/polaris/build/esm/styles.css';
 import { useState, useCallback, useMemo, useEffect,useRef } from 'react';
 import { useAppTranslation } from '@hooks/useAppTranslation';
 import { Post } from "@/network/network.ts";
