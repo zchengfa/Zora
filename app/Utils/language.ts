@@ -3,7 +3,8 @@ export default {
     "sidebar": {
       "chat": "Chat",
       "orders": "Orders",
-      "settings": "Settings"
+      "settings": "Settings",
+      "discounts": "Discounts"
     },
     "orders": {
       "title": "Orders",
@@ -409,7 +410,8 @@ export default {
     "sidebar": {
       "chat": "聊天",
       "orders": "订单",
-      "settings": "设置"
+      "settings": "设置",
+      "discounts": "折扣"
     },
     "orders": {
       "title": "订单管理",

@@ -235,7 +235,6 @@ function App() {
       if(customerMessages.length > 0){
         updateChatList(customerMessages, false)
       }
-
       // 添加所有消息到消息列表
       addMessage(offlineMessages.messages).then()
 
@@ -253,6 +252,7 @@ function App() {
           <s-link href="/app">{t.chat}</s-link>
           <s-link href="/app/orders">{t.orders}</s-link>
           <s-link href="/app/settings">{t.settings}</s-link>
+          <s-link href="/app/discounts">{t.discounts}</s-link>
         </s-app-nav>
         <ZoraModalProvider>
           <ZoraNotificationProvider>
