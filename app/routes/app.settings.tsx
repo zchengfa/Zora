@@ -1,5 +1,4 @@
 import { Page, Layout, Card, Text, BlockStack, InlineStack, TextField, Button, Select, Divider, Badge, Banner } from "@shopify/polaris";
-import '@shopify/polaris/build/esm/styles.css';
 import { useState, useCallback, useEffect } from 'react';
 import { usePersistStorage } from '@hooks/usePersistStorage';
 import { useAppTranslation } from '@hooks/useAppTranslation';

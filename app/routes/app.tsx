@@ -8,7 +8,7 @@ import en from "@shopify/polaris/locales/en.json"
 import { authenticate } from "@/shopify.server.ts";
 import ZoraModalProvider from "@/contexts/ZoraModalProvider.tsx";
 import ZoraNotificationProvider from "@/contexts/ZoraNotificationProvider.tsx";
-
+import '@shopify/polaris/build/esm/styles.css';
 import  '@styles/_variables.scss'
 import  '@styles/base.scss'
 
